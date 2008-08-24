@@ -1,0 +1,56 @@
+Rush README
+Copyright (C) 2008 Sergey Poznyakoff
+
+* Introduction
+
+This file contains brief information about configuring, testing
+and running Rush. It is *not* intended as a replacement
+for the documentation, it is provided as a brief reference only.
+The complete documentation for Rush is available in info format.
+To read it without installing the package run `info -f ./rush.info'.
+After installation, the documentation can be accessed running
+`info rush'. 
+
+An online copy of the documentation in various formats is available
+at http://rush.man.gnu.org.ua.
+
+* Overview
+
+Rush is a restricted user shell, designed for use with ssh, sftp,
+and similar programs.
+
+* Building
+
+Usual sequence applies:
+
+  ./configure
+  ./make
+  ./make install
+
+Refer to the INSTALL file for information about generic configure options.
+
+* Bug reporting.		
+
+Send bug reports to <gray@gnu.org.ua>. 
+
+
+* Copyright information:
+
+Copyright (C) 2008 Sergey Poznyakoff
+
+   Permission is granted to anyone to make or distribute verbatim copies
+   of this document as received, in any medium, provided that the
+   copyright notice and this permission notice are preserved,
+   thus giving the recipient permission to redistribute in turn.
+
+   Permission is granted to distribute modified versions
+   of this document, or of portions of it,
+   under the above conditions, provided also that they
+   carry prominent notices stating who last changed them.
+
+
+Local Variables:
+mode: outline
+paragraph-separate: "[ 	]*$"
+version-control: never
+End:
