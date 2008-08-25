@@ -17,6 +17,10 @@
 ACLOCAL_AMFLAGS = -I m4 
 SUBDIRS=gnu src etc doc
 
+# We never remove files from the configuration directory
+distuninstallcheck_listfiles = \
+ find $(prefix) -type f -not -path '$(sysconfdir)/*'
+
 .PHONY: make-ChangeLog
 make-ChangeLog: 
 	if test -d .git; then                                           \

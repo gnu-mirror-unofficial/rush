@@ -138,10 +138,9 @@ read_line(struct input_buf *ibuf, char **pbuf, size_t *psize)
 
 		if (len == 0)
 			ibuf->line++;
-		else if (ptr[len - 1] == '\n') {
+		else if (ptr[len] == '\n') 
 			ibuf->line++;
-			len--;
-		}
+		
 		if (len > 0 && ptr[len - 1] == '\\') {
 			len--;
 			cont = 1;
@@ -248,14 +247,13 @@ check_dir(const char *dir, struct input_buf *ibuf)
 	struct stat st;
 
 	if (dir[0] == '~') {
-		if (dir[1] == 0)
-			return 0;
-		if (!absolute_dir_p(dir + 1)) {
+		if (dir[1] && !absolute_dir_p(dir + 1)) {
 			syslog(LOG_NOTICE,
 			       "%s:%d: not an absolute directory",
 			       ibuf->file, ibuf->line);
 			return 1;
 		}
+		return 0;
 	} else if (!absolute_dir_p(dir)) {
 		syslog(LOG_NOTICE,
 		       "%s:%d: not an absolute directory",
@@ -475,7 +473,8 @@ parse_input_buf(struct input_buf *ibuf, struct command_config *cur)
 				       "%s:%d: invalid home directory",
 				       ibuf->file, ibuf->line);
 				err = 1;
-			} else if (check_dir(home_dir, ibuf))
+			} else if (!cur->chroot_dir 
+                                   && check_dir(home_dir, ibuf))
 				err = 1;
 			cur->home_dir = home_dir;
 

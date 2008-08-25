@@ -295,7 +295,7 @@ run_config(struct command_config *cfg, struct passwd *pw, const char *arg)
 	char **argv;
 	char *cmdline;
 	struct transform_arg *xarg;
-	const char *home_dir;
+	const char *home_dir = NULL;
 	int rc;
 	char **new_env;
 	
@@ -348,8 +348,6 @@ run_config(struct command_config *cfg, struct passwd *pw, const char *arg)
 
 	if (cfg->home_dir)
 		home_dir = expand_tilde(cfg->home_dir, pw->pw_dir);
-	else
-		home_dir = "/";
 
 	if (cfg->chroot_dir) {
 		const char *dir = expand_tilde(cfg->chroot_dir, pw->pw_dir);
@@ -357,12 +355,14 @@ run_config(struct command_config *cfg, struct passwd *pw, const char *arg)
 		if (chroot(dir)) 
 			die(system_error, "cannot chroot to %s: %s",
 			    dir, strerror(errno));
-		if (is_prefix(dir, home_dir))
+		if (home_dir && is_prefix(dir, home_dir))
 			home_dir += strlen(dir);
 	}
 
-	debug1(1, "Home dir: %s", home_dir);
-	chdir(home_dir);
+	if (home_dir) {
+		debug1(1, "Home dir: %s", home_dir);
+		chdir(home_dir);
+	}
 
 	if (setuid(pw->pw_uid))
 		die(system_error, "cannot enforce uid %lu: %s",

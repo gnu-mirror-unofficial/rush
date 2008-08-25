@@ -14,7 +14,7 @@ command ^cvs server
 
 # Secure cp requests are allowed only with /upload or /var/ftp as target
 # directories.
-command ^(scp .*-t /upload)|(scp .*-t /var/ftp)
+command ^(scp .*-f /upload)|(scp .*-f /var/ftp)
   transform[0] s|.*|/usr/bin/scp|
 
 # Same for rsync.  The match[$] statement matches last command line argument.
@@ -28,7 +28,7 @@ command ^svnserve -t
 
 # For git requests, let git-shell determine what to do.  
 command ^git-.+
-  transform s|.*|/usr/bin/git-shell &|
+  transform s|.*|/usr/bin/git-shell -c "&"|
 
 # Sftp-server requests: chroot into the user's home directory, set umask
 # 002 and execute bin/sftp-server.
