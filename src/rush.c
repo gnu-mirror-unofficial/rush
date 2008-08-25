@@ -185,6 +185,109 @@ expand_tilde(const char *dir, const char *home)
 	return dir;
 }
 
+static char *
+find_env(char *name, int val)
+{
+	int nlen = strcspn(name, "+=");
+	int i;
+
+	for (i = 0; environ[i]; i++) {
+		size_t elen = strcspn(environ[i], "=");
+		if (elen == nlen && memcmp(name, environ[i], nlen) == 0)
+			return val ? environ[i] + elen + 1 : environ[i];
+	}
+	return NULL;
+}
+
+static char *
+env_concat(char *name, size_t namelen, char *a, char *b)
+{
+	char *res;
+	size_t len;
+	
+	if (a && b) {
+		res = xmalloc(namelen + 1 + strlen(a) + strlen(b) + 1);
+		strcpy(res + namelen + 1, a);
+		strcat(res, b);
+	} else if (a) {
+		len = strlen(a);
+		if (c_ispunct(a[len-1]))
+			len--;
+		res = xmalloc(namelen + 1 + len + 1);
+		memcpy(res + namelen + 1, a, len);
+		res[namelen + 1 + len] = 0;
+	} else /* if (a == NULL) */ {
+		if (c_ispunct(b[0]))
+			b++;
+		res = xmalloc(namelen + 1 + len + 1);
+		strcpy(res + namelen + 1, b);
+	}
+	memcpy(res, name, namelen);
+	res[namelen] = '=';
+	return res;
+}
+	
+static char **
+env_setup(char **env)
+{
+	char **old_env = environ;
+	char **new_env;
+	int count, i, n;
+	
+	if (!env)
+		return old_env;
+
+	if (strcmp(env[0], "-") == 0) {
+		old_env = NULL;
+		env++;
+	}
+	
+	/* Count new environment size */
+	count = 0;
+	if (old_env)
+		for (i = 0; old_env[i]; i++)
+			count++;
+    
+	for (i = 0; env[i]; i++)
+		count++;
+
+	/* Allocate the new environment. */
+	new_env = xcalloc(count + 1, sizeof new_env[0]);
+
+	/* Populate the environment. */
+	n = 0;
+	
+	if (old_env)
+		for (i = 0; old_env[i]; i++)
+			new_env[n++] = old_env[i];
+
+	for (i = 0; env[i]; i++) {
+		char *p;
+		if ((p = strchr(env[i], '='))) {
+			if (p == env[i])
+				continue; /* Ignore erroneous entry */
+			if (p[-1] == '+') 
+				new_env[n++] = env_concat(env[i],
+							  p - env[i] - 1,
+							  find_env(env[i], 1),
+							  p + 1);
+			else if (p[1] == '+')
+				new_env[n++] = env_concat(env[i],
+							  p - env[i],
+							  p + 2,
+							  find_env(env[i], 1));
+			else
+				new_env[n++] = env[i];
+		} else {
+			p = find_env(env[i], 0);
+			if (p)
+				new_env[n++] = p;
+		}
+	}
+	new_env[n] = NULL;
+	return new_env;
+}
+
 void
 run_config(struct command_config *cfg, struct passwd *pw, const char *arg)
 {
@@ -194,7 +297,8 @@ run_config(struct command_config *cfg, struct passwd *pw, const char *arg)
 	struct transform_arg *xarg;
 	const char *home_dir;
 	int rc;
-
+	char **new_env;
+	
 	debug2(1, "Matching config: %s:%d", cfg->file, cfg->line);
 	
 	if (pw->pw_uid < cfg->min_uid)
@@ -229,8 +333,15 @@ run_config(struct command_config *cfg, struct passwd *pw, const char *arg)
 		for (i = 0; i < argc; i++)
 			syslog(LOG_DEBUG, "% 4d: %s", i, argv[i]);
 	}
-
-	argcv_string (argc, argv, &cmdline);
+	new_env = env_setup(cfg->env);
+	if (__debug_p(1)) {
+		int i;
+		syslog(LOG_DEBUG, "Final environment:");
+		for (i = 0; new_env[i]; i++)
+			syslog(LOG_DEBUG, "% 4d: %s", i, new_env[i]);
+	}
+		
+	argcv_string(argc, argv, &cmdline);
 
 	if (cfg->mask)
 		umask(cfg->mask);
@@ -257,9 +368,8 @@ run_config(struct command_config *cfg, struct passwd *pw, const char *arg)
 		die(system_error, "cannot enforce uid %lu: %s",
 		    pw->pw_uid, strerror(errno));
 	
-	/* FIXME: tailor environment */
 	debug1(1, "executing %s", cmdline);
-	execve(argv[0], argv, environ);
+	execve(argv[0], argv, new_env);
 	die(system_error, "cannot execute %s: %s",
 	    cmdline, strerror(errno));
 }
@@ -288,7 +398,7 @@ main(int argc, char **argv)
 		for (i = 0; i < argc; i++)
 			syslog(LOG_DEBUG, "% 4d: %s", i, argv[i]);
 		syslog(LOG_DEBUG, "Environment:");
-		for (i = 0; i < argc; i++)
+		for (i = 0; environ[i]; i++)
 			syslog(LOG_DEBUG, "% 4d %s", i, environ[i]);
 	}
 	

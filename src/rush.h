@@ -89,20 +89,38 @@ enum cmp_op {
 };
 
 struct command_config {
-	struct command_config *next;
-	const char *file;
-	size_t line;
+	struct command_config *next;      /* Next config in the list */
+
+	/* Source location */
+	const char *file;                 /* Configuration file name */
+	size_t line;                      /* and line number. */
+	
+	/* Match parameters */
+	
+	/* Regex to match against entire command line: */
 	regex_t regex;
-	transform_t trans;
+	/* Regular expressions for particular arguments: */
 	struct match_arg *match_head, *match_tail;
-	struct transform_arg *arg_head, *arg_tail;
-	enum cmp_op cmp_op;
+
+	/* Match number of arguments argc, using operation cmp_op: */
 	int argc;
-	mode_t mask;
-	char *chroot_dir;
-	char *home_dir;
-	limits_record_t limits;
-	uid_t min_uid;
+	enum cmp_op cmp_op;
+	
+	/* Transformation parameters: */
+
+	/* ... for entire command line. */
+	transform_t trans;
+	/* ... for particular arguments. */
+	struct transform_arg *arg_head, *arg_tail;
+
+	/* Environment modification: */
+	char **env;
+
+	mode_t mask;                 /* umask */
+	char *chroot_dir;            /* chroot directory */ 
+	char *home_dir;              /* home directory */
+	limits_record_t limits;      /* resource limits */
+	uid_t min_uid;               /* minimal allowed uid */
 };
 
 extern unsigned sleep_time;
