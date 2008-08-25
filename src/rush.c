@@ -388,9 +388,6 @@ run_config(struct command_config *cfg, struct passwd *pw, const char *arg)
 		
 	argcv_string(argc, argv, &cmdline);
 
-	if (cfg->mask)
-		umask(cfg->mask);
-
 	if (cfg->home_dir)
 		home_dir = expand_tilde(cfg->home_dir, pw->pw_dir);
 
@@ -413,6 +410,8 @@ run_config(struct command_config *cfg, struct passwd *pw, const char *arg)
 		die(system_error, "cannot enforce uid %lu: %s",
 		    pw->pw_uid, strerror(errno));
 	
+	umask(cfg->mask ? cfg->mask : 022);
+
 	debug1(1, "executing %s", cmdline);
 	execve(argv[0], argv, new_env);
 	die(system_error, "cannot execute %s: %s",
