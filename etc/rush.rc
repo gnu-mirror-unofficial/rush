@@ -1,0 +1,41 @@
+# Sample configuration file for rush.
+# Lines beginning with # and empty lines are ignored.
+# See `info rush' for a detailed description.
+
+# Uncomment this line to set debugging level to 2
+#debug 2
+
+# Set default limits.  See man limits for a description of the argument.
+limits t10r20
+
+# For cvs server requests, force the right cvs binary.
+command ^cvs server
+  transform[0] s|.*|/usr/bin/cvs|
+
+# Secure cp requests are allowed only with /upload or /var/ftp as target
+# directories.
+command ^(scp .*-t /upload)|(scp .*-t /var/ftp)
+  transform[0] s|.*|/usr/bin/scp|
+
+# Same for rsync.  The match[$] statement matches last command line argument.
+command ^rsync --server
+  match[$] ^(/upload)|(/var/ftp)
+  transform[0] s|.*|/usr/bin/rsync|
+
+# Svn server: force right binary and root directory.  
+command ^svnserve -t
+  transform s|^svnserve |/usr/bin/svnserve -r /svnroot |
+
+# For git requests, let git-shell determine what to do.  
+command ^git-.+
+  transform s|.*|/usr/bin/git-shell &|
+
+# Sftp-server requests: chroot into the user's home directory, set umask
+# 002 and execute bin/sftp-server.
+command ^.*/sftp-server
+  transform[0] s,.*,bin/sftp-server,
+  umask 002
+  min-uid 1
+  chroot ~
+  chdir /
+

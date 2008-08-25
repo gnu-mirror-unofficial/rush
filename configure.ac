@@ -52,5 +52,6 @@ gl_INIT
 
 AC_CONFIG_FILES([Makefile
                  gnu/Makefile
-		 src/Makefile])
+		 src/Makefile
+		 etc/Makefile])
 AC_OUTPUT

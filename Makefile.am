@@ -15,7 +15,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 ACLOCAL_AMFLAGS = -I m4 
-SUBDIRS=gnu src
+SUBDIRS=gnu src etc
 
 .PHONY: make-ChangeLog
 make-ChangeLog: 
