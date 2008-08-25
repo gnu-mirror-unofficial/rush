@@ -142,8 +142,51 @@ match_args(struct command_config *cfg, int argc, char **argv)
 	return 0;
 }
 
+int
+match_user(struct command_config *cfg, const char *name)
+{
+	if (cfg->users) {
+		char **p;
+		for (p = cfg->users; *p; p++)
+			if (strcmp(*p, name) == 0)
+				return 0;
+		return 1;
+	}
+	return 0;
+}
+
+int
+groupcmp(char *gname, struct passwd *pw)
+{
+	struct group *grp;
+	grp = getgrnam(gname);
+	if (grp) {
+		char **p;
+		if (pw->pw_gid == grp->gr_gid)
+			return 0;
+		for (p = grp->gr_mem; *p; p++) {
+			if (strcmp(*p, pw->pw_name) == 0)
+				return 0;
+		}
+	}
+	return 1;
+}
+
+int
+match_group(struct command_config *cfg, struct passwd *pw)
+{
+	if (cfg->groups) {
+		char **p;
+		for (p = cfg->groups; *p; p++) 
+			if (groupcmp(*p, pw) == 0)
+				return 0;
+		return 1;
+	}
+	return 0;
+}
+
 struct command_config *
-match_config(const char *cmdline)
+match_config(const char *cmdline, struct passwd *pw)
 {
 	struct command_config *cfg;
 	int rc;
@@ -158,7 +201,9 @@ match_config(const char *cmdline)
 	
 	for (cfg = config_list; cfg; cfg = cfg->next) {
 		if (regexec (&cfg->regex, cmdline, 0, NULL, 0) == 0) {
-			if (match_args(cfg, argc, argv) == 0)
+			if (match_args(cfg, argc, argv) == 0
+			    && match_user(cfg, pw->pw_name) == 0
+			    && match_group(cfg, pw) == 0)
 				break;
 		}
 	}
@@ -416,7 +461,7 @@ main(int argc, char **argv)
 	if (argc != 3 || strcmp(argv[1], "-c"))
 		die(usage_error, "invalid command line");
 
-	config = match_config(argv[2]);
+	config = match_config(argv[2], pw);
 	if (!config)
 		die(usage_error, "no matching configuration for %s", argv[2]);
 	run_config(config, pw, argv[2]);

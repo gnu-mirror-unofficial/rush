@@ -504,6 +504,24 @@ parse_input_buf(struct input_buf *ibuf, struct command_config *cur)
 				       ibuf->file, ibuf->line, strerror (rc));
 				err = 1;
 			}
+		} else if (strcmp(kw, "users") == 0) {
+			int rc, n;
+			rc = argcv_get(val, NULL, "#", &n, &cur->users);
+			if (rc) {
+				syslog(LOG_NOTICE,
+				       "%s:%d: failed to parse value: %s",
+				       ibuf->file, ibuf->line, strerror (rc));
+				err = 1;
+			}
+		} else if (strcmp(kw, "groups") == 0) {
+			int rc, n;
+			rc = argcv_get(val, NULL, "#", &n, &cur->groups);
+			if (rc) {
+				syslog(LOG_NOTICE,
+				       "%s:%d: failed to parse value: %s",
+				       ibuf->file, ibuf->line, strerror (rc));
+				err = 1;
+			}
 			
 			/* Global statements */
 		} else if (strcmp(kw, "debug") == 0) {

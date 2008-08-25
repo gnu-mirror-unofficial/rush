@@ -22,6 +22,7 @@
 #include <stdarg.h>
 #include <errno.h>
 #include <pwd.h>
+#include <grp.h>
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -105,6 +106,11 @@ struct command_config {
 	/* Match number of arguments argc, using operation cmp_op: */
 	int argc;
 	enum cmp_op cmp_op;
+
+	/* Match user names */
+	char **users;
+	/* Match user groups */
+	char **groups;
 	
 	/* Transformation parameters: */
 
