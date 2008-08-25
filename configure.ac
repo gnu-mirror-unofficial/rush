@@ -50,8 +50,27 @@ AC_CHECK_FUNCS([strdup strerror strrchr strtoul])
 
 gl_INIT
 
+# Doc hints.
+# Select a rendition level:
+#  DISTRIB for stable releases (at most one dot in the version number)
+#  and maintenance releases (two dots, patchlevel < 50)
+#  PROOF for alpha releases.
+#  PUBLISH can only be required manually when running make in doc/
+AC_SUBST(RENDITION)
+case `echo $VERSION|sed  's/[[^.]]//g'` in
+""|".")  RENDITION=DISTRIB;;
+"..")  if test `echo $VERSION | sed  's/.*\.//'` -lt 50; then
+	 RENDITION=DISTRIB
+       else
+         RENDITION=PROOF
+       fi;;
+*)     RENDITION=PROOF;;
+esac
+
+
 AC_CONFIG_FILES([Makefile
                  gnu/Makefile
 		 src/Makefile
-		 etc/Makefile])
+		 etc/Makefile
+		 doc/Makefile])
 AC_OUTPUT

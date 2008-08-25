@@ -1,0 +1,126 @@
+\input texinfo @c -*-texinfo-*-
+@smallbook
+@c %**start of header
+@setfilename rush.info
+@settitle Rush -- a restricted user shell.
+@c %**end of header
+@setchapternewpage odd
+
+@defcodeindex pr
+@defcodeindex op
+@defcodeindex kw
+@defcodeindex fl
+
+@syncodeindex fn cp
+@syncodeindex vr cp
+@syncodeindex ky cp
+@syncodeindex pg cp
+@syncodeindex tp cp
+@syncodeindex op cp
+@syncodeindex pr cp
+@syncodeindex kw cp
+@syncodeindex fl cp
+
+@include version.texi
+@include rendition.texi
+
+@ifinfo
+@dircategory System Administration Utilities
+@direntry
+* rush (rush).          A restricted user shell.
+@end direntry
+@end ifinfo
+
+@copying
+Published by the Free Software Foundation,
+51 Franklin Street, Fifth Floor,
+Boston, MA 02110-1301 USA 
+
+Copyright @copyright{} 2008 Sergey Poznyakoff
+
+Permission is granted to copy, distribute and/or modify this document
+under the terms of the GNU Free Documentation License, Version 1.2 or
+any later version published by the Free Software Foundation; with no
+Invariant Sections, with the Front-Cover texts being ``Rush -- a
+restricted user shell'' and with the Back-Cover Texts as in (a) below.
+A copy of the license is included in the section entitled ``GNU Free
+Documentation License''. 
+
+(a) The FSF's Back-Cover Text is: ``You have freedom to copy and modify
+this GNU Manual, like GNU software.  Copies published by the Free
+Software Foundation raise funds for GNU development.''
+@end copying
+
+@titlepage
+@title Rush -- a restricted user shell
+@subtitle version @value{VERSION}, @value{UPDATED}
+@author Sergey Poznyakoff.
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+
+@page
+@summarycontents
+@page
+@contents
+
+@ifnottex
+@node Top
+@top Rush
+
+This edition of the @cite{Rush Manual}, last updated @value{UPDATED},
+documents Rush Version @value{VERSION}.
+
+@end ifnottex
+
+@menu
+* Intro::             
+* Reporting Bugs::       How to Report a Bug.
+
+Appendices
+
+* Copying This Manual::  The GNU Free Documentation License.
+* Concept Index::        Index of Concepts.
+
+@detailmenu
+@end detailmenu
+
+@end menu
+
+@node Intro
+@chapter Introduction
+@UNREVISED
+
+@node Reporting Bugs
+@chapter How to Report a Bug
+
+  Email bug reports to @email{gray@@gnu.org.ua}.  Please include a
+detailed description of the bug and information about the conditions
+under which it occurs, so we can reproduce it.  To facilitate the
+task, the following list shows the basic set of information that is
+needed in order to find the bug:
+
+@itemize
+@item Package version you use.  
+@item A detailed description of the bug.
+@item Conditions under which the bug appears.
+@item It is often helpful to send the contents of @file{config.log}
+file along with your bug report. This file is created after running
+@command{./configure} in the Rush source root directory.
+@end itemize
+
+@node Copying This Manual
+@appendix GNU Free Documentation License
+@include fdl.texi
+
+@node Concept Index
+@comment node-name,  next,  previous,  up
+@unnumbered Concept Index
+
+This is a general index of all issues discussed in this manual.
+
+@printindex cp
+
+@bye
+
