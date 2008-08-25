@@ -1,3 +1,6 @@
+.emacs.desktop
+*.tar.*
+*~
 build-aux
 gnu
 m4
