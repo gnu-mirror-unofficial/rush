@@ -54,7 +54,7 @@ Software Foundation raise funds for GNU development.''
 @titlepage
 @title Rush -- a restricted user shell
 @subtitle version @value{VERSION}, @value{UPDATED}
-@author Sergey Poznyakoff.
+@author Sergey Poznyakoff
 @page
 @vskip 0pt plus 1filll
 @insertcopying
@@ -109,8 +109,8 @@ Configuration File
 certain remote users a restricted access to the resources of your
 machine.  It is intended for use with @code{ssh}, @code{rsh} and
 similar remote access programs.  Using a sophisticated configuration
-file, Rush allows you to control what programs and with what arguments
-a user is permitted to execute, and to limit the usage of system resources.
+file, Rush gives you complete control over the command lines that users
+execute, and the usage of system resources.
 
 @node Operation
 @chapter Operation
@@ -211,12 +211,11 @@ after installing the chroot.
 
 @node Configuration File
 @chapter Configuration File
-@UNREVISED
 @flindex rush.rc
   The configuration file is called @file{rush.rc} and is located in
-@file{/usr/local/etc} by default.  You can change its location when
-building the package, @FIXME-ref{Installation} for a detailed
-information about it.
+@file{/usr/local/etc} by default.@footnote{The exact location of the
+configuration file is defined when configuring the package.  See the
+file @file{INSTALL} in the Rush source directory for more information}.
 
   The configuration file is read and parsed right after start up.  Any
 errors occurred in parsing are reported using @code{syslog} facility

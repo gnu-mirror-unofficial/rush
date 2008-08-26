@@ -1,11 +1,11 @@
-chrsh NEWS -- history of user-visible changes. 2008-08-24
+Rush NEWS -- history of user-visible changes. 2008-08-26
 Copyright (C) 2008 Sergey Poznyakoff
 See the end of file for copying conditions.
 
 Please send bug reports to <bug-rush@gnu.org.ua>
 
 
-Version 1.0 (SVN)
+Version 1.0, 2008-08-26
 
 Initial version.
 
