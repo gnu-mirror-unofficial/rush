@@ -68,18 +68,13 @@ typedef struct transform *transform_t;
 		tail = elt;			\
 	} while(0)
 
-struct match_arg {
-	struct match_arg *next;
-	int arg_no;
-	regex_t regex;
-};
-	
 struct transform_arg {
 	struct transform_arg *next;
 	int arg_no;
 	transform_t trans;
 };
 
+/* Comparison operator */
 enum cmp_op {
 	cmp_eq,
 	cmp_ne,
@@ -87,6 +82,37 @@ enum cmp_op {
 	cmp_le,
 	cmp_gt,
 	cmp_ge
+};
+
+enum test_type {
+	test_cmdline,
+	test_arg,
+	test_argc,
+	test_uid,
+	test_gid,
+	test_user,
+	test_group
+};
+
+struct test_numeric_node {
+	enum cmp_op op;
+	unsigned long val; /* FIXME: Should be uintmax_t? */
+};
+
+struct test_arg_node {
+	int arg_no;
+	regex_t regex;
+};
+
+struct test_node {
+	struct test_node *next;
+	enum test_type type;
+	union {
+		regex_t regex;
+		struct test_arg_node arg;
+		struct test_numeric_node num;
+		char **strv;
+	} v;
 };
 
 struct command_config {
@@ -97,20 +123,7 @@ struct command_config {
 	size_t line;                      /* and line number. */
 	
 	/* Match parameters */
-	
-	/* Regex to match against entire command line: */
-	regex_t regex;
-	/* Regular expressions for particular arguments: */
-	struct match_arg *match_head, *match_tail;
-
-	/* Match number of arguments argc, using operation cmp_op: */
-	int argc;
-	enum cmp_op cmp_op;
-
-	/* Match user names */
-	char **users;
-	/* Match user groups */
-	char **groups;
+	struct test_node *test_head, *test_tail;
 	
 	/* Transformation parameters: */
 
@@ -126,7 +139,6 @@ struct command_config {
 	char *chroot_dir;            /* chroot directory */ 
 	char *home_dir;              /* home directory */
 	limits_record_t limits;      /* resource limits */
-	uid_t min_uid;               /* minimal allowed uid */
 };
 
 extern unsigned sleep_time;

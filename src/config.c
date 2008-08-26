@@ -202,7 +202,6 @@ new_command_config()
 	SET_DEFAULT(chroot_dir);
 	SET_DEFAULT(home_dir);
 	SET_DEFAULT(limits);
-	SET_DEFAULT(min_uid);
 	return p;
 }
 
@@ -284,11 +283,12 @@ new_transform_arg(struct command_config *cur)
 	return p;
 }
 
-struct match_arg *
-new_match_arg(struct command_config *cur)
+struct test_node *
+new_test_node(struct command_config *cur, enum test_type type)
 {
-	struct match_arg *p = xzalloc(sizeof(*p));
-	LIST_APPEND(p, cur->match_head, cur->match_tail);
+	struct test_node *p = xzalloc(sizeof(*p));
+	LIST_APPEND(p, cur->test_head, cur->test_tail);
+	p->type = type;
 	return p;
 }
 
@@ -318,6 +318,28 @@ parse_cmp_op (enum cmp_op *op, char **pstr)
 		return 1;
 	str = skipws(str);
 	*pstr = str;
+	return 0;
+}
+
+int
+parse_numtest(struct input_buf *ibuf, struct test_numeric_node *numtest,
+	      char *val)
+{
+	char *q;
+	
+	if (parse_cmp_op (&numtest->op, &val)) {
+		syslog(LOG_NOTICE,
+		       "%s:%d: invalid opcode",
+		       ibuf->file, ibuf->line);
+		return 1;
+	}
+	numtest->val = strtoul(val, &q, 10);
+	if (*q) {
+		syslog(LOG_NOTICE,
+		       "%s:%d: invalid number: %s",
+		       ibuf->file, ibuf->line, val);
+		return 1;
+	}
 	return 0;
 }
 
@@ -357,20 +379,89 @@ parse_input_buf(struct input_buf *ibuf, struct command_config *cur)
 		if (strcmp(kw, "command") == 0) {
 			int cflags = REG_EXTENDED;
 			int rc;
-				
+			struct test_node *node;
+
 			cur = new_command_config();
 			cur->file = ibuf->file;
 			cur->line = ibuf->line;
-			rc = regcomp(&cur->regex, val, cflags);
+			node = new_test_node(cur, test_cmdline);
+			rc = regcomp(&node->v.regex, val, cflags);
 			if (rc) {
 				char errbuf[512];
-				regerror(rc, &cur->regex, errbuf,
+				regerror(rc, &node->v.regex, errbuf,
 					 sizeof(errbuf));
 				syslog(LOG_NOTICE,
 				       "%s:%d: invalid regexp: %s",
 				       ibuf->file, ibuf->line, errbuf);
 				err = 1;
 			}
+		} else if (strncmp(kw, "match", 5) == 0
+			   && kw[5] == '[') {
+			int cflags = REG_EXTENDED;
+			char *q;
+			struct test_node *node;
+			int n;
+			int rc;
+			
+			if (kw[6] == '$') {
+				n = -1;
+				q = kw + 7;
+			} else 
+				n = strtoul(kw + 6, &q, 10);
+			if (*q != ']') {
+				syslog(LOG_NOTICE,
+				       "%s:%d: missing ]",
+				       ibuf->file, ibuf->line);
+				err = 1;
+				continue;
+			}
+			node = new_test_node(cur, test_arg);
+			node->v.arg.arg_no = n;
+			rc = regcomp(&node->v.arg.regex, val, cflags);
+			if (rc) {
+				char errbuf[512];
+				regerror(rc, &node->v.arg.regex, errbuf,
+					 sizeof(errbuf));
+				syslog(LOG_NOTICE,
+				       "%s:%d: invalid regexp: %s",
+				       ibuf->file, ibuf->line, errbuf);
+				err = 1;
+			}
+		} else if (strcmp(kw, "argc") == 0) {
+			struct test_node *node = new_test_node(cur, test_argc);
+
+			parse_numtest(ibuf, &node->v.num, val);
+		} else if (strcmp(kw, "uid") == 0) {
+			struct test_node *node = new_test_node(cur, test_uid);
+
+			parse_numtest(ibuf, &node->v.num, val);
+		} else if (strcmp(kw, "gid") == 0) {
+			struct test_node *node = new_test_node(cur, test_gid);
+
+			parse_numtest(ibuf, &node->v.num, val);
+
+		} else if (strcmp(kw, "user") == 0) {
+			int rc, n;
+			struct test_node *node = new_test_node(cur, test_user);
+			rc = argcv_get(val, NULL, "#", &n, &node->v.strv);
+			if (rc) {
+				syslog(LOG_NOTICE,
+				       "%s:%d: failed to parse value: %s",
+				       ibuf->file, ibuf->line, strerror (rc));
+				err = 1;
+			}
+		} else if (strcmp(kw, "group") == 0) {
+			int rc, n;
+			struct test_node *node = new_test_node(cur,
+							       test_group);
+			rc = argcv_get(val, NULL, "#", &n, &node->v.strv);
+			if (rc) {
+				syslog(LOG_NOTICE,
+				       "%s:%d: failed to parse value: %s",
+				       ibuf->file, ibuf->line, strerror (rc));
+				err = 1;
+			}
+			
 		} else if (strcmp(kw, "umask") == 0) {
 			char *q;
 			unsigned int n = strtoul(val, &q, 8);
@@ -381,16 +472,6 @@ parse_input_buf(struct input_buf *ibuf, struct command_config *cur)
 				err = 1;
 			} else
 				cur->mask = n;
-		} else if (strcmp(kw, "min-uid") == 0) {
-			char *q;
-			unsigned uid = strtoul(val, &q, 10);
-			if (*q) {
-				syslog(LOG_NOTICE,
-				       "%s:%d: invalid uid: %s",
-				       ibuf->file, ibuf->line, val);
-				err = 1;
-			} else
-				cur->min_uid = uid;
 		} else if (strcmp(kw, "chroot") == 0) {
 			char *chroot_dir = xstrdup(val);
 			if (trimslash(chroot_dir) == 0) {
@@ -434,38 +515,6 @@ parse_input_buf(struct input_buf *ibuf, struct command_config *cur)
 			xarg = new_transform_arg(cur);
 			xarg->arg_no = n;
 			xarg->trans = compile_transform_expr(val);
-		} else if (strncmp(kw, "match", 5) == 0
-			   && kw[5] == '[') {
-			int cflags = REG_EXTENDED;
-			char *q;
-			struct match_arg *marg;
-			int n;
-			int rc;
-			
-			if (kw[6] == '$') {
-				n = -1;
-				q = kw + 7;
-			} else 
-				n = strtoul(kw + 6, &q, 10);
-			if (*q != ']') {
-				syslog(LOG_NOTICE,
-				       "%s:%d: missing ]",
-				       ibuf->file, ibuf->line);
-				err = 1;
-				continue;
-			}
-			marg = new_match_arg(cur);
-			marg->arg_no = n;
-			rc = regcomp(&marg->regex, val, cflags);
-			if (rc) {
-				char errbuf[512];
-				regerror(rc, &marg->regex, errbuf,
-					 sizeof(errbuf));
-				syslog(LOG_NOTICE,
-				       "%s:%d: invalid regexp: %s",
-				       ibuf->file, ibuf->line, errbuf);
-				err = 1;
-			}
 		} else if (strcmp(kw, "chdir") == 0) {
 			char *home_dir = cur->home_dir = xstrdup(val);
 			if (trimslash(home_dir) == 0) {
@@ -478,44 +527,9 @@ parse_input_buf(struct input_buf *ibuf, struct command_config *cur)
 				err = 1;
 			cur->home_dir = home_dir;
 
-		} else if (strcmp(kw, "argc") == 0) {
-			char *q;
-			
-			if (parse_cmp_op (&cur->cmp_op, &val)) {
-				syslog(LOG_NOTICE,
-				       "%s:%d: invalid opcode",
-				       ibuf->file, ibuf->line);
-				err = 1;
-			}
-			cur->argc = strtoul(val, &q, 10);
-			if (*q) {
-				syslog(LOG_NOTICE,
-				       "%s:%d: invalid number: %s",
-				       ibuf->file, ibuf->line, val);
-				err = 1;
-			}
-
 		} else if (strcmp(kw, "env") == 0) {
 			int rc, n;
 			rc = argcv_get(val, NULL, "#", &n, &cur->env);
-			if (rc) {
-				syslog(LOG_NOTICE,
-				       "%s:%d: failed to parse value: %s",
-				       ibuf->file, ibuf->line, strerror (rc));
-				err = 1;
-			}
-		} else if (strcmp(kw, "users") == 0) {
-			int rc, n;
-			rc = argcv_get(val, NULL, "#", &n, &cur->users);
-			if (rc) {
-				syslog(LOG_NOTICE,
-				       "%s:%d: failed to parse value: %s",
-				       ibuf->file, ibuf->line, strerror (rc));
-				err = 1;
-			}
-		} else if (strcmp(kw, "groups") == 0) {
-			int rc, n;
-			rc = argcv_get(val, NULL, "#", &n, &cur->groups);
 			if (rc) {
 				syslog(LOG_NOTICE,
 				       "%s:%d: failed to parse value: %s",

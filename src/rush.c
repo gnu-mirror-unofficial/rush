@@ -98,61 +98,67 @@ is_suffix(const char *suf, const char *str)
 	return 1;
 }
 
+
+struct rush_request {
+	const char *cmdline;
+	int argc;
+	char **argv;
+	struct passwd *pw;
+};
+
 int
-cmp_argc(struct command_config *cfg, int argc)
+test_request_cmdline(struct test_node *node, struct rush_request *req)
 {
-	if (cfg->argc) {
-		debug3(1, "match %d %d %d",
-		       argc, cfg->cmp_op, cfg->argc);
-		switch (cfg->cmp_op) {
-		case cmp_eq:
-			return argc == cfg->argc;
-		case cmp_ne:
-			return argc != cfg->argc;
-		case cmp_lt:
-			return argc < cfg->argc;
-		case cmp_le:
-			return argc <= cfg->argc;
-		case cmp_gt:
-			return argc > cfg->argc;
-		case cmp_ge:
-			return argc >= cfg->argc;
-		}
-	}
-	return 1;
+	return regexec (&node->v.regex, req->cmdline, 0, NULL, 0);
 }
 
-static int
-match_args(struct command_config *cfg, int argc, char **argv)
+int
+test_request_arg(struct test_node *node, struct rush_request *req)
 {
-	struct match_arg *mp;
-
-	if (!cmp_argc(cfg, argc))
+	int n = node->v.arg.arg_no;
+	if (n == -1)
+		n = req->argc - 1;
+	if (n >= req->argc)
 		return 1;
-	
-	for (mp = cfg->match_head; mp; mp = mp->next) {
-		int n = mp->arg_no;
-		if (n == -1)
-			n = argc - 1;
-		if (n >= argc)
-			return 1;
-		if (regexec(&mp->regex, argv[n], 0, NULL, 0))
-			return 1;
+	return regexec(&node->v.arg.regex, req->argv[n], 0, NULL, 0);
+}
+
+int
+test_num_p(struct test_numeric_node *node, unsigned long val)
+{
+	switch (node->op) {
+	case cmp_eq:
+		return val == node->val;
+	case cmp_ne:
+		return val != node->val;
+	case cmp_lt:
+		return val < node->val;
+	case cmp_le:
+		return val <= node->val;
+	case cmp_gt:
+		return val > node->val;
+	case cmp_ge:
+		return val >= node->val;
 	}
 	return 0;
 }
 
 int
-match_user(struct command_config *cfg, const char *name)
+test_request_argc(struct test_node *node, struct rush_request *req)
 {
-	if (cfg->users) {
-		char **p;
-		for (p = cfg->users; *p; p++)
-			if (strcmp(*p, name) == 0)
-				return 0;
-		return 1;
-	}
-	return 0;
+	return !test_num_p(&node->v.num, req->argc);
+}
+
+int
+test_request_uid(struct test_node *node, struct rush_request *req)
+{
+	return !test_num_p(&node->v.num, req->pw->pw_uid);
+}
+
+int
+test_request_gid(struct test_node *node, struct rush_request *req)
+{
+	return !test_num_p(&node->v.num, req->pw->pw_gid);
 }
 
 int
@@ -173,14 +179,48 @@ groupcmp(char *gname, struct passwd *pw)
 }
 
 int
-match_group(struct command_config *cfg, struct passwd *pw)
+test_request_group(struct test_node *node, struct rush_request *req)
 {
-	if (cfg->groups) {
-		char **p;
-		for (p = cfg->groups; *p; p++) 
-			if (groupcmp(*p, pw) == 0)
-				return 0;
-		return 1;
+	char **p;
+	
+	for (p = node->v.strv; *p; p++) 
+		if (groupcmp(*p, req->pw) == 0)
+			return 0;
+	return 1;
+}
+
+int
+test_request_user(struct test_node *node, struct rush_request *req)
+{
+	char **p;
+	
+	for (p = node->v.strv; *p; p++) 
+		if (strcmp(*p, req->pw->pw_name) == 0)
+			return 0;
+	return 1;
+}
+
+int (*test_request[])(struct test_node *, struct rush_request *) = {
+	test_request_cmdline,
+	test_request_arg,
+	test_request_argc,
+	test_request_uid,
+	test_request_gid,
+	test_request_user,
+	test_request_group
+};
+
+int
+run_tests(struct command_config *cfg, struct rush_request *req)
+{
+	struct test_node *node;
+	for (node = cfg->test_head; node; node = node->next) {
+		if (node->type >= sizeof(test_request)/sizeof(test_request[0]))
+			die(system_error,
+			    "%s:%d: INTERNAL ERROR: node type out of range",
+			    __FILE__, __LINE__);
+		if (test_request[node->type](node, req))
+			return 1;
 	}
 	return 0;
 }
@@ -190,24 +230,22 @@ match_config(const char *cmdline, struct passwd *pw)
 {
 	struct command_config *cfg;
 	int rc;
-	int argc;
-	char **argv;
+	struct rush_request req;
 
-	rc = argcv_get(cmdline, NULL, NULL, &argc, &argv);
+	req.cmdline = cmdline;
+	req.pw = pw;
+
+	rc = argcv_get(cmdline, NULL, NULL, &req.argc, &req.argv);
 	if (rc)
 		die(system_error,
 		    "argcv_get(%s) failed: %s",
 		    cmdline, strerror(rc));
-	
+
 	for (cfg = config_list; cfg; cfg = cfg->next) {
-		if (regexec (&cfg->regex, cmdline, 0, NULL, 0) == 0) {
-			if (match_args(cfg, argc, argv) == 0
-			    && match_user(cfg, pw->pw_name) == 0
-			    && match_group(cfg, pw) == 0)
-				break;
-		}
+		if (run_tests(cfg, &req) == 0)
+			break;
 	}
-	argcv_free(argc, argv);
+	argcv_free(req.argc, req.argv);
 	return cfg;
 }
 
@@ -346,10 +384,6 @@ run_config(struct command_config *cfg, struct passwd *pw, const char *arg)
 	
 	debug2(1, "Matching config: %s:%d", cfg->file, cfg->line);
 	
-	if (pw->pw_uid < cfg->min_uid)
-		die(nologin_error, "uid %lu out of range",
-		    (unsigned long) pw->pw_uid);
-
 	if (set_user_limits (pw->pw_name, cfg->limits))
 		die(usage_error, "cannot set limits for %s", pw->pw_name);
 
