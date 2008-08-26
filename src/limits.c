@@ -51,7 +51,7 @@ do_set_limit(int rlimit, rlim_t limit)
 {
         struct rlimit rlim;
 
-        debug2(1, "Setting limit %d to %lu", rlimit, (unsigned long) limit);
+        debug2(2, "Setting limit %d to %lu", rlimit, (unsigned long) limit);
         rlim.rlim_cur = limit;
         rlim.rlim_max = limit;
 
@@ -65,7 +65,7 @@ do_set_limit(int rlimit, rlim_t limit)
 static int
 set_prio(int prio)
 {
-        debug1(1, "Setting priority to %d", prio);
+        debug1(2, "Setting priority to %d", prio);
         if (setpriority(PRIO_PROCESS, 0, prio)) {
                 syslog(LOG_NOTICE, "error setting priority: %s",
                        strerror(errno));
@@ -83,12 +83,12 @@ check_logins(const char *name, int limit)
         STRUCT_UTMP *utmpbuf, *uptr;
         
         if (limit == 0) /* maximum 0 logins ? */ {
-                debug1(1, "No logins allowed for `%s'\n", name);
+                debug1(2, "No logins allowed for `%s'\n", name);
                 syslog(LOG_ERR, "No logins allowed for `%s'", name);
                 return 1;
         }
 
-        debug1(2, "counting logins for %s", name);
+        debug1(3, "counting logins for %s", name);
         read_utmp (UTMP_FILE, &utmp_count, &utmpbuf,
                    READ_UTMP_USER_PROCESS | READ_UTMP_CHECK_PIDS);
         for (uptr = utmpbuf; uptr < utmpbuf + utmp_count; uptr++) {
@@ -99,14 +99,14 @@ check_logins(const char *name, int limit)
                 }
         }
         free (utmpbuf);
-        debug2(2, "counted %d logins for %s", count, name);
+        debug2(3, "counted %d logins for %s", count, name);
 
         /*
          * This is called after setutmp(), so the number of logins counted
          * includes the user who is currently trying to log in.
          */
         if (count > limit) {
-                debug2(1, "Too many logins (max %d) for %s",
+                debug2(2, "Too many logins (max %d) for %s",
 		       limit, name);
                 syslog(LOG_ERR, "Too many logins (max %d) for %s",
                        limit, name);
@@ -123,7 +123,7 @@ set_user_limits(const char *name, struct limits_rec *lrec)
         if (!lrec)
                 return 0;
 
-	debug1(1, "Setting limits for %s", name);
+	debug1(2, "Setting limits for %s", name);
 
 #if defined(RLIMIT_AS)
         if (lrec->set & SET_LIMIT_AS)

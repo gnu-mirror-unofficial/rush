@@ -75,7 +75,10 @@ documents Rush Version @value{VERSION}.
 @end ifnottex
 
 @menu
-* Intro::             
+* Intro::
+* Operation::
+* Quick Start::
+* Configuration File::
 * Reporting Bugs::       How to Report a Bug.
 
 Appendices
@@ -90,7 +93,637 @@ Appendices
 
 @node Intro
 @chapter Introduction
+  Rush is a Restricted User Shell, which is useful if you wish to give
+certain remote users a restricted access to the resources of your
+machine.  It is intended for use with @code{ssh}, @code{rsh} and
+similar remote access programs.  Using a sophisticated configuration
+file, Rush allows you to control what programs and with what arguments
+a user is permitted to execute, and to limit the usage of system resources.
+
+@node Operation
+@chapter Operation
+  Rush is usually installed as a user shell.  When a user logs in to
+the server using @command{ssh}, the shell binary, @command{rush}, is
+executed.  Rush must be called with exactly two arguments: the
+@option{-c} command line option and a command line to be executed on
+the host machine.  If wrong arguments are supplied, the shell aborts.
+
+@cindex request
+  The third argument to @command{rush} supplies the command line to be
+executed.  This command line along with the password database entry
+for the user who executes @command{rush} are told to form a
+@dfn{request}.
+
+@cindex rule
+@cindex conditions
+@cindex actions
+  After startup, @command{rush} reads a set of @dfn{rules} from its
+configuration file.  Each rule consists of a set of @dfn{conditions},
+and a number of @dfn{actions}.  Conditions are used to match the rule
+against the request.  They can include regular expression matching
+against the command line or its particular arguments, user name or
+group comparisons, etc.  If all conditions match the request, the
+actions are executed.  Actions allow to:
+
+@itemize @bullet
+@item Modify the command line;
+@item Impose resource limits;
+@item Set umask;
+@item Change current working directory;
+@item Modify the execution environment;
+@item Run command in a special root directory (@samp{chroot}).
+@end itemize
+
+  Finally, after all actions are executed successfully, @command{rush}
+executes the command.  Notice, that the resulting command line is not
+necessarily the same as was supplied to @command{rush} via the @option{-c}
+option.
+
+@cindex fall-through rule
+@cindex rule, fall-through
+  A special kind of rules, called @dfn{fall-through} rules, is
+provided.  Fall-through rules differ from other rules in that they do
+not execute the command.  After all actions in a fall-through rule
+have been executed, Rush continues to search for another matching rule
+in its configuration and applies it if found.  Fall-through rules
+allow to set default values for rules that follow them.
+
+@node Quick Start
+@chapter Quick Start
+  For example, suppose you have the following configuration file
+rule:
+
+@smallexample
+@group
+rule sftp
+  # Conditions:
+  command ^.*/sftp-server
+  uid >= 100
+  # Actions:
+  transform[0] s,.*,bin/sftp-server,
+  umask 002
+  chroot ~
+  chdir /
+@end group
+@end smallexample
+
+  The first clause, @code{rule}, defines a new rule.  Its argument
+serves as a rule identifier in diagnostic messages.
+
+  Next two statements, @code{command} and @code{uid}, define
+conditions that must be met for this rule to become active.  The
+@code{command} statement introduces a regular expression to match
+against the command line.  In this example, the command line must
+begin with @samp{/sftp-server}, preceded by arbitrary directory
+components. 
+
+  The @code{uid} statement tells that this rule applies only to users
+with @acronym{UID}s greater than or equal to 100. 
+
+  Following clauses define actions associated with this rule.
+
+  The @code{transform[0]} clause contains instructions on how to
+modify the zeroth argument of the command line (i.e. the command
+name).  These instructions are in the form of @code{sed} replace
+expression (@pxref{Transformations, transformation expression}).  The
+supplied expression tells to replace the command name with
+@samp{bin/sftp-server}. 
+
+  The @code{umask} clause sets the file creation mask.
+
+  The @code{chroot} clause instructs Rush to chroot to the user home
+directory before executing the command.
+
+  Finally, the @code{chdir} statement sets the directory to change to
+after installing the chroot.
+
+@node Configuration File
+@chapter Configuration File
 @UNREVISED
+@flindex rush.rc
+  The configuration file is called @file{rush.rc} and is located in
+@file{/usr/local/etc} by default.  You can change its location when
+building the package, @FIXME-ref{Installation} for a detailed
+information about it.
+
+  The configuration file is read and parsed right after start up.  Any
+errors accursed in parsing are reported using @code{syslog} facility
+@samp{authpriv} and priority @samp{notice}.  The simplest way to
+test your configuration is to run @command{rush} from the command
+line and check the syslog output for details.  @xref{Debugging}, for
+information about how to debug your configurations.
+
+@menu
+* Syntax::
+* Debugging::
+* Conditions::
+* Transformations::
+* System Actions::
+* Environment::
+* Global Actions::
+* Fall-through::
+@end menu
+
+@node Syntax
+@section Syntax
+@cindex syntax, configuration files
+@cindex configuration file syntax
+  Configuration file consists of statements and comments.  
+
+  A @dfn{comment} is any line whose first non-whitespace character is
+@samp{#}.  Empty lines and comments are ignored.
+
+  A @dfn{statement} consists of a keyword and optional value.  If the
+value is supplied, it must be separated from the keyword by any amount
+of white space.  Statements are delimited by newline characters.
+Length of a statement line is not limited.  Long statements
+can be split over several lines by using backslash (@samp{\}) as a
+last character on line.  Thus, the following statement:
+
+@smallexample
+usage-error Contact your\
+ system administrator
+@end smallexample
+
+@noindent
+is equivalent to:
+
+@smallexample
+usage-error Contact your system administrator
+@end smallexample
+
+@node Debugging
+@section Debugging
+@cindex debugging
+  The @code{debug} statement sets the @dfn{debugging level}, an
+integer value that controls the verbosity of @command{rush}:
+
+@kwindex debug
+@table @code
+@item debug @var{num}
+Set the debugging level to @var{num}.
+@end table
+
+  The greater @var{num}, the more verbose is shell's logging.  The
+debugging information is reported via @code{syslog} at facility
+@samp{authpriv}, priority @samp{debug}.  As of version @value{VERSION},
+the following debugging levels are supported: 
+
+@cindex debugging levels
+@table @asis
+@item 1
+A minimum debugging level, and the only one whose messages are logged
+using the priority @samp{notice}.  At this level, @command{rush} only
+logs requests and rules that are used to serve them.  For example:
+
+@smallexample
+rush[16821]: Serving request "/usr/libexec/sftp-server"
+for sergiusz by rule sftp-savane
+@end smallexample
+
+@item 2
+List all actions executed when serving requests.
+
+@item 3
+Verbosely describe the parsing of configuration file.
+@end table
+
+  More debugging levels may be implemented in future.  
+
+@node Conditions
+@section Conditions
+@cindex conditions
+  These statements define conditions using in matching the rule with
+the request.  A rule may contain any number of conditions.  All
+conditions are tested using boolean shortcut @samp{and}
+evaluation: if any of them yields false, the rest is not considered
+and control is transferred to the subsequent rule.
+
+@table @code
+@kwindex command
+@item command @var{regex}
+True, if the current command line matches regular expression
+@var{regex}.  
+
+For example:
+
+@smallexample
+command ^scp (-v )?-t /incoming/(alpha|ftp)
+@end smallexample
+
+@kwindex match
+@item match[@var{n}] @var{regexp}
+True, if @var{n}th @dfn{word} from the command line matches regular
+expression @var{regexp}.  A special value @samp{$} can be used instead
+of @var{n} to denote the last word.
+
+The command line is split into words using the same rules as used in
+@code{/bin/sh}.
+
+For example, the condition below yields true if the last arguments is
+an absolute path name:
+
+@smallexample
+match[$] ^/.*
+@end smallexample
+
+@kwindex argc
+@item argc @var{op} @var{num}
+True, if the number of command line arguments compares to @var{num}.
+The comparison operator is given by @var{op}, which can be one is one
+of the following: @samp{=} (@samp{==}), @samp{!=}, @samp{<},
+@samp{<=}, @samp{>}, @samp{>=}.
+
+For example, the following condition matches if the number of
+arguments is less than 3:
+
+@smallexample
+argc < 3
+@end smallexample
+
+@kwindex uid
+@item uid @var{op} @var{num}
+True, if the @acronym{UID} compares to @var{num}.
+The comparison operator is given by @var{op}, which can be one is one
+of the following: @samp{=} (@samp{==}), @samp{!=}, @samp{<},
+@samp{<=}, @samp{>}, @samp{>=}.
+
+@kwindex gid
+@item gid @var{op} @var{num}
+True, if the @acronym{GID} compares to @var{num}.
+The comparison operator is given by @var{op}, which can be one is one
+of the following: @samp{=} (@samp{==}), @samp{!=}, @samp{<},
+@samp{<=}, @samp{>}, @samp{>=}.
+
+@kwindex user
+@item user @var{names}
+Argument is a whitespace-delimited list of user names.  This condition
+yields true, if the user name matches one of listed names.
+String comparisons are case-sensitive.
+
+@kwindex group
+@item group @var{names}
+Argument is a whitespace-delimited list of group names.  This condition
+yields true, if the the name of any group the user is a member of
+matches one of listed names. String comparisons are case-sensitive.
+
+For example, to match users from groups @samp{admin} and @samp{root}:
+
+@smallexample
+group admin root
+@end smallexample
+@end table
+
+@node Transformations
+@section Transformations
+@cindex transformations
+  Special actions that allow to rewrite the command line are called
+@dfn{transformations}.
+
+@kwindex transform
+@table @code
+@item transform @var{expr}
+Apply the expression @var{expr} to the entire command line.
+
+@item transform[@var{n}] @var{expr}
+Apply the expression @var{expr} to @var{n}th @dfn{word} from the
+command line.  A special value @samp{$} can be used instead
+of @var{n} to denote the last word.
+@end table
+
+The transformation expression, @var{expr}, is a @command{sed}-like
+replace expression of the form:
+
+@smallexample
+s/@var{regexp}/@var{replace}/[@var{flags}]
+@end smallexample
+
+@noindent
+where @var{regexp} is a @dfn{regular expression}, @var{replace} is a
+replacement for each file name part that matches @var{regexp}.  Both
+@var{regexp} and @var{replace} are described in detail in
+@ref{The "s" Command, The "s" Command, The `s' Command, sed, GNU sed}.
+
+As in @command{sed}, you can give several replace expressions,
+separated by a semicolon.
+
+Supported @var{flags} are:
+
+@table @samp
+@cindex g, @option{transform} flag
+@item g
+Apply the replacement to @emph{all} matches to the @var{regexp}, not
+just the first.
+
+@cindex i, @option{transform} flag
+@item i
+Use case-insensitive matching
+
+@cindex x, @option{transform} flag
+@item x
+@var{regexp} is an @dfn{extended regular expression} (@pxref{Extended
+regexps, Extended regular expressions, Extended regular expressions,
+sed, GNU sed}).
+
+@item @var{number}
+Only replace the @var{number}th match of the @var{regexp}.
+
+Note: the @var{posix} standard does not specify what should happen
+when you mix the @samp{g} and @var{number} modifiers.  Rush
+follows the GNU @command{sed} implementation in this regard, so
+the interaction is defined to be: ignore matches before the
+@var{number}th, and then match and replace all matches from the
+@var{number}th on.
+@end table
+
+Any delimiter can be used in lieue of @samp{/}, the only requirement being
+that it be used consistently throughout the expression. For example,
+the following two expressions are equivalent:
+
+@smallexample
+@group
+transform s/one/two/
+transform s,one,two,
+@end group
+@end smallexample
+
+  Changing delimiters is often useful when the @var{regex} contains
+slashes.  For instance, it is more convenient to write @code{s,/,-,} than
+@code{s/\//-/}.
+
+  For example, the following rule uses @code{transform} to ensure the
+well known and presumably safe path to the binary:
+
+@smallexample
+@group
+rule cvs
+  command ^cvs server
+  transform[0] s|.*|/usr/bin/cvs|
+@end group
+@end smallexample
+
+ As a more complex example, consider the following rule:
+
+@smallexample
+@group
+rule svn
+  command ^svnserve -t
+  transform s|-r *[^ ]*||;s|^svnserve |/usr/bin/svnserve -r /svnroot |
+@end group
+@end smallexample
+
+  This transform expression first removes all occurrences of
+@option{-r} option and its arguments from the command line, and then
+adds its own @option{-r} option and ensures the proper binary name.
+
+@node System Actions
+@section System Actions
+@cindex system actions
+@cindex actions, system
+
+System actions provide an interface to the operating system:
+
+@table @code
+@kwindex umask
+@item umask @var{mask}
+Set the umask.  The @var{mask} must be an octal value not greater than
+@samp{0777}.  The default umask is @samp{022}.
+
+@kwindex chroot
+@item chroot @var{dir}
+Change the root directory to that specified in @var{dir}.  This
+directory will be used for file names beginning with @samp{/}.
+If @var{dir} begins with tilde (@samp{~}), it is replaced with
+the user's home directory before chrooting.
+
+The directory @var{dir} must be properly set up to execute the 
+commands.  For example, the following rule defines execution of
+@command{sftp-server} in an environment, chrooted to the user's home
+directory:
+
+@smallexample
+@group
+rule sftp
+  command ^.*/sftp-server
+  transform[0] s,.*,bin/sftp-server,
+  chroot ~
+@end group
+@end smallexample
+
+For this to work, each user's home must contain the directory
+@file{bin} with a copy of @file{sftp-server} in it, as well as all the
+directories and files that are needed for executing it, in particular
+@file{lib}.
+
+@kwindex chdir
+@item chdir @var{dir}
+Change to the directory @var{dir}.  The @var{dir} is subject to
+tilde-expansion (see @code{chroot}, above).  If both @code{chdir} and
+@code{chroot} are specified, then @code{chroot} is executed first.
+
+@kwindex limits
+@item limits @var{res}
+Impose limits on system resources as defined by @var{res}.  The
+argument consists of @dfn{commands}, optionally separated by any
+amount of whitespace.  A command is a single command letter followed
+by a number, that specifies the limit.  The command letters are
+case-insensitive and are the same as used by the shell @code{ulimit}
+utility:
+
+@multitable @columnfractions 0.3 0.6 
+@headitem Command @tab  limit it sets
+@item     A       @tab  max address space (KB)
+@item     C       @tab  max core file size (KB)
+@item     D       @tab  max data size (KB)
+@item     F       @tab  maximum file size (KB)
+@item     M       @tab  max locked-in-memory address space (KB)
+@item     N       @tab  max number of open files
+@item     R       @tab  max resident set size (KB)
+@item     S       @tab  max stack size (KB)
+@item     T       @tab  max CPU time (MIN)
+@item     U       @tab  max number of processes
+@item     L       @tab  max number of logins for this user
+@item     P       @tab  process priority -20..20 (negative = high priority)
+@end multitable
+
+For example:
+
+@smallexample
+limits T10 R20 U16 P20
+@end smallexample
+
+Note, that as of Rush version @value{VERSION}, the @code{L} resource
+setting is obeyed only if the executed command updates the system
+accounting database.
+@end table
+
+@node Environment
+@section Environment
+@cindex Environment
+
+The @code{env} action allows to modify the environment in which the
+program will be executed.
+
+@table @code
+@kwindex env
+@item env @var{args}
+Modify the environment.
+@end table
+
+Its argument is a whitespace-delimited list of specifiers.  The
+following specifiers are understood: 
+
+@table @asis
+@item -
+Clear the environment.  This is understood only when used as a first
+word in @var{args}.
+
+@item -@var{name}
+Unset the environment variable @var{name}.
+
+@item -@var{name}=@var{val}
+Unset the environment variable @var{name} only if its value is @var{val}.
+
+@item @var{name}
+Retain the environment variable @var{name}.
+
+@item @var{name}=@var{value}
+Define environment variable @var{name} to have value @var{value}.
+
+@item @var{name}+=@var{value}
+Retain variable @var{name} and append @var{value} to its existing
+value.  If no such variable is present in the environment, it is
+created and @var{value} is assigned to it.  However, if @var{value}
+begins with a punctuation character, this character is removed from it
+before assignment.  This is convenient for using this construct with
+environment variables like @env{PATH}, e.g.:
+
+@smallexample
+PATH+=:/sbin
+@end smallexample
+
+In this example, if @env{PATH} exists, @samp{:/sbin} will be appended
+to it.  Otherwise, it will be created and @samp{/sbin} will be
+assigned to it.
+
+@item @var{name}=+@var{value}
+Retain variable @var{name} and prepend @var{value} to its existing
+value.  If no such variable is present in the environment, it is
+created and @var{value} is assigned to it.  However, if @var{value}
+ends with a punctuation character, this character is removed from it
+before assignment. 
+@end table
+
+@node Global Actions
+@section Global Actions
+
+Global actions affect the behavior of @command{rush} as a whole.
+
+@table @code
+@kwindex sleep-time @var{number}
+Set the time in seconds to sleep before exiting on error.  This
+is intended as a measure against brute-force attacks.  The default
+is 5 seconds.
+
+@kwindex usage-error
+@item usage-error @var{text}
+Set the textual message which is returned to the remote user if a
+usage error occurs.  See below for a description of @var{text}.
+The default is:
+
+@smallexample
+You are not permitted to execute this command.
+@end smallexample
+
+@kwindex nologin-error
+@item nologin-error @var{text}
+Set the textual message which is returned to the remote user if
+there is no such user name in the password database.  See below for a
+description of @var{text}. 
+
+The default is:
+
+@smallexample
+You do not have interactive login access to this machine.
+@end smallexample
+
+@kwindex config-error
+@item config-error @var{text}
+Set the textual message which is returned to the remote user on
+Rush configuration errors.  See below for a description of @var{text}.
+
+The default is:
+
+@smallexample
+Local configuration error occurred.
+@end smallexample
+
+@kwindex system-error
+@item system-error @var{text}
+Set the textual message which is returned to the remote user if
+a system error occurs.  See below for a description of @var{text}.
+
+The default message is:
+
+@smallexample
+A system error occurred while attempting to execute command.
+@end smallexample
+@end table
+
+The argument to all @samp{-error} statements is subject to backslash
+interpretation, during which the following @dfn{escape sequences} are
+replaced with the corresponding single characters:
+
+@float Table, backslash-interpretation
+@caption{Backslash escapes}
+@multitable @columnfractions 0.30 .5
+@item Sequence @tab Replaced with
+@item \a @tab Audible bell character (@acronym{ASCII} 7)
+@item \b @tab Backspace character (@acronym{ASCII} 8)
+@item \f @tab Form-feed character (@acronym{ASCII} 12)
+@item \n @tab Newline character (@acronym{ASCII} 10)
+@item \r @tab Carriage return character (@acronym{ASCII} 13)
+@item \t @tab Horizontal tabulation character (@acronym{ASCII} 9)
+@item \\ @tab A single backslash (@samp{\}).
+@end multitable
+@end float
+
+Any escape sequence not listed in the table above is copied verbatim.
+
+For example (note the use of line continuation character):
+
+@smallexample
+usage-error \
+    \r\nYou are not allowed to execute that command.\r\n\
+    \r\nIf you think this is wrong, ask <foo@@bar.com> for assistance.\r\n
+@end smallexample
+
+@node Fall-through
+@section Fall-through
+@cindex fall-through rule
+A @dfn{fall-through} rule is such a rule that does not execute the
+requested commands.  It is declared using the following statement:
+
+@table @code
+@kwindex fall-through
+@item fall-through
+Declare a rule as a fall-through.
+@end table
+
+Usually it is placed as the last statement in a rule, e.g.:
+
+@smallexample
+@group
+rule default
+  umask 002
+  env - HOME USERNAME PATH
+  fall-through
+@end group
+@end smallexample
+
+Fall-through rules provide a way to set default values for subsequent
+rules.  For example, any rules that follow the @samp{default} rule
+shown above, will inherit the umask and environment set there.
 
 @node Reporting Bugs
 @chapter How to Report a Bug

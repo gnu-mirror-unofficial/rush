@@ -47,7 +47,7 @@ extern int argcv_get_np (const char *command, int len,
 			 int flags,
 			 int *pargc, char ***pargv, char **endp);
   
-extern int argcv_string (int argc, const char **argv, char **string);
+extern int argcv_string (int argc, char **argv, char **string);
 extern void argcv_free   (int argc, char **argv);
 extern void argv_free (char **argv);
 

@@ -184,24 +184,11 @@ copy_string(const char *src)
 	return dest;
 }
 
-struct command_config default_config;
-#define SET_DEFAULT(f)				\
-	if (default_config.f)			\
-		config_tail->f = default_config.f
-
-struct command_config *
-new_command_config()
+struct rush_rule *
+new_rush_rule()
 {
-	struct command_config *p = xzalloc(sizeof(*p));
-	LIST_APPEND(p, config_list, config_tail);
-	SET_DEFAULT(trans);
-	SET_DEFAULT(arg_head);
-	SET_DEFAULT(arg_tail);
-	SET_DEFAULT(env);
-	SET_DEFAULT(mask);
-	SET_DEFAULT(chroot_dir);
-	SET_DEFAULT(home_dir);
-	SET_DEFAULT(limits);
+	struct rush_rule *p = xzalloc(sizeof(*p));
+	LIST_APPEND(p, rule_head, rule_tail);
 	return p;
 }
 
@@ -276,18 +263,18 @@ check_dir(const char *dir, struct input_buf *ibuf)
 }
 	
 struct transform_arg *
-new_transform_arg(struct command_config *cur)
+new_transform_arg(struct rush_rule *rule)
 {
 	struct transform_arg *p = xzalloc(sizeof(*p));
-	LIST_APPEND(p, cur->arg_head, cur->arg_tail);
+	LIST_APPEND(p, rule->arg_head, rule->arg_tail);
 	return p;
 }
 
 struct test_node *
-new_test_node(struct command_config *cur, enum test_type type)
+new_test_node(struct rush_rule *rule, enum test_type type)
 {
 	struct test_node *p = xzalloc(sizeof(*p));
-	LIST_APPEND(p, cur->test_head, cur->test_tail);
+	LIST_APPEND(p, rule->test_head, rule->test_tail);
 	p->type = type;
 	return p;
 }
@@ -364,14 +351,14 @@ regexp_error(struct input_buf *ibuf, regex_t *regex, int rc)
 }
 
 static int
-_parse_command(struct input_buf *ibuf, struct command_config *cur,
+_parse_command(struct input_buf *ibuf, struct rush_rule *rule,
 	       char *kw, char *val)
 {
 	int cflags = REG_EXTENDED;
 	int rc;
 	struct test_node *node;
 
-	node = new_test_node(cur, test_cmdline);
+	node = new_test_node(rule, test_cmdline);
 	rc = regcomp(&node->v.regex, val, cflags);
 	if (rc) 
 		regexp_error(ibuf, &node->v.regex, rc);
@@ -379,7 +366,7 @@ _parse_command(struct input_buf *ibuf, struct command_config *cur,
 }
 	
 static int
-_parse_match(struct input_buf *ibuf, struct command_config *cur,
+_parse_match(struct input_buf *ibuf, struct rush_rule *rule,
 	     char *kw, char *val)
 {
 	int cflags = REG_EXTENDED;
@@ -398,7 +385,7 @@ _parse_match(struct input_buf *ibuf, struct command_config *cur,
 			       ibuf->file, ibuf->line);
 		return 1;
 	}
-	node = new_test_node(cur, test_arg);
+	node = new_test_node(rule, test_arg);
 	node->v.arg.arg_no = n;
 	rc = regcomp(&node->v.arg.regex, val, cflags);
 	if (rc) 
@@ -407,47 +394,47 @@ _parse_match(struct input_buf *ibuf, struct command_config *cur,
 }
 	
 static int
-_parse_argc(struct input_buf *ibuf, struct command_config *cur,
+_parse_argc(struct input_buf *ibuf, struct rush_rule *rule,
 	    char *kw, char *val)
 {
-	struct test_node *node = new_test_node(cur, test_argc);
+	struct test_node *node = new_test_node(rule, test_argc);
 	return parse_numtest(ibuf, &node->v.num, val);
 }
 
 static int
-_parse_uid(struct input_buf *ibuf, struct command_config *cur,
+_parse_uid(struct input_buf *ibuf, struct rush_rule *rule,
 	   char *kw, char *val)
 {
-	struct test_node *node = new_test_node(cur, test_uid);
+	struct test_node *node = new_test_node(rule, test_uid);
 	return parse_numtest(ibuf, &node->v.num, val);
 }
 
 static int
-_parse_gid(struct input_buf *ibuf, struct command_config *cur,
+_parse_gid(struct input_buf *ibuf, struct rush_rule *rule,
 	   char *kw, char *val)
 {
-	struct test_node *node = new_test_node(cur, test_gid);
+	struct test_node *node = new_test_node(rule, test_gid);
 	return parse_numtest(ibuf, &node->v.num, val);
 }
 
 static int
-_parse_user(struct input_buf *ibuf, struct command_config *cur,
+_parse_user(struct input_buf *ibuf, struct rush_rule *rule,
 	    char *kw, char *val)
 {
-	struct test_node *node = new_test_node(cur, test_user);
+	struct test_node *node = new_test_node(rule, test_user);
 	return parse_strv(ibuf, node, val);
 }
 
 static int
-_parse_group(struct input_buf *ibuf, struct command_config *cur,
+_parse_group(struct input_buf *ibuf, struct rush_rule *rule,
 	     char *kw, char *val)
 {
-	struct test_node *node = new_test_node(cur, test_group);
+	struct test_node *node = new_test_node(rule, test_group);
 	return parse_strv(ibuf, node, val);
 }
 
 static int
-_parse_umask(struct input_buf *ibuf, struct command_config *cur,
+_parse_umask(struct input_buf *ibuf, struct rush_rule *rule,
 	     char *kw, char *val)
 {
 	char *q;
@@ -458,12 +445,12 @@ _parse_umask(struct input_buf *ibuf, struct command_config *cur,
 		       ibuf->file, ibuf->line, val);
 		return 1;
 	} else
-		cur->mask = n;
+		rule->mask = n;
 	return 0;
 }
 
 static int
-_parse_chroot(struct input_buf *ibuf, struct command_config *cur,
+_parse_chroot(struct input_buf *ibuf, struct rush_rule *rule,
 	      char *kw, char *val)
 {
 	char *chroot_dir = xstrdup(val);
@@ -474,17 +461,17 @@ _parse_chroot(struct input_buf *ibuf, struct command_config *cur,
 		return 1;
 	} else if (check_dir(chroot_dir, ibuf))
 		return 1;
-	cur->chroot_dir = chroot_dir;
+	rule->chroot_dir = chroot_dir;
 	return 0;
 }
 
 static int
-_parse_limits(struct input_buf *ibuf, struct command_config *cur,
+_parse_limits(struct input_buf *ibuf, struct rush_rule *rule,
 	      char *kw, char *val)
 {
 	char *q;
 			
-	if (parse_limits(&cur->limits, val, &q)) {
+	if (parse_limits(&rule->limits, val, &q)) {
 		syslog(LOG_NOTICE,
 		       "%s:%d: unknown limit: %s",
 		       ibuf->file, ibuf->line, q);
@@ -494,15 +481,15 @@ _parse_limits(struct input_buf *ibuf, struct command_config *cur,
 }
 
 static int
-_parse_transform(struct input_buf *ibuf, struct command_config *cur,
+_parse_transform(struct input_buf *ibuf, struct rush_rule *rule,
 		 char *kw, char *val)
 {
-	cur->trans = compile_transform_expr(val);
+	rule->trans = compile_transform_expr(val);
 	return 0;
 }
 
 static int
-_parse_transform_ar(struct input_buf *ibuf, struct command_config *cur,
+_parse_transform_ar(struct input_buf *ibuf, struct rush_rule *rule,
 		    char *kw, char *val)
 {
 	char *q;
@@ -520,35 +507,35 @@ _parse_transform_ar(struct input_buf *ibuf, struct command_config *cur,
 		       ibuf->file, ibuf->line);
 		return 1;
 	}
-	xarg = new_transform_arg(cur);
+	xarg = new_transform_arg(rule);
 	xarg->arg_no = n;
 	xarg->trans = compile_transform_expr(val);
 	return 0;
 }
 
 static int
-_parse_chdir(struct input_buf *ibuf, struct command_config *cur,
+_parse_chdir(struct input_buf *ibuf, struct rush_rule *rule,
 	     char *kw, char *val)
 {
-	char *home_dir = cur->home_dir = xstrdup(val);
+	char *home_dir = rule->home_dir = xstrdup(val);
 	if (trimslash(home_dir) == 0) {
 		syslog(LOG_NOTICE,
 		       "%s:%d: invalid home directory",
 		       ibuf->file, ibuf->line);
 		return 1;
 	}
-	else if (!cur->chroot_dir && check_dir(home_dir, ibuf))
+	else if (!rule->chroot_dir && check_dir(home_dir, ibuf))
 		return 1;
-	cur->home_dir = home_dir;
+	rule->home_dir = home_dir;
 	return 0;
 }
 
 static int
-_parse_env(struct input_buf *ibuf, struct command_config *cur,
+_parse_env(struct input_buf *ibuf, struct rush_rule *rule,
 	   char *kw, char *val)
 {
 	int rc, n;
-	rc = argcv_get(val, NULL, "#", &n, &cur->env);
+	rc = argcv_get(val, NULL, "#", &n, &rule->env);
 	if (rc) 
 		syslog(LOG_NOTICE,
 		       "%s:%d: failed to parse value: %s",
@@ -558,7 +545,7 @@ _parse_env(struct input_buf *ibuf, struct command_config *cur,
 
 /* Global statements */
 static int
-_parse_debug(struct input_buf *ibuf, struct command_config *cur,
+_parse_debug(struct input_buf *ibuf, struct rush_rule *rule,
 	     char *kw, char *val)
 {
 	debug_level = strtoul(val, NULL, 0);
@@ -567,7 +554,7 @@ _parse_debug(struct input_buf *ibuf, struct command_config *cur,
 }
 
 static int
-_parse_sleep_time(struct input_buf *ibuf, struct command_config *cur,
+_parse_sleep_time(struct input_buf *ibuf, struct rush_rule *rule,
 		  char *kw, char *val)
 {
 	char *q;
@@ -582,7 +569,7 @@ _parse_sleep_time(struct input_buf *ibuf, struct command_config *cur,
 }
 
 static int
-_parse_usage_error(struct input_buf *ibuf, struct command_config *cur,
+_parse_usage_error(struct input_buf *ibuf, struct rush_rule *rule,
 		   char *kw, char *val)
 {
 	error_msg[usage_error] = copy_string(val);
@@ -590,7 +577,7 @@ _parse_usage_error(struct input_buf *ibuf, struct command_config *cur,
 }
 
 static int
-_parse_nologin_error(struct input_buf *ibuf, struct command_config *cur,
+_parse_nologin_error(struct input_buf *ibuf, struct rush_rule *rule,
 		     char *kw, char *val)
 {
 	error_msg[nologin_error] = copy_string(val);
@@ -598,7 +585,7 @@ _parse_nologin_error(struct input_buf *ibuf, struct command_config *cur,
 }
 
 static int
-_parse_config_error(struct input_buf *ibuf, struct command_config *cur,
+_parse_config_error(struct input_buf *ibuf, struct rush_rule *rule,
 		    char *kw, char *val)
 {
 	error_msg[config_error] = copy_string(val);
@@ -606,43 +593,59 @@ _parse_config_error(struct input_buf *ibuf, struct command_config *cur,
 }
 
 static int
-_parse_system_error(struct input_buf *ibuf, struct command_config *cur,
+_parse_system_error(struct input_buf *ibuf, struct rush_rule *rule,
 		    char *kw, char *val)
 {
 	error_msg[system_error] = copy_string(val);
 	return 0;
 }
 
+static int
+_parse_fall_through(struct input_buf *ibuf, struct rush_rule *rule,
+		    char *kw, char *val)
+{
+	rule->fall_through = 1;
+	return 0;
+}
+
 
+#define TOK_NONE  0x00   /* No flags */
+#define TOK_ARG   0x01   /* Token requires an argument */
+#define TOK_IND   0x02   /* Token must be followed by an index */
+#define TOK_RUL   0x04   /* Token is valid only within a rule */
+
+#define TOK_DFL   TOK_ARG|TOK_RUL
+
 struct token {
 	char *name;
-	int ar;
-	int (*parser) (struct input_buf *, struct command_config *,
+	int flags;
+	int (*parser) (struct input_buf *, struct rush_rule *,
 		       char *, char *);
 };
 
 
 struct token toktab[] = {
-	{ "command", 0, _parse_command },
-	{ "match", 1, _parse_match },
-	{ "argc", 0, _parse_argc },
-	{ "uid", 0, _parse_uid },
-	{ "gid", 0, _parse_gid },
-	{ "user", 0, _parse_user },
-	{ "group", 0, _parse_group },
-	{ "umask", 0, _parse_umask },
-	{ "chroot", 0, _parse_chroot },
-	{ "limits", 0, _parse_limits },
-	{ "transform", 0, _parse_transform },
-	{ "transform", 1, _parse_transform_ar },
-	{ "chdir", 0, _parse_chdir },
-	{ "env", 0, _parse_env },
-	{ "debug", 0, _parse_debug },
-	{ "sleep-time", 0, _parse_sleep_time },
-	{ "usage-error", 0, _parse_usage_error },
-	{ "nologin-error", 0, _parse_nologin_error },
-	{ "config-error", 0, _parse_config_error },
-	{ "system-error", 0, _parse_system_error },
+	{ "command",       TOK_DFL, _parse_command },
+	{ "match",         TOK_RUL|TOK_IND, _parse_match },
+	{ "argc",          TOK_DFL, _parse_argc },
+	{ "uid",           TOK_DFL, _parse_uid },
+	{ "gid",           TOK_DFL, _parse_gid },
+	{ "user",          TOK_DFL, _parse_user },
+	{ "group",         TOK_DFL, _parse_group },
+	{ "transform",     TOK_DFL, _parse_transform },
+	{ "transform",     TOK_RUL|TOK_IND, _parse_transform_ar },
+	{ "umask",         TOK_DFL, _parse_umask },
+	{ "chroot",        TOK_DFL, _parse_chroot },
+	{ "limits",        TOK_DFL, _parse_limits },
+	{ "chdir",         TOK_DFL, _parse_chdir },
+	{ "env",           TOK_DFL, _parse_env },
+	{ "fall-through",  TOK_RUL, _parse_fall_through },
+	{ "debug",         TOK_ARG, _parse_debug },
+	{ "sleep-time",    TOK_ARG, _parse_sleep_time },
+	{ "usage-error",   TOK_ARG, _parse_usage_error },
+	{ "nologin-error", TOK_ARG, _parse_nologin_error },
+	{ "config-error",  TOK_ARG, _parse_config_error },
+	{ "system-error",  TOK_ARG, _parse_system_error },
 	{ NULL }
 };
 
@@ -654,7 +657,8 @@ find_token(const char *name, int *plen)
 	
 	for (tok = toktab; tok->name; tok++) {
 		if (strncmp(tok->name, name, len) == 0
-		    && (name[len] == 0 ? tok->ar == 0 : tok->ar != 0)) {
+		    && (name[len] == 0 ? (tok->flags & TOK_IND) == 0
+			: (tok->flags & TOK_IND))) {
 			*plen = len;
 			return tok;
 		}
@@ -663,13 +667,14 @@ find_token(const char *name, int *plen)
 }
 
 void
-parse_input_buf(struct input_buf *ibuf, struct command_config *cur)
+parse_input_buf(struct input_buf *ibuf)
 {
 	char *buf = NULL;
 	size_t size = 0;
 	int err = 0;
+	struct rush_rule *rule = NULL;
 
-	debug1(2, "Parsing %s", ibuf->file);
+	debug1(3, "Parsing %s", ibuf->file);
 	while (read_line(ibuf, &buf, &size)) {
 		char *kw, *val;
 		char *p;
@@ -677,7 +682,7 @@ parse_input_buf(struct input_buf *ibuf, struct command_config *cur)
 		int len;
 		
 		p = skipws(buf);
-		debug1(2, "read line: %s", p);
+		debug3(3, "%s:%d: %s", ibuf->file, ibuf->line, p);
 		if (p[0] == 0 || p[0] == '#')
 			continue;
 		kw = p;
@@ -689,11 +694,12 @@ parse_input_buf(struct input_buf *ibuf, struct command_config *cur)
 		} else
 			val = NULL;
 		
-		if (!val || !*val) {
-			syslog(LOG_NOTICE,
-			       "%s:%d: invalid statement: missing value",
-			       ibuf->file, ibuf->line);
-			err = 1;
+		if (strcmp(kw, "rule") == 0) {
+			rule = new_rush_rule();
+			if (val && val[0])
+				rule->tag = xstrdup (val);
+			rule->file = ibuf->file;
+			rule->line = ibuf->line;
 			continue;
 		}
 
@@ -705,41 +711,52 @@ parse_input_buf(struct input_buf *ibuf, struct command_config *cur)
 			err = 1;
 			continue;
 		}
-			
-		if (strcmp(kw, "command") == 0) {
-			cur = new_command_config();
-			cur->file = ibuf->file;
-			cur->line = ibuf->line;
+
+		if (tok->flags & TOK_ARG && !(val && *val)) {
+			syslog(LOG_NOTICE,
+			       "%s:%d: invalid statement: missing value",
+			       ibuf->file, ibuf->line);
+			err = 1;
+			continue;
 		}
 
-		err |= tok->parser(ibuf, cur, kw + len, val);
+		if (tok->flags & TOK_RUL) {
+			if (!rule) {
+				syslog(LOG_NOTICE,
+				       "%s:%d: statement cannot be used outside a rule",
+				       ibuf->file, ibuf->line);
+				err = 1;
+				continue;
+			}
+		} 
+		
+		err |= tok->parser(ibuf, rule, kw + len, val);
 	}
 	free(buf);
-	debug1(2, "Finished parsing %s", ibuf->file);
+	debug1(3, "Finished parsing %s", ibuf->file);
 	if (err)
 		die(config_error, "error parsing config file");
 }
 
-const char default_entry[] = "\
-command ^.*/sftp-server\n\
-  transform[0] s,.*,bin/sftp-server,\n\
-  umask 002\n\
-  min-uid 1\n\
-  chroot ~\n\
-  chdir /";
+#ifdef RUSH_DEFAULT_CONFIG
+const char default_entry[] = 
+#include RUSH_DEFAULT_CONFIG
+;	
+#endif
 
 void
 parse_config()
 {
 	struct input_buf buf;
 
-	memset(&default_config, 0, sizeof default_config);
 	if (init_input_buf(&buf, CONFIG_FILE) == 0) {
-		parse_input_buf(&buf, &default_config);
+		parse_input_buf(&buf);
 		free_input_buf(&buf);
+#ifdef RUSH_DEFAULT_CONFIG
 	} else {
 		init_input_string(&buf, default_entry);
-		parse_input_buf(&buf, NULL);
+		parse_input_buf(&buf);
 		free_input_buf(&buf);
+#endif
 	}
 }

@@ -20,7 +20,8 @@ extern char **environ;
 
 unsigned sleep_time = 5;
 unsigned debug_level;
-struct command_config *config_list, *config_tail;
+unsigned default_umask = 022;
+struct rush_rule *rule_head, *rule_tail;
 
 #define STDOUT_FILENO 1
 #define STDERR_FILENO 2
@@ -100,7 +101,7 @@ is_suffix(const char *suf, const char *str)
 
 
 struct rush_request {
-	const char *cmdline;
+	char *cmdline;
 	int argc;
 	char **argv;
 	struct passwd *pw;
@@ -211,10 +212,10 @@ int (*test_request[])(struct test_node *, struct rush_request *) = {
 };
 
 int
-run_tests(struct command_config *cfg, struct rush_request *req)
+run_tests(struct rush_rule *rule, struct rush_request *req)
 {
 	struct test_node *node;
-	for (node = cfg->test_head; node; node = node->next) {
+	for (node = rule->test_head; node; node = node->next) {
 		if (node->type >= sizeof(test_request)/sizeof(test_request[0]))
 			die(system_error,
 			    "%s:%d: INTERNAL ERROR: node type out of range",
@@ -225,28 +226,16 @@ run_tests(struct command_config *cfg, struct rush_request *req)
 	return 0;
 }
 
-struct command_config *
-match_config(const char *cmdline, struct passwd *pw)
+struct rush_rule *
+match_rule(struct rush_rule *rule, struct rush_request *req)
 {
-	struct command_config *cfg;
-	int rc;
-	struct rush_request req;
-
-	req.cmdline = cmdline;
-	req.pw = pw;
-
-	rc = argcv_get(cmdline, NULL, NULL, &req.argc, &req.argv);
-	if (rc)
-		die(system_error,
-		    "argcv_get(%s) failed: %s",
-		    cmdline, strerror(rc));
-
-	for (cfg = config_list; cfg; cfg = cfg->next) {
-		if (run_tests(cfg, &req) == 0)
+	if (!rule)
+		rule = rule_head;
+	for (; rule; rule = rule->next) {
+		if (run_tests(rule, req) == 0)
 			break;
 	}
-	argcv_free(req.argc, req.argv);
-	return cfg;
+	return rule;
 }
 
 const char *
@@ -280,6 +269,28 @@ find_env(char *name, int val)
 			return val ? environ[i] + elen + 1 : environ[i];
 	}
 	return NULL;
+}
+
+static int
+locate_unset(char **env, const char *name)
+{
+	volatile int i;
+	int nlen = strcspn(name, "=");
+
+	for (i = 0; env[i]; i++) {
+		if (env[i][0] == '-') {
+			size_t elen = strcspn(env[i] + 1, "=");
+			if (elen == nlen
+			    && memcmp(name, env[i] + 1, nlen) == 0) {
+				if (env[i][nlen + 1])
+					return strcmp(name + nlen,
+						      env[i] + 1 + nlen) == 0;
+				else
+					return 1;
+			}
+		}
+	}
+	return 0;
 }
 
 static char *
@@ -341,12 +352,18 @@ env_setup(char **env)
 	n = 0;
 	
 	if (old_env)
-		for (i = 0; old_env[i]; i++)
-			new_env[n++] = old_env[i];
+		for (i = 0; old_env[i]; i++) {
+			if (!locate_unset(env, old_env[i]))
+				new_env[n++] = old_env[i];
+		}
 
 	for (i = 0; env[i]; i++) {
 		char *p;
-		if ((p = strchr(env[i], '='))) {
+		
+		if (env[i][0] == '-') {
+			/* Skip unset directives. */
+			continue;
+		} if ((p = strchr(env[i], '='))) {
 			if (p == env[i])
 				continue; /* Ignore erroneous entry */
 			if (p[-1] == '+') 
@@ -372,62 +389,67 @@ env_setup(char **env)
 }
 
 void
-run_config(struct command_config *cfg, struct passwd *pw, const char *arg)
+run_rule(struct rush_rule *rule, struct rush_request *req)
 {
-	int argc;
-	char **argv;
-	char *cmdline;
 	struct transform_arg *xarg;
 	const char *home_dir = NULL;
 	int rc;
 	char **new_env;
 	
-	debug2(1, "Matching config: %s:%d", cfg->file, cfg->line);
+	debug2(2, "Matching rule: %s:%d", rule->file, rule->line);
 	
-	if (set_user_limits (pw->pw_name, cfg->limits))
-		die(usage_error, "cannot set limits for %s", pw->pw_name);
+	if (set_user_limits (req->pw->pw_name, rule->limits))
+		die(usage_error, "cannot set limits for %s", req->pw->pw_name);
 
-	debug(1, "Transforming command line");
-	cmdline = transform_string(cfg->trans, arg);
-	debug1(1, "Command line: %s", cmdline);
+	debug(2, "Transforming command line");
+	req->cmdline = transform_string(rule->trans, req->cmdline);
+	debug1(2, "Command line: %s", req->cmdline);
+
+	argcv_free(req->argc, req->argv);
 	
-	if ((rc = argcv_get(cmdline, NULL, NULL, &argc, &argv)))
+	if ((rc = argcv_get(req->cmdline, NULL, NULL, &req->argc, &req->argv)))
 		die(system_error, "argcv_get(%s) failed: %s",
-		    cmdline, strerror(rc));
+		    req->cmdline, strerror(rc));
 
-	debug(1, "Transforming arguments");
-	for (xarg = cfg->arg_head; xarg; xarg = xarg->next) {
+	debug(2, "Transforming arguments");
+	for (xarg = rule->arg_head; xarg; xarg = xarg->next) {
+		char *p;
 		int arg_no = xarg->arg_no;
 		if (arg_no == -1)
-			arg_no = argc - 1;
-		if (arg_no >= argc) 
+			arg_no = req->argc - 1;
+		if (arg_no >= req->argc) 
 			die(usage_error, "not enough arguments in command: %s",
-			    arg);
-		argv[arg_no] = transform_string(xarg->trans, argv[arg_no]);
+			    req->cmdline);
+		p = transform_string(xarg->trans, req->argv[arg_no]);
+		free(req->argv[arg_no]);
+		req->argv[arg_no] = p;
 	}
 
-	if (__debug_p(1)) {
+	free(req->cmdline);
+	argcv_string(req->argc, req->argv, &req->cmdline);
+
+	if (__debug_p(2)) {
 		int i;
 		syslog(LOG_DEBUG, "Final arguments:");
-		for (i = 0; i < argc; i++)
-			syslog(LOG_DEBUG, "% 4d: %s", i, argv[i]);
+		for (i = 0; i < req->argc; i++)
+			syslog(LOG_DEBUG, "% 4d: %s", i, req->argv[i]);
 	}
-	new_env = env_setup(cfg->env);
-	if (__debug_p(1)) {
+	new_env = env_setup(rule->env);
+	if (__debug_p(2)) {
 		int i;
 		syslog(LOG_DEBUG, "Final environment:");
 		for (i = 0; new_env[i]; i++)
 			syslog(LOG_DEBUG, "% 4d: %s", i, new_env[i]);
 	}
-		
-	argcv_string(argc, argv, &cmdline);
+	environ = new_env;
+	
+	if (rule->home_dir)
+		home_dir = expand_tilde(rule->home_dir, req->pw->pw_dir);
 
-	if (cfg->home_dir)
-		home_dir = expand_tilde(cfg->home_dir, pw->pw_dir);
-
-	if (cfg->chroot_dir) {
-		const char *dir = expand_tilde(cfg->chroot_dir, pw->pw_dir);
-		debug1(1, "Chroot dir: %s", dir);
+	if (rule->chroot_dir) {
+		const char *dir = expand_tilde(rule->chroot_dir,
+					       req->pw->pw_dir);
+		debug1(2, "Chroot dir: %s", dir);
 		if (chroot(dir)) 
 			die(system_error, "cannot chroot to %s: %s",
 			    dir, strerror(errno));
@@ -436,30 +458,37 @@ run_config(struct command_config *cfg, struct passwd *pw, const char *arg)
 	}
 
 	if (home_dir) {
-		debug1(1, "Home dir: %s", home_dir);
+		debug1(2, "Home dir: %s", home_dir);
 		chdir(home_dir);
 	}
 
-	if (setuid(pw->pw_uid))
-		die(system_error, "cannot enforce uid %lu: %s",
-		    pw->pw_uid, strerror(errno));
+	default_umask = rule->mask;
+	if (rule->fall_through)
+		return;
 	
-	umask(cfg->mask ? cfg->mask : 022);
+	if (setuid(req->pw->pw_uid))
+		die(system_error, "cannot enforce uid %lu: %s",
+		    req->pw->pw_uid, strerror(errno));
 
-	debug1(1, "executing %s", cmdline);
-	execve(argv[0], argv, new_env);
-	die(system_error, "cannot execute %s: %s",
-	    cmdline, strerror(errno));
+	umask(default_umask);
+
+	debug1(2, "executing %s", req->cmdline);
+	execve(req->argv[0], req->argv, new_env);
+	die(system_error, "%s:%d: %s: cannot execute %s: %s",
+	    rule->file, rule->line, rule->tag ? rule->tag : "(untagged)",
+	    req->cmdline, strerror(errno));
 }
 	
 int
 main(int argc, char **argv)
 {
 	char *p;
+	int rc;
 	uid_t uid;
 	struct passwd *pw;
-	struct command_config *config;
-	
+	struct rush_rule *rule;
+	struct rush_request req;
+
 	p = strrchr(argv[0], '/');
 	if (p)
 		p++;
@@ -470,7 +499,7 @@ main(int argc, char **argv)
 	openlog(p, LOG_NDELAY|LOG_PID, LOG_AUTHPRIV);
 	parse_config();
 
-	if (__debug_p(1)) {
+	if (__debug_p(2)) {
 		int i;
 		syslog(LOG_DEBUG, "Command line:");
 		for (i = 0; i < argc; i++)
@@ -484,7 +513,7 @@ main(int argc, char **argv)
 	if ((pw = getpwuid(uid)) == NULL)
 		die(nologin_error, "invalid uid %lu", (unsigned long) uid);
 
-	debug2(1, "user %s, uid %lu", pw->pw_name,
+	debug2(2, "user %s, uid %lu", pw->pw_name,
 	       (unsigned long) pw->pw_uid);
 #if 0
 	if (strcmp (pw->pw_shell, CANONICAL_PROGRAM_NAME))
@@ -494,10 +523,26 @@ main(int argc, char **argv)
 	if (argc != 3 || strcmp(argv[1], "-c"))
 		die(usage_error, "invalid command line");
 
-	config = match_config(argv[2], pw);
-	if (!config)
-		die(usage_error, "no matching configuration for %s", argv[2]);
-	run_config(config, pw, argv[2]);
-
+	req.cmdline = xstrdup(argv[2]);
+	req.pw = pw;
+	rc = argcv_get(req.cmdline, NULL, NULL, &req.argc, &req.argv);
+	if (rc)
+		die(system_error,
+		    "argcv_get(%s) failed: %s",
+		    req.cmdline, strerror(rc));
+	
+	for (rule = NULL; ; rule = rule->next) {
+		rule = match_rule(rule, &req);
+		if (!rule)
+			die(usage_error,
+			    "no matching rule for \"%s\", user %s",
+			    req.cmdline, pw->pw_name);
+		if (debug_level && rule->tag) 
+			syslog(LOG_NOTICE,
+			       "Serving request \"%s\" for %s by rule %s",
+			       argv[2], pw->pw_name, rule->tag);
+		run_rule(rule, &req);
+	} 
+	
 	return 0;
 }

@@ -115,9 +115,12 @@ struct test_node {
 	} v;
 };
 
-struct command_config {
-	struct command_config *next;      /* Next config in the list */
+struct rush_rule {
+	struct rush_rule *next;      /* Next config in the list */
 
+	const char *tag;
+	int fall_through;
+	
 	/* Source location */
 	const char *file;                 /* Configuration file name */
 	size_t line;                      /* and line number. */
@@ -143,7 +146,7 @@ struct command_config {
 
 extern unsigned sleep_time;
 extern char *error_msg[];
-extern struct command_config *config_list, *config_tail;
+extern struct rush_rule *rule_head, *rule_tail;
 extern unsigned debug_level;
 
 #define __debug_p(x) ((x) <= debug_level)
