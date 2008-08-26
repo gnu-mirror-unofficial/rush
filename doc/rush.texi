@@ -87,8 +87,20 @@ Appendices
 * Concept Index::        Index of Concepts.
 
 @detailmenu
-@end detailmenu
+ --- The Detailed Node Listing ---
 
+Configuration File
+
+* Syntax::
+* Debugging::
+* Conditions::
+* Transformations::
+* System Actions::
+* Environment::
+* Global Actions::
+* Fall-through::
+
+@end detailmenu
 @end menu
 
 @node Intro
@@ -111,15 +123,15 @@ the host machine.  If wrong arguments are supplied, the shell aborts.
 @cindex request
   The third argument to @command{rush} supplies the command line to be
 executed.  This command line along with the password database entry
-for the user who executes @command{rush} are told to form a
+for the user who executes @command{rush} are said to form a
 @dfn{request}.
 
 @cindex rule
 @cindex conditions
 @cindex actions
   After startup, @command{rush} reads a set of @dfn{rules} from its
-configuration file.  Each rule consists of a set of @dfn{conditions},
-and a number of @dfn{actions}.  Conditions are used to match the rule
+configuration file.  Each rule consists of @dfn{conditions}
+and @dfn{actions}.  Conditions are used to match the rule
 against the request.  They can include regular expression matching
 against the command line or its particular arguments, user name or
 group comparisons, etc.  If all conditions match the request, the
@@ -134,7 +146,7 @@ actions are executed.  Actions allow to:
 @item Run command in a special root directory (@samp{chroot}).
 @end itemize
 
-  Finally, after all actions are executed successfully, @command{rush}
+  Finally, after all actions have been executed successfully, @command{rush}
 executes the command.  Notice, that the resulting command line is not
 necessarily the same as was supplied to @command{rush} via the @option{-c}
 option.
@@ -145,13 +157,13 @@ option.
 provided.  Fall-through rules differ from other rules in that they do
 not execute the command.  After all actions in a fall-through rule
 have been executed, Rush continues to search for another matching rule
-in its configuration and applies it if found.  Fall-through rules
+in its configuration and applies it, if found.  Fall-through rules
 allow to set default values for rules that follow them.
 
 @node Quick Start
 @chapter Quick Start
-  For example, suppose you have the following configuration file
-rule:
+  To give you the feel of Rush possibilities, let's consider the
+following configuration file rule:
 
 @smallexample
 @group
@@ -180,11 +192,11 @@ components.
   The @code{uid} statement tells that this rule applies only to users
 with @acronym{UID}s greater than or equal to 100. 
 
-  Following clauses define actions associated with this rule.
+  Subsequent clauses define actions associated with this rule.
 
   The @code{transform[0]} clause contains instructions on how to
-modify the zeroth argument of the command line (i.e. the command
-name).  These instructions are in the form of @code{sed} replace
+modify the first argument of the command line (i.e. the command
+name).  These instructions use the form of @code{sed} replace
 expression (@pxref{Transformations, transformation expression}).  The
 supplied expression tells to replace the command name with
 @samp{bin/sftp-server}. 
@@ -207,7 +219,7 @@ building the package, @FIXME-ref{Installation} for a detailed
 information about it.
 
   The configuration file is read and parsed right after start up.  Any
-errors accursed in parsing are reported using @code{syslog} facility
+errors occurred in parsing are reported using @code{syslog} facility
 @samp{authpriv} and priority @samp{notice}.  The simplest way to
 test your configuration is to run @command{rush} from the command
 line and check the syslog output for details.  @xref{Debugging}, for
@@ -255,7 +267,7 @@ usage-error Contact your system administrator
 @node Debugging
 @section Debugging
 @cindex debugging
-  The @code{debug} statement sets the @dfn{debugging level}, an
+  The @code{debug} statement sets the @dfn{debugging level} -- an
 integer value that controls the verbosity of @command{rush}:
 
 @kwindex debug
@@ -264,7 +276,7 @@ integer value that controls the verbosity of @command{rush}:
 Set the debugging level to @var{num}.
 @end table
 
-  The greater @var{num}, the more verbose is shell's logging.  The
+  The greater @var{num} is, the more verbose is shell's logging.  The
 debugging information is reported via @code{syslog} at facility
 @samp{authpriv}, priority @samp{debug}.  As of version @value{VERSION},
 the following debugging levels are supported: 
@@ -285,7 +297,7 @@ for sergiusz by rule sftp-savane
 List all actions executed when serving requests.
 
 @item 3
-Verbosely describe the parsing of configuration file.
+Verbosely describe parsing of the configuration file.
 @end table
 
   More debugging levels may be implemented in future.  
@@ -293,11 +305,11 @@ Verbosely describe the parsing of configuration file.
 @node Conditions
 @section Conditions
 @cindex conditions
-  These statements define conditions using in matching the rule with
+  These statements define conditions that are used to match the rule with
 the request.  A rule may contain any number of conditions.  All
 conditions are tested using boolean shortcut @samp{and}
 evaluation: if any of them yields false, the rest is not considered
-and control is transferred to the subsequent rule.
+and control is transferred to subsequent rule.
 
 @table @code
 @kwindex command
@@ -330,7 +342,7 @@ match[$] ^/.*
 @kwindex argc
 @item argc @var{op} @var{num}
 True, if the number of command line arguments compares to @var{num}.
-The comparison operator is given by @var{op}, which can be one is one
+The comparison operator is given by @var{op}, which can be one 
 of the following: @samp{=} (@samp{==}), @samp{!=}, @samp{<},
 @samp{<=}, @samp{>}, @samp{>=}.
 
@@ -344,21 +356,21 @@ argc < 3
 @kwindex uid
 @item uid @var{op} @var{num}
 True, if the @acronym{UID} compares to @var{num}.
-The comparison operator is given by @var{op}, which can be one is one
+The comparison operator is given by @var{op}, which can be one 
 of the following: @samp{=} (@samp{==}), @samp{!=}, @samp{<},
 @samp{<=}, @samp{>}, @samp{>=}.
 
 @kwindex gid
 @item gid @var{op} @var{num}
 True, if the @acronym{GID} compares to @var{num}.
-The comparison operator is given by @var{op}, which can be one is one
+The comparison operator is given by @var{op}, which can be one
 of the following: @samp{=} (@samp{==}), @samp{!=}, @samp{<},
 @samp{<=}, @samp{>}, @samp{>=}.
 
 @kwindex user
 @item user @var{names}
 Argument is a whitespace-delimited list of user names.  This condition
-yields true, if the user name matches one of listed names.
+yields true, if the user name matches one of the listed names.
 String comparisons are case-sensitive.
 
 @kwindex group
@@ -451,8 +463,8 @@ transform s,one,two,
 slashes.  For instance, it is more convenient to write @code{s,/,-,} than
 @code{s/\//-/}.
 
-  For example, the following rule uses @code{transform} to ensure the
-well known and presumably safe path to the binary:
+  For example, the following rule uses @code{transform} to ensure that
+@file{/usr/bin/cvs} binary is used:
 
 @smallexample
 @group
@@ -493,8 +505,8 @@ Set the umask.  The @var{mask} must be an octal value not greater than
 @item chroot @var{dir}
 Change the root directory to that specified in @var{dir}.  This
 directory will be used for file names beginning with @samp{/}.
-If @var{dir} begins with tilde (@samp{~}), it is replaced with
-the user's home directory before chrooting.
+A tilde (@samp{~}) in the beginning of @var{dir} is replaced with
+the user's home directory.
 
 The directory @var{dir} must be properly set up to execute the 
 commands.  For example, the following rule defines execution of
@@ -517,21 +529,21 @@ directories and files that are needed for executing it, in particular
 
 @kwindex chdir
 @item chdir @var{dir}
-Change to the directory @var{dir}.  The @var{dir} is subject to
+Change to the directory @var{dir}.  The argument is subject to
 tilde-expansion (see @code{chroot}, above).  If both @code{chdir} and
 @code{chroot} are specified, then @code{chroot} is executed first.
 
 @kwindex limits
 @item limits @var{res}
-Impose limits on system resources as defined by @var{res}.  The
+Impose limits on system resources, as defined by @var{res}.  The
 argument consists of @dfn{commands}, optionally separated by any
 amount of whitespace.  A command is a single command letter followed
 by a number, that specifies the limit.  The command letters are
-case-insensitive and are the same as used by the shell @code{ulimit}
+case-insensitive and coincide with those used by the shell @code{ulimit}
 utility:
 
 @multitable @columnfractions 0.3 0.6 
-@headitem Command @tab  limit it sets
+@headitem Command @tab  The limit it sets
 @item     A       @tab  max address space (KB)
 @item     C       @tab  max core file size (KB)
 @item     D       @tab  max data size (KB)
@@ -724,6 +736,21 @@ rule default
 Fall-through rules provide a way to set default values for subsequent
 rules.  For example, any rules that follow the @samp{default} rule
 shown above, will inherit the umask and environment set there.
+
+One can also use fall-through rules to ``normalize'' command lines.
+For example, consider this rule:
+
+@smallexample
+@group
+rule default
+  transform[0] s|.*/||;
+  fall-through
+@end group
+@end smallexample
+
+This rule will remove all path components from the first argument.
+As a result, all subsequent rules may expect a bare binary name as the
+first argument.
 
 @node Reporting Bugs
 @chapter How to Report a Bug

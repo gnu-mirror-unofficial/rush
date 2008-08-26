@@ -105,6 +105,7 @@ struct rush_request {
 	int argc;
 	char **argv;
 	struct passwd *pw;
+	char *home_dir;
 };
 
 int
@@ -392,7 +393,6 @@ void
 run_rule(struct rush_rule *rule, struct rush_request *req)
 {
 	struct transform_arg *xarg;
-	const char *home_dir = NULL;
 	int rc;
 	char **new_env;
 	
@@ -443,9 +443,11 @@ run_rule(struct rush_rule *rule, struct rush_request *req)
 	}
 	environ = new_env;
 	
-	if (rule->home_dir)
-		home_dir = expand_tilde(rule->home_dir, req->pw->pw_dir);
-
+	if (rule->home_dir) {
+		free(req->home_dir);
+		req->home_dir = expand_tilde(rule->home_dir, req->pw->pw_dir);
+	}
+	
 	if (rule->chroot_dir) {
 		const char *dir = expand_tilde(rule->chroot_dir,
 					       req->pw->pw_dir);
@@ -453,19 +455,23 @@ run_rule(struct rush_rule *rule, struct rush_request *req)
 		if (chroot(dir)) 
 			die(system_error, "cannot chroot to %s: %s",
 			    dir, strerror(errno));
-		if (home_dir && is_prefix(dir, home_dir))
-			home_dir += strlen(dir);
+		if (req->home_dir && is_prefix(dir, req->home_dir)) {
+			char *new_dir = req->home_dir + strlen(dir);
+			memmove(req->home_dir, new_dir, strlen(new_dir) + 1);
+		}
 	}
 
-	if (home_dir) {
-		debug1(2, "Home dir: %s", home_dir);
-		chdir(home_dir);
-	}
-
+	if (req->home_dir) 
+		debug1(2, "Home dir: %s", req->home_dir);
+	
 	default_umask = rule->mask;
 	if (rule->fall_through)
 		return;
 	
+	if (req->home_dir && chdir(req->home_dir)) 
+		die(system_error, "cannot change to dir %s: %s",
+		    req->home_dir, strerror(errno));
+
 	if (setuid(req->pw->pw_uid))
 		die(system_error, "cannot enforce uid %lu: %s",
 		    req->pw->pw_uid, strerror(errno));
@@ -525,6 +531,7 @@ main(int argc, char **argv)
 
 	req.cmdline = xstrdup(argv[2]);
 	req.pw = pw;
+	req.home_dir = NULL;
 	rc = argcv_get(req.cmdline, NULL, NULL, &req.argc, &req.argv);
 	if (rc)
 		die(system_error,
