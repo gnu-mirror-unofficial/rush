@@ -728,7 +728,7 @@ shown above, will inherit the umask and environment set there.
 @node Reporting Bugs
 @chapter How to Report a Bug
 
-  Email bug reports to @email{gray@@gnu.org.ua}.  Please include a
+  Email bug reports to @email{bug-rush@@gnu.org.ua}.  Please include a
 detailed description of the bug and information about the conditions
 under which it occurs, so we can reproduce it.  To facilitate the
 task, the following list shows the basic set of information that is

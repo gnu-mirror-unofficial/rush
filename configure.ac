@@ -15,7 +15,7 @@
 # along with Rush.  If not, see <http://www.gnu.org/licenses/>.
 
 AC_PREREQ(2.61)
-AC_INIT([rush], [1.0], [gray@gnu.org.ua])
+AC_INIT([rush], [1.0], [bug-rush@gnu.org.ua])
 AC_CONFIG_SRCDIR([src/rush.c])
 AC_CONFIG_HEADER([config.h])
 AC_CONFIG_AUX_DIR([build-aux])
