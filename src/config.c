@@ -343,6 +343,325 @@ parse_numtest(struct input_buf *ibuf, struct test_numeric_node *numtest,
 	return 0;
 }
 
+int
+parse_strv(struct input_buf *ibuf, struct test_node *node, char *val)
+{
+	int n, rc = argcv_get(val, NULL, "#", &n, &node->v.strv);
+	if (rc)
+		syslog(LOG_NOTICE,
+		       "%s:%d: failed to parse value: %s",
+		       ibuf->file, ibuf->line, strerror (rc));
+	return rc;
+}
+
+void
+regexp_error(struct input_buf *ibuf, regex_t *regex, int rc)
+{
+	char errbuf[512];
+	regerror(rc, regex, errbuf, sizeof(errbuf));
+	syslog(LOG_NOTICE, "%s:%d: invalid regexp: %s",
+	       ibuf->file, ibuf->line, errbuf);
+}
+
+static int
+_parse_command(struct input_buf *ibuf, struct command_config *cur,
+	       char *kw, char *val)
+{
+	int cflags = REG_EXTENDED;
+	int rc;
+	struct test_node *node;
+
+	node = new_test_node(cur, test_cmdline);
+	rc = regcomp(&node->v.regex, val, cflags);
+	if (rc) 
+		regexp_error(ibuf, &node->v.regex, rc);
+	return rc;
+}
+	
+static int
+_parse_match(struct input_buf *ibuf, struct command_config *cur,
+	     char *kw, char *val)
+{
+	int cflags = REG_EXTENDED;
+	char *q;
+	struct test_node *node;
+	int rc, n;
+
+	if (kw[1] == '$') {
+		n = -1;
+		q = kw + 2;
+	} else 
+		n = strtoul(kw + 1, &q, 10);
+	if (*q != ']') {
+		syslog(LOG_NOTICE,
+		       "%s:%d: missing ]",
+			       ibuf->file, ibuf->line);
+		return 1;
+	}
+	node = new_test_node(cur, test_arg);
+	node->v.arg.arg_no = n;
+	rc = regcomp(&node->v.arg.regex, val, cflags);
+	if (rc) 
+		regexp_error(ibuf, &node->v.regex, rc);
+	return rc;
+}
+	
+static int
+_parse_argc(struct input_buf *ibuf, struct command_config *cur,
+	    char *kw, char *val)
+{
+	struct test_node *node = new_test_node(cur, test_argc);
+	return parse_numtest(ibuf, &node->v.num, val);
+}
+
+static int
+_parse_uid(struct input_buf *ibuf, struct command_config *cur,
+	   char *kw, char *val)
+{
+	struct test_node *node = new_test_node(cur, test_uid);
+	return parse_numtest(ibuf, &node->v.num, val);
+}
+
+static int
+_parse_gid(struct input_buf *ibuf, struct command_config *cur,
+	   char *kw, char *val)
+{
+	struct test_node *node = new_test_node(cur, test_gid);
+	return parse_numtest(ibuf, &node->v.num, val);
+}
+
+static int
+_parse_user(struct input_buf *ibuf, struct command_config *cur,
+	    char *kw, char *val)
+{
+	struct test_node *node = new_test_node(cur, test_user);
+	return parse_strv(ibuf, node, val);
+}
+
+static int
+_parse_group(struct input_buf *ibuf, struct command_config *cur,
+	     char *kw, char *val)
+{
+	struct test_node *node = new_test_node(cur, test_group);
+	return parse_strv(ibuf, node, val);
+}
+
+static int
+_parse_umask(struct input_buf *ibuf, struct command_config *cur,
+	     char *kw, char *val)
+{
+	char *q;
+	unsigned int n = strtoul(val, &q, 8);
+	if (*q || (n & ~0777)) {
+		syslog(LOG_NOTICE,
+		       "%s:%d: invalid umask: %s",
+		       ibuf->file, ibuf->line, val);
+		return 1;
+	} else
+		cur->mask = n;
+	return 0;
+}
+
+static int
+_parse_chroot(struct input_buf *ibuf, struct command_config *cur,
+	      char *kw, char *val)
+{
+	char *chroot_dir = xstrdup(val);
+	if (trimslash(chroot_dir) == 0) {
+		syslog(LOG_NOTICE,
+		       "%s:%d: invalid chroot directory",
+		       ibuf->file, ibuf->line);
+		return 1;
+	} else if (check_dir(chroot_dir, ibuf))
+		return 1;
+	cur->chroot_dir = chroot_dir;
+	return 0;
+}
+
+static int
+_parse_limits(struct input_buf *ibuf, struct command_config *cur,
+	      char *kw, char *val)
+{
+	char *q;
+			
+	if (parse_limits(&cur->limits, val, &q)) {
+		syslog(LOG_NOTICE,
+		       "%s:%d: unknown limit: %s",
+		       ibuf->file, ibuf->line, q);
+		return 1;
+	}
+	return 0;
+}
+
+static int
+_parse_transform(struct input_buf *ibuf, struct command_config *cur,
+		 char *kw, char *val)
+{
+	cur->trans = compile_transform_expr(val);
+	return 0;
+}
+
+static int
+_parse_transform_ar(struct input_buf *ibuf, struct command_config *cur,
+		    char *kw, char *val)
+{
+	char *q;
+	struct transform_arg *xarg;
+	int n;
+	
+	if (kw[1] == '$') {
+		n = -1;
+		q = kw + 2;
+	} else 
+		n = strtoul(kw + 1, &q, 10);
+	if (*q != ']') {
+		syslog(LOG_NOTICE,
+		       "%s:%d: missing ]",
+		       ibuf->file, ibuf->line);
+		return 1;
+	}
+	xarg = new_transform_arg(cur);
+	xarg->arg_no = n;
+	xarg->trans = compile_transform_expr(val);
+	return 0;
+}
+
+static int
+_parse_chdir(struct input_buf *ibuf, struct command_config *cur,
+	     char *kw, char *val)
+{
+	char *home_dir = cur->home_dir = xstrdup(val);
+	if (trimslash(home_dir) == 0) {
+		syslog(LOG_NOTICE,
+		       "%s:%d: invalid home directory",
+		       ibuf->file, ibuf->line);
+		return 1;
+	}
+	else if (!cur->chroot_dir && check_dir(home_dir, ibuf))
+		return 1;
+	cur->home_dir = home_dir;
+	return 0;
+}
+
+static int
+_parse_env(struct input_buf *ibuf, struct command_config *cur,
+	   char *kw, char *val)
+{
+	int rc, n;
+	rc = argcv_get(val, NULL, "#", &n, &cur->env);
+	if (rc) 
+		syslog(LOG_NOTICE,
+		       "%s:%d: failed to parse value: %s",
+		       ibuf->file, ibuf->line, strerror (rc));
+	return rc;
+}
+
+/* Global statements */
+static int
+_parse_debug(struct input_buf *ibuf, struct command_config *cur,
+	     char *kw, char *val)
+{
+	debug_level = strtoul(val, NULL, 0);
+	debug1(0, "debug level set to %d", debug_level);
+	return 0;
+}
+
+static int
+_parse_sleep_time(struct input_buf *ibuf, struct command_config *cur,
+		  char *kw, char *val)
+{
+	char *q;
+	sleep_time = strtoul(val, &q, 10);
+	if (*q) {
+		syslog(LOG_NOTICE,
+		       "%s:%d: invalid time: %s",
+		       ibuf->file, ibuf->line, val);
+		return 1;
+	}
+	return 0;
+}
+
+static int
+_parse_usage_error(struct input_buf *ibuf, struct command_config *cur,
+		   char *kw, char *val)
+{
+	error_msg[usage_error] = copy_string(val);
+	return 0;
+}
+
+static int
+_parse_nologin_error(struct input_buf *ibuf, struct command_config *cur,
+		     char *kw, char *val)
+{
+	error_msg[nologin_error] = copy_string(val);
+	return 0;
+}
+
+static int
+_parse_config_error(struct input_buf *ibuf, struct command_config *cur,
+		    char *kw, char *val)
+{
+	error_msg[config_error] = copy_string(val);
+	return 0;
+}
+
+static int
+_parse_system_error(struct input_buf *ibuf, struct command_config *cur,
+		    char *kw, char *val)
+{
+	error_msg[system_error] = copy_string(val);
+	return 0;
+}
+
+
+struct token {
+	char *name;
+	int ar;
+	int (*parser) (struct input_buf *, struct command_config *,
+		       char *, char *);
+};
+
+
+struct token toktab[] = {
+	{ "command", 0, _parse_command },
+	{ "match", 1, _parse_match },
+	{ "argc", 0, _parse_argc },
+	{ "uid", 0, _parse_uid },
+	{ "gid", 0, _parse_gid },
+	{ "user", 0, _parse_user },
+	{ "group", 0, _parse_group },
+	{ "umask", 0, _parse_umask },
+	{ "chroot", 0, _parse_chroot },
+	{ "limits", 0, _parse_limits },
+	{ "transform", 0, _parse_transform },
+	{ "transform", 1, _parse_transform_ar },
+	{ "chdir", 0, _parse_chdir },
+	{ "env", 0, _parse_env },
+	{ "debug", 0, _parse_debug },
+	{ "sleep-time", 0, _parse_sleep_time },
+	{ "usage-error", 0, _parse_usage_error },
+	{ "nologin-error", 0, _parse_nologin_error },
+	{ "config-error", 0, _parse_config_error },
+	{ "system-error", 0, _parse_system_error },
+	{ NULL }
+};
+
+struct token *
+find_token(const char *name, int *plen)
+{
+	struct token *tok;
+	int len = strcspn(name, "[");
+	
+	for (tok = toktab; tok->name; tok++) {
+		if (strncmp(tok->name, name, len) == 0
+		    && (name[len] == 0 ? tok->ar == 0 : tok->ar != 0)) {
+			*plen = len;
+			return tok;
+		}
+	}
+	return NULL;
+}
+
 void
 parse_input_buf(struct input_buf *ibuf, struct command_config *cur)
 {
@@ -354,7 +673,9 @@ parse_input_buf(struct input_buf *ibuf, struct command_config *cur)
 	while (read_line(ibuf, &buf, &size)) {
 		char *kw, *val;
 		char *p;
-
+		struct token *tok;
+		int len;
+		
 		p = skipws(buf);
 		debug1(2, "read line: %s", p);
 		if (p[0] == 0 || p[0] == '#')
@@ -376,194 +697,22 @@ parse_input_buf(struct input_buf *ibuf, struct command_config *cur)
 			continue;
 		}
 
-		if (strcmp(kw, "command") == 0) {
-			int cflags = REG_EXTENDED;
-			int rc;
-			struct test_node *node;
-
-			cur = new_command_config();
-			cur->file = ibuf->file;
-			cur->line = ibuf->line;
-			node = new_test_node(cur, test_cmdline);
-			rc = regcomp(&node->v.regex, val, cflags);
-			if (rc) {
-				char errbuf[512];
-				regerror(rc, &node->v.regex, errbuf,
-					 sizeof(errbuf));
-				syslog(LOG_NOTICE,
-				       "%s:%d: invalid regexp: %s",
-				       ibuf->file, ibuf->line, errbuf);
-				err = 1;
-			}
-		} else if (strncmp(kw, "match", 5) == 0
-			   && kw[5] == '[') {
-			int cflags = REG_EXTENDED;
-			char *q;
-			struct test_node *node;
-			int n;
-			int rc;
-			
-			if (kw[6] == '$') {
-				n = -1;
-				q = kw + 7;
-			} else 
-				n = strtoul(kw + 6, &q, 10);
-			if (*q != ']') {
-				syslog(LOG_NOTICE,
-				       "%s:%d: missing ]",
-				       ibuf->file, ibuf->line);
-				err = 1;
-				continue;
-			}
-			node = new_test_node(cur, test_arg);
-			node->v.arg.arg_no = n;
-			rc = regcomp(&node->v.arg.regex, val, cflags);
-			if (rc) {
-				char errbuf[512];
-				regerror(rc, &node->v.arg.regex, errbuf,
-					 sizeof(errbuf));
-				syslog(LOG_NOTICE,
-				       "%s:%d: invalid regexp: %s",
-				       ibuf->file, ibuf->line, errbuf);
-				err = 1;
-			}
-		} else if (strcmp(kw, "argc") == 0) {
-			struct test_node *node = new_test_node(cur, test_argc);
-
-			parse_numtest(ibuf, &node->v.num, val);
-		} else if (strcmp(kw, "uid") == 0) {
-			struct test_node *node = new_test_node(cur, test_uid);
-
-			parse_numtest(ibuf, &node->v.num, val);
-		} else if (strcmp(kw, "gid") == 0) {
-			struct test_node *node = new_test_node(cur, test_gid);
-
-			parse_numtest(ibuf, &node->v.num, val);
-
-		} else if (strcmp(kw, "user") == 0) {
-			int rc, n;
-			struct test_node *node = new_test_node(cur, test_user);
-			rc = argcv_get(val, NULL, "#", &n, &node->v.strv);
-			if (rc) {
-				syslog(LOG_NOTICE,
-				       "%s:%d: failed to parse value: %s",
-				       ibuf->file, ibuf->line, strerror (rc));
-				err = 1;
-			}
-		} else if (strcmp(kw, "group") == 0) {
-			int rc, n;
-			struct test_node *node = new_test_node(cur,
-							       test_group);
-			rc = argcv_get(val, NULL, "#", &n, &node->v.strv);
-			if (rc) {
-				syslog(LOG_NOTICE,
-				       "%s:%d: failed to parse value: %s",
-				       ibuf->file, ibuf->line, strerror (rc));
-				err = 1;
-			}
-			
-		} else if (strcmp(kw, "umask") == 0) {
-			char *q;
-			unsigned int n = strtoul(val, &q, 8);
-			if (*q || (n & ~0777)) {
-				syslog(LOG_NOTICE,
-				       "%s:%d: invalid umask: %s",
-				       ibuf->file, ibuf->line, val);
-				err = 1;
-			} else
-				cur->mask = n;
-		} else if (strcmp(kw, "chroot") == 0) {
-			char *chroot_dir = xstrdup(val);
-			if (trimslash(chroot_dir) == 0) {
-				syslog(LOG_NOTICE,
-				       "%s:%d: invalid chroot directory",
-				       ibuf->file, ibuf->line);
-				err = 1;
-			} else if (check_dir(chroot_dir, ibuf))
-				err = 1;
-			cur->chroot_dir = chroot_dir;
-		} else if (strcmp(kw, "limits") == 0) {
-			char *q;
-			
-			if (parse_limits(&cur->limits, val, &q)) {
-				syslog(LOG_NOTICE,
-				       "%s:%d: unknown limit: %s",
-				       ibuf->file, ibuf->line, q);
-				err = 1;
-			}
-
-		} else if (strcmp(kw, "transform") == 0) {
-			cur->trans = compile_transform_expr(val);
-		} else if (strncmp(kw, "transform", 9) == 0
-			   && kw[9] == '[') {
-			char *q;
-			struct transform_arg *xarg;
-			int n;
-			
-			if (kw[10] == '$') {
-				n = -1;
-				q = kw + 11;
-			} else 
-				n = strtoul(kw + 10, &q, 10);
-			if (*q != ']') {
-				syslog(LOG_NOTICE,
-				       "%s:%d: missing ]",
-				       ibuf->file, ibuf->line);
-				err = 1;
-				continue;
-			}
-			xarg = new_transform_arg(cur);
-			xarg->arg_no = n;
-			xarg->trans = compile_transform_expr(val);
-		} else if (strcmp(kw, "chdir") == 0) {
-			char *home_dir = cur->home_dir = xstrdup(val);
-			if (trimslash(home_dir) == 0) {
-				syslog(LOG_NOTICE,
-				       "%s:%d: invalid home directory",
-				       ibuf->file, ibuf->line);
-				err = 1;
-			} else if (!cur->chroot_dir 
-                                   && check_dir(home_dir, ibuf))
-				err = 1;
-			cur->home_dir = home_dir;
-
-		} else if (strcmp(kw, "env") == 0) {
-			int rc, n;
-			rc = argcv_get(val, NULL, "#", &n, &cur->env);
-			if (rc) {
-				syslog(LOG_NOTICE,
-				       "%s:%d: failed to parse value: %s",
-				       ibuf->file, ibuf->line, strerror (rc));
-				err = 1;
-			}
-			
-			/* Global statements */
-		} else if (strcmp(kw, "debug") == 0) {
-			debug_level = strtoul(val, NULL, 0);
-			debug1(0, "debug level set to %d", debug_level);
-		} else if (strcmp(kw, "sleep-time") == 0) {
-			char *q;
-			sleep_time = strtoul(val, &q, 10);
-			if (*q) {
-				syslog(LOG_NOTICE,
-				       "%s:%d: invalid time: %s",
-				       ibuf->file, ibuf->line, val);
-				err = 1;
-			}
-		} else if (strcmp(kw, "usage-error") == 0) 
-			error_msg[usage_error] = copy_string(val);
-		else if (strcmp(kw, "nologin-error") == 0) 
-			error_msg[nologin_error] = copy_string(val);
-		else if (strcmp(kw, "config-error") == 0)
-			error_msg[config_error] = copy_string(val);
-		else if (strcmp(kw, "system-error") == 0)
-			error_msg[system_error] = copy_string(val);
-		else {
+		tok = find_token(kw, &len);
+		if (!tok) {
 			syslog(LOG_NOTICE,
 			       "%s:%d: unknown statement: %s",
 			       ibuf->file, ibuf->line, kw);
 			err = 1;
+			continue;
 		}
+			
+		if (strcmp(kw, "command") == 0) {
+			cur = new_command_config();
+			cur->file = ibuf->file;
+			cur->line = ibuf->line;
+		}
+
+		err |= tok->parser(ibuf, cur, kw + len, val);
 	}
 	free(buf);
 	debug1(2, "Finished parsing %s", ibuf->file);
