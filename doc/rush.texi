@@ -105,12 +105,11 @@ Configuration File
 
 @node Intro
 @chapter Introduction
-  Rush is a Restricted User Shell, which is useful if you wish to give
-certain remote users a restricted access to the resources of your
-machine.  It is intended for use with @code{ssh}, @code{rsh} and
-similar remote access programs.  Using a sophisticated configuration
-file, Rush gives you complete control over the command lines that users
-execute, and the usage of system resources.
+  Rush is a Restricted User Shellm, intended for use with ssh,
+rsh and similar remote access programs.  Using a sophisticated
+configuration file, Rush gives you complete control over the command
+lines that users execute, the usage of system resources, such as
+virtual memory, CPU time, etc. 
 
 @node Operation
 @chapter Operation
