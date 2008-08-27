@@ -68,10 +68,16 @@ typedef struct transform *transform_t;
 		tail = elt;			\
 	} while(0)
 
-struct transform_arg {
-	struct transform_arg *next;
-	int arg_no;
+enum transform_node_type {
+	transform_cmdline,
+	transform_arg
+};
+
+struct transform_node {
+	struct transform_node *next;
+	enum transform_node_type type;
 	transform_t trans;
+	int arg_no;
 };
 
 /* Comparison operator */
@@ -129,11 +135,7 @@ struct rush_rule {
 	struct test_node *test_head, *test_tail;
 	
 	/* Transformation parameters: */
-
-	/* ... for entire command line. */
-	transform_t trans;
-	/* ... for particular arguments. */
-	struct transform_arg *arg_head, *arg_tail;
+	struct transform_node *transform_head, *transform_tail;
 
 	/* Environment modification: */
 	char **env;

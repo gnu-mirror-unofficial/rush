@@ -390,43 +390,66 @@ env_setup(char **env)
 }
 
 void
-run_rule(struct rush_rule *rule, struct rush_request *req)
+reparse_cmdline(struct rush_request *req)
 {
-	struct transform_arg *xarg;
 	int rc;
-	char **new_env;
 	
-	debug2(2, "Matching rule: %s:%d", rule->file, rule->line);
-	
-	if (set_user_limits (req->pw->pw_name, rule->limits))
-		die(usage_error, "cannot set limits for %s", req->pw->pw_name);
-
-	debug(2, "Transforming command line");
-	req->cmdline = transform_string(rule->trans, req->cmdline);
-	debug1(2, "Command line: %s", req->cmdline);
-
 	argcv_free(req->argc, req->argv);
-	
 	if ((rc = argcv_get(req->cmdline, NULL, NULL, &req->argc, &req->argv)))
 		die(system_error, "argcv_get(%s) failed: %s",
 		    req->cmdline, strerror(rc));
+}
 
-	debug(2, "Transforming arguments");
-	for (xarg = rule->arg_head; xarg; xarg = xarg->next) {
-		char *p;
-		int arg_no = xarg->arg_no;
-		if (arg_no == -1)
-			arg_no = req->argc - 1;
-		if (arg_no >= req->argc) 
-			die(usage_error, "not enough arguments in command: %s",
-			    req->cmdline);
-		p = transform_string(xarg->trans, req->argv[arg_no]);
-		free(req->argv[arg_no]);
-		req->argv[arg_no] = p;
+void
+rebuild_cmdline(struct rush_request *req)
+{
+	int rc;
+	free(req->cmdline);
+	rc = argcv_string(req->argc, req->argv, &req->cmdline);
+	if (rc)
+		die(system_error, "argcv_string failed: %s", strerror(rc));
+}
+
+void
+run_transforms(struct rush_rule *rule, struct rush_request *req)
+{
+	struct transform_node *node;
+	char *p;
+	int arg_no;
+	int args_transformed = 0;
+	
+	for (node = rule->transform_head; node; node = node->next) {
+		switch (node->type) {
+		case transform_cmdline:
+			if (args_transformed) {
+				rebuild_cmdline(req);
+				args_transformed = 0;
+			}
+			debug(2, "Transforming command line");
+			p = transform_string(node->trans, req->cmdline);
+			free(req->cmdline);
+			req->cmdline = p;
+			debug1(2, "Command line: %s", req->cmdline);
+			reparse_cmdline(req);
+			break;
+
+		case transform_arg:
+			arg_no = node->arg_no;
+			if (arg_no == -1)
+				arg_no = req->argc - 1;
+			if (arg_no >= req->argc) 
+				die(usage_error,
+				    "not enough arguments in command: %s",
+				    req->cmdline);
+			p = transform_string(node->trans, req->argv[arg_no]);
+			free(req->argv[arg_no]);
+			req->argv[arg_no] = p;
+			args_transformed = 1;
+		}
 	}
 
-	free(req->cmdline);
-	argcv_string(req->argc, req->argv, &req->cmdline);
+	if (args_transformed) 
+		rebuild_cmdline(req);
 
 	if (__debug_p(2)) {
 		int i;
@@ -434,6 +457,20 @@ run_rule(struct rush_rule *rule, struct rush_request *req)
 		for (i = 0; i < req->argc; i++)
 			syslog(LOG_DEBUG, "% 4d: %s", i, req->argv[i]);
 	}
+}
+
+void
+run_rule(struct rush_rule *rule, struct rush_request *req)
+{
+	char **new_env;
+	
+	debug2(2, "Matching rule: %s:%d", rule->file, rule->line);
+	
+	if (set_user_limits (req->pw->pw_name, rule->limits))
+		die(usage_error, "cannot set limits for %s", req->pw->pw_name);
+
+	run_transforms(rule, req);
+
 	new_env = env_setup(rule->env);
 	if (__debug_p(2)) {
 		int i;

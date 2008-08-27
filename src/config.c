@@ -262,11 +262,12 @@ check_dir(const char *dir, struct input_buf *ibuf)
 	return 0;
 }
 	
-struct transform_arg *
-new_transform_arg(struct rush_rule *rule)
+struct transform_node *
+new_transform_node(struct rush_rule *rule, enum transform_node_type type)
 {
-	struct transform_arg *p = xzalloc(sizeof(*p));
-	LIST_APPEND(p, rule->arg_head, rule->arg_tail);
+	struct transform_node *p = xzalloc(sizeof(*p));
+	LIST_APPEND(p, rule->transform_head, rule->transform_tail);
+	p->type = type;
 	return p;
 }
 
@@ -484,7 +485,9 @@ static int
 _parse_transform(struct input_buf *ibuf, struct rush_rule *rule,
 		 char *kw, char *val)
 {
-	rule->trans = compile_transform_expr(val);
+	struct transform_node *node;
+	node = new_transform_node(rule, transform_cmdline);
+	node->trans = compile_transform_expr(val);
 	return 0;
 }
 
@@ -493,7 +496,7 @@ _parse_transform_ar(struct input_buf *ibuf, struct rush_rule *rule,
 		    char *kw, char *val)
 {
 	char *q;
-	struct transform_arg *xarg;
+	struct transform_node *node;
 	int n;
 	
 	if (kw[1] == '$') {
@@ -507,9 +510,9 @@ _parse_transform_ar(struct input_buf *ibuf, struct rush_rule *rule,
 		       ibuf->file, ibuf->line);
 		return 1;
 	}
-	xarg = new_transform_arg(rule);
-	xarg->arg_no = n;
-	xarg->trans = compile_transform_expr(val);
+	node = new_transform_node(rule, transform_arg);
+	node->arg_no = n;
+	node->trans = compile_transform_expr(val);
 	return 0;
 }
 
