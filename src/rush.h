@@ -113,6 +113,7 @@ struct test_arg_node {
 struct test_node {
 	struct test_node *next;
 	enum test_type type;
+	int negate;
 	union {
 		regex_t regex;
 		struct test_arg_node arg;

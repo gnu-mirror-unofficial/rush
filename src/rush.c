@@ -217,11 +217,16 @@ run_tests(struct rush_rule *rule, struct rush_request *req)
 {
 	struct test_node *node;
 	for (node = rule->test_head; node; node = node->next) {
+		int res;
+		
 		if (node->type >= sizeof(test_request)/sizeof(test_request[0]))
 			die(system_error,
 			    "%s:%d: INTERNAL ERROR: node type out of range",
 			    __FILE__, __LINE__);
-		if (test_request[node->type](node, req))
+		res = test_request[node->type](node, req);
+		if (node->negate)
+			res = !res;
+		if (res) 
 			return 1;
 	}
 	return 0;

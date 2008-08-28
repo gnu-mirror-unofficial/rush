@@ -309,6 +309,16 @@ parse_cmp_op (enum cmp_op *op, char **pstr)
 	return 0;
 }
 
+static char *
+_parse_negation(struct test_node *node, char *val)
+{
+	if (val[0] == '!' && val[1] != '=') {
+		node->negate = 1;
+		val = skipws(val + 1);
+	}
+	return val;
+}
+
 int
 parse_numtest(struct input_buf *ibuf, struct test_numeric_node *numtest,
 	      char *val)
@@ -360,6 +370,7 @@ _parse_command(struct input_buf *ibuf, struct rush_rule *rule,
 	struct test_node *node;
 
 	node = new_test_node(rule, test_cmdline);
+	val = _parse_negation(node, val);
 	rc = regcomp(&node->v.regex, val, cflags);
 	if (rc) 
 		regexp_error(ibuf, &node->v.regex, rc);
@@ -388,6 +399,7 @@ _parse_match(struct input_buf *ibuf, struct rush_rule *rule,
 	}
 	node = new_test_node(rule, test_arg);
 	node->v.arg.arg_no = n;
+	val = _parse_negation(node, val);
 	rc = regcomp(&node->v.arg.regex, val, cflags);
 	if (rc) 
 		regexp_error(ibuf, &node->v.regex, rc);
@@ -399,6 +411,7 @@ _parse_argc(struct input_buf *ibuf, struct rush_rule *rule,
 	    char *kw, char *val)
 {
 	struct test_node *node = new_test_node(rule, test_argc);
+	val = _parse_negation(node, val);
 	return parse_numtest(ibuf, &node->v.num, val);
 }
 
@@ -407,6 +420,7 @@ _parse_uid(struct input_buf *ibuf, struct rush_rule *rule,
 	   char *kw, char *val)
 {
 	struct test_node *node = new_test_node(rule, test_uid);
+	val = _parse_negation(node, val);
 	return parse_numtest(ibuf, &node->v.num, val);
 }
 
@@ -415,6 +429,7 @@ _parse_gid(struct input_buf *ibuf, struct rush_rule *rule,
 	   char *kw, char *val)
 {
 	struct test_node *node = new_test_node(rule, test_gid);
+	val = _parse_negation(node, val);
 	return parse_numtest(ibuf, &node->v.num, val);
 }
 
@@ -423,6 +438,7 @@ _parse_user(struct input_buf *ibuf, struct rush_rule *rule,
 	    char *kw, char *val)
 {
 	struct test_node *node = new_test_node(rule, test_user);
+	val = _parse_negation(node, val);
 	return parse_strv(ibuf, node, val);
 }
 
@@ -431,6 +447,7 @@ _parse_group(struct input_buf *ibuf, struct rush_rule *rule,
 	     char *kw, char *val)
 {
 	struct test_node *node = new_test_node(rule, test_group);
+	val = _parse_negation(node, val);
 	return parse_strv(ibuf, node, val);
 }
 

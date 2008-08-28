@@ -384,6 +384,17 @@ group admin root
 @end smallexample
 @end table
 
+  Each condition allows for a negated form, by placing an exclamation
+sign between the condition keyword and expression.  For example:
+
+@table @code
+@item command ^scp
+True, if command line begins with @samp{scp}.
+
+@item command ! ^scp
+True if command line does not begin with @samp{scp}.
+@end table
+
 @node Transformations
 @section Transformations
 @cindex transformations
