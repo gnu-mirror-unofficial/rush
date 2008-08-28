@@ -47,8 +47,8 @@ char *error_msg[] = {
 void
 send_msg(const char *msg, size_t len)
 {
-	int fd = isatty(STDERR_FILENO) ? STDERR_FILENO : STDOUT_FILENO;
-	write (fd, msg, len);
+        if (write (STDERR_FILENO, msg, len) < 0)
+		write (STDOUT_FILENO, msg, len);
 }
 
 void

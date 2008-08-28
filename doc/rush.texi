@@ -79,6 +79,7 @@ documents Rush Version @value{VERSION}.
 * Operation::
 * Quick Start::
 * Configuration File::
+* Usage Tips::
 * Reporting Bugs::       How to Report a Bug.
 
 Appendices
@@ -97,8 +98,16 @@ Configuration File
 * Transformations::
 * System Actions::
 * Environment::
-* Global Actions::
 * Fall-through::
+* Exit::
+* Global Actions::
+
+Usage Tips
+
+* scp::
+* git::
+* rsync::
+* sftp::
 
 @end detailmenu
 @end menu
@@ -812,6 +821,92 @@ A system error occurred while attempting to execute command.
 
 The argument to all @samp{-error} statements is subject to backslash
 interpretation, as described in @ref{Exit, backslash interpretation}.
+
+@node Usage Tips
+@chapter Usage Tips
+@UNREVISED
+
+@menu
+* scp::
+* git::
+* rsync::
+* sftp::
+@end menu
+
+@node scp
+@section scp
+@cindex scp
+@UNREVISED
+
+@smallexample
+# Secure cp requests
+rule scp-to
+  command ^scp (-v )?-t /incoming/(alpha|ftp)
+  transform[0] s|.*|/bin/scp|
+  chroot /var/spool/sftp-upload
+  chdir /incoming
+
+# A trap rule for outbound scp requests
+rule scp-from
+  command ^scp (-v )?-f
+  exit Error: Secure copy from this server is not allowed
+@end smallexample
+
+@node git
+@section git
+@cindex git
+@UNREVISED
+
+@smallexample
+rule git
+  command ^git-.+
+  match[1] ^/vcs-roots/git/[^ ]+\.git$
+  transform s|.*|/usr/bin/git-shell -c "&"|
+
+# Trap the rest of Git requests:
+rule git-trap
+  command ^git-(receive|upload)-pack
+  exit fatal: access to this repository is denied.
+@end smallexample
+
+@node rsync
+@section rsync
+@cindex rsync
+@UNREVISED
+
+@smallexample
+rule rsync-out
+  command ^rsync --server
+  command --sender
+  exit Error: Command administratively prohibited
+
+rule rsync-in
+  command ^rsync --server
+  match[$] /incoming/(alpha|ftp)
+  transform[0] s|rsync|/usr/bin/rsync|
+  transform[$] s|^|/var/spool/sftp-upload|
+@end smallexample
+
+@node sftp
+@section sftp
+@cindex sftp
+@UNREVISED
+
+rule sftp-upload
+  command ^.*/sftp-server
+  group svusers
+  transform[0] s,.*,/bin/sftp-server,
+  chroot /var/spool/sftp-upload
+  chdir /incoming
+
+# Sftp-server requests: chroot into the user's home directory, set umask
+# 002 and execute bin/sftp-server.
+rule sftp-user
+  command ^.*/sftp-server
+  transform[0] s,.*,/bin/sftp-server,
+  umask 002
+  chroot ~
+  chdir /public_html
 
 @node Reporting Bugs
 @chapter How to Report a Bug
