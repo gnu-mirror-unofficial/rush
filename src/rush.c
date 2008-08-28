@@ -244,23 +244,24 @@ match_rule(struct rush_rule *rule, struct rush_request *req)
 	return rule;
 }
 
-const char *
+char *
 expand_tilde(const char *dir, const char *home)
 {
+	char *res;
 	if (dir[0] == '~') {
 		if (dir[1] == '/') {
 			size_t hlen = strlen(home);
 			size_t len = hlen + strlen(dir + 1);
-			char *p = xmalloc(len + 1);
-			strcpy(p, home);
-			if (hlen > 0 && p[hlen-1] != '/')
-				p[hlen++] = '/';
-			strcpy(p + hlen, dir + 2);
-			dir = p;
+			res = xmalloc(len + 1);
+			strcpy(res, home);
+			if (hlen > 0 && res[hlen-1] != '/')
+				res[hlen++] = '/';
+			strcpy(res + hlen, dir + 2);
 		} else
-			dir = xstrdup(home);
-	}
-	return dir;
+			res = xstrdup(home);
+	} else
+		res = xstrdup(dir);
+	return res;
 }
 
 static char *
@@ -469,8 +470,19 @@ run_rule(struct rush_rule *rule, struct rush_request *req)
 {
 	char **new_env;
 	
-	debug2(2, "Matching rule: %s:%d", rule->file, rule->line);
-	
+	debug3(2, "Rule %s at %s:%d matched",
+	       rule->tag ? rule->tag : "(untagged)", rule->file, rule->line);
+
+	if (rule->error_msg) {
+		debug1(2, "Error message: %s", rule->error_msg);
+		if (write(rule->error_fd, rule->error_msg,
+			  strlen(rule->error_msg)) < 0)
+			die(system_error,
+			    "Error sending error message to descriptor %d: %s",
+			    rule->error_fd, strerror(errno));
+		exit(1);
+	}
+			
 	if (set_user_limits (req->pw->pw_name, rule->limits))
 		die(usage_error, "cannot set limits for %s", req->pw->pw_name);
 

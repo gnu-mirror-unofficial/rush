@@ -20,17 +20,30 @@ rule scp-to
   command ^scp (-v )?-t /incoming/(alpha|ftp)
   transform[0] s|.*|/bin/scp|
   chroot /var/spool/sftp-upload
+  chdir /incoming
 
-# Svn server: force right binary and root directory.  
+# A trap rule for outbound scp requests
+rule scp-from
+  command ^scp (-v )?-f
+  exit Error: Secure copy from this server is not allowed
+  
+# Svn server: force full binary path and root directory.  
 rule svn
   command ^svnserve -t
   transform s|-r *[^ ]*||;s|^svnserve |/usr/bin/svnserve -r /svnroot |
 
-# For git requests, let git-shell determine what to do.  
+# For git requests, allow access to repositories located under
+# /vcs-roots/git
 rule git
   command ^git-.+
+  match[1] ^/vcs-roots/git/[^ ]+\.git$
   transform s|.*|/usr/bin/git-shell -c "&"|
 
+# Trap the rest of Git requests:
+rule git-trap
+  command ^git-(receive|upload)-pack
+  exit fatal: access to this repository is denied.
+  
 # Sftp-server requests: chroot into the user's home directory, set umask
 # 002 and execute bin/sftp-server.
 rule sftp

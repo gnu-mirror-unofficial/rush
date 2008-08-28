@@ -230,8 +230,9 @@ information about how to debug your configurations.
 * Transformations::
 * System Actions::
 * Environment::
-* Global Actions::
 * Fall-through::
+* Exit::
+* Global Actions::
 @end menu
 
 @node Syntax
@@ -635,6 +636,124 @@ ends with a punctuation character, this character is removed from it
 before assignment. 
 @end table
 
+@node Fall-through
+@section Fall-through
+@cindex fall-through rule
+A @dfn{fall-through} rule is such a rule that does not execute the
+requested commands.  It is declared using the following statement:
+
+@table @code
+@kwindex fall-through
+@item fall-through
+Declare a rule as a fall-through.
+@end table
+
+Usually it is placed as the last statement in a rule, e.g.:
+
+@smallexample
+@group
+rule default
+  umask 002
+  env - HOME USERNAME PATH
+  fall-through
+@end group
+@end smallexample
+
+Fall-through rules provide a way to set default values for subsequent
+rules.  For example, any rules that follow the @samp{default} rule
+shown above, will inherit the umask and environment set there.
+
+One can also use fall-through rules to ``normalize'' command lines.
+For example, consider this rule:
+
+@smallexample
+@group
+rule default
+  transform[0] s|.*/||;
+  fall-through
+@end group
+@end smallexample
+
+This rule will remove all path components from the first argument.
+As a result, all subsequent rules may expect a bare binary name as the
+first argument.
+
+@node Exit
+@section Exit rule
+@cindex exit rule
+  An @dfn{exit} rule does not execute the command.  Instead, it writes
+a supplied error message to the specified file descriptor and exits
+immediately.  An exit rule is defined using the following statement:
+
+@kwindex exit
+@table @code
+@item exit [@var{fd}] @var{message}
+Write textual message @var{message} to a file descriptor, given by
+optional argument @var{fd}.  If @var{fd} is absent, @samp{2} (standard
+error) is used.
+@end table
+
+The @var{message} argument is subject to backslash interpretation,
+during which the following @dfn{escape sequences} are replaced with
+the corresponding single characters:
+
+@float Table, backslash-interpretation
+@caption{Backslash escapes}
+@multitable @columnfractions 0.30 .5
+@item Sequence @tab Replaced with
+@item \a @tab Audible bell character (@acronym{ASCII} 7)
+@item \b @tab Backspace character (@acronym{ASCII} 8)
+@item \f @tab Form-feed character (@acronym{ASCII} 12)
+@item \n @tab Newline character (@acronym{ASCII} 10)
+@item \r @tab Carriage return character (@acronym{ASCII} 13)
+@item \t @tab Horizontal tabulation character (@acronym{ASCII} 9)
+@item \\ @tab A single backslash (@samp{\}).
+@end multitable
+@end float
+
+Any escape sequence not listed in the table above is copied verbatim.
+
+For example (note the use of line continuation character):
+
+@smallexample
+exit \
+    \r\nYou are not allowed to execute that command.\r\n\
+    \r\nIf you think this is wrong, ask <foo@@bar.com> for assistance.\r\n
+@end smallexample
+
+@cindex trap rule
+Exit actions are useful for writing @dfn{trap rules}, i.e. rules that
+are intended to trap incorrect or prohibited command lines and to return
+customized reply messages in such cases.  Consider the following
+rule:
+
+@smallexample
+@group
+rule git
+  command ^git-.+
+  match[1] ^/sources/[^ ]+\.git$
+  transform s|.*|/usr/bin/git-shell -c "&"|
+@end group
+@end smallexample
+
+It allows to use only those Git repositories that are located under
+@file{/sources} directory.  If a user tries to access a repository
+outside this root, he will be returned a default error message, saying
+@samp{You are not permitted to execute this command} (@pxref{Global
+Actions}).  You can, however, provide a more convenient message in
+this case.  To do so, place the following after the @samp{git} rule:
+
+@smallexample
+@group
+rule git-trap
+  command ^git-.+
+  exit fatal: Use of this repository is prohibited.
+@end group
+@end smallexample
+
+This rule will trap all git invocations that do not match the
+@samp{git} rule.
+
 @node Global Actions
 @section Global Actions
 
@@ -692,74 +811,7 @@ A system error occurred while attempting to execute command.
 @end table
 
 The argument to all @samp{-error} statements is subject to backslash
-interpretation, during which the following @dfn{escape sequences} are
-replaced with the corresponding single characters:
-
-@float Table, backslash-interpretation
-@caption{Backslash escapes}
-@multitable @columnfractions 0.30 .5
-@item Sequence @tab Replaced with
-@item \a @tab Audible bell character (@acronym{ASCII} 7)
-@item \b @tab Backspace character (@acronym{ASCII} 8)
-@item \f @tab Form-feed character (@acronym{ASCII} 12)
-@item \n @tab Newline character (@acronym{ASCII} 10)
-@item \r @tab Carriage return character (@acronym{ASCII} 13)
-@item \t @tab Horizontal tabulation character (@acronym{ASCII} 9)
-@item \\ @tab A single backslash (@samp{\}).
-@end multitable
-@end float
-
-Any escape sequence not listed in the table above is copied verbatim.
-
-For example (note the use of line continuation character):
-
-@smallexample
-usage-error \
-    \r\nYou are not allowed to execute that command.\r\n\
-    \r\nIf you think this is wrong, ask <foo@@bar.com> for assistance.\r\n
-@end smallexample
-
-@node Fall-through
-@section Fall-through
-@cindex fall-through rule
-A @dfn{fall-through} rule is such a rule that does not execute the
-requested commands.  It is declared using the following statement:
-
-@table @code
-@kwindex fall-through
-@item fall-through
-Declare a rule as a fall-through.
-@end table
-
-Usually it is placed as the last statement in a rule, e.g.:
-
-@smallexample
-@group
-rule default
-  umask 002
-  env - HOME USERNAME PATH
-  fall-through
-@end group
-@end smallexample
-
-Fall-through rules provide a way to set default values for subsequent
-rules.  For example, any rules that follow the @samp{default} rule
-shown above, will inherit the umask and environment set there.
-
-One can also use fall-through rules to ``normalize'' command lines.
-For example, consider this rule:
-
-@smallexample
-@group
-rule default
-  transform[0] s|.*/||;
-  fall-through
-@end group
-@end smallexample
-
-This rule will remove all path components from the first argument.
-As a result, all subsequent rules may expect a bare binary name as the
-first argument.
+interpretation, as described in @ref{Exit, backslash interpretation}.
 
 @node Reporting Bugs
 @chapter How to Report a Bug

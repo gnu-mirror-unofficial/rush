@@ -46,6 +46,14 @@
 # define CANONICAL_PROGRAM_NAME "/usr/local/sbin/rush"
 #endif
 
+#if defined HAVE_SYSCONF && defined _SC_OPEN_MAX
+# define getmaxfd() sysconf(_SC_OPEN_MAX)
+#elif defined (HAVE_GETDTABLESIZE)
+# define getmaxfd() getdtablesize()
+#else
+# define getmaxfd() 256
+#endif
+
 #define ISWS(c) ((c) == ' ' || (c) == '\t')
 
 enum error_type {
@@ -141,6 +149,10 @@ struct rush_rule {
 	/* Environment modification: */
 	char **env;
 
+	/* If not NULL, print this message on ERROR_FD and exit */
+	char *error_msg;
+	int error_fd;
+	
 	mode_t mask;                 /* umask */
 	char *chroot_dir;            /* chroot directory */ 
 	char *home_dir;              /* home directory */
@@ -194,7 +206,7 @@ extern unsigned debug_level;
 			       x3, x4, x5, x6);		\
 	} while(0)
 
-void die(enum error_type type, const char *fmt, ...);
+void die(enum error_type type, const char *fmt, ...) ATTRIBUTE_NORETURN;
 
 int parse_limits(limits_record_t *plrec, char *str, char **endp);
 int set_user_limits(const char *name, struct limits_rec *lrec);

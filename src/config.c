@@ -173,13 +173,19 @@ char *
 copy_string(const char *src)
 {
 	char *p;
-	char *dest = xmalloc(strlen(src) + 1);
+	size_t len = strlen(src);
+	char *dest;
+	int add_nl = len > 0 && src[len-1] != '\n';
+	
+	dest = xmalloc(len + (add_nl ? 1 : 0) + 1);
 	for (p = dest; *src; ) {
 		char c = *src++;
 		if (c == '\\' && *src) 
 			c = unquote_char(*src++);
 		*p++ = c;
 	}
+	if (add_nl)
+		*p++ = '\n';
 	*p = 0;
 	return dest;
 }
@@ -628,6 +634,26 @@ _parse_fall_through(struct input_buf *ibuf, struct rush_rule *rule,
 	return 0;
 }
 
+static int
+_parse_exit(struct input_buf *ibuf, struct rush_rule *rule,
+	    char *kw, char *val)
+{
+	if (c_isdigit(val[0])) {
+		unsigned long n = strtoul(val, &val, 10);
+		if (!ISWS(val[0]) || n > getmaxfd()) {
+			syslog(LOG_NOTICE,
+			       "%s:%d: invalid file descriptor",
+			       ibuf->file, ibuf->line);
+			return 1;
+		}
+		val = skipws(val);
+		rule->error_fd = n;
+	} else
+		rule->error_fd = 2;
+	rule->error_msg = copy_string(val);
+	return 0;
+}
+
 
 #define TOK_NONE  0x00   /* No flags */
 #define TOK_ARG   0x01   /* Token requires an argument */
@@ -660,6 +686,7 @@ struct token toktab[] = {
 	{ "chdir",         TOK_DFL, _parse_chdir },
 	{ "env",           TOK_DFL, _parse_env },
 	{ "fall-through",  TOK_RUL, _parse_fall_through },
+	{ "exit",          TOK_RUL, _parse_exit },
 	{ "debug",         TOK_ARG, _parse_debug },
 	{ "sleep-time",    TOK_ARG, _parse_sleep_time },
 	{ "usage-error",   TOK_ARG, _parse_usage_error },

@@ -15,7 +15,7 @@
 # along with Rush.  If not, see <http://www.gnu.org/licenses/>.
 
 AC_PREREQ(2.61)
-AC_INIT([rush], [1.0], [bug-rush@gnu.org.ua])
+AC_INIT([rush], [1.0.90], [bug-rush@gnu.org.ua])
 AC_CONFIG_SRCDIR([src/rush.c])
 AC_CONFIG_HEADER([config.h])
 AC_CONFIG_AUX_DIR([build-aux])
@@ -46,7 +46,7 @@ AC_FUNC_MEMCMP
 AC_FUNC_REALLOC
 AC_FUNC_STAT
 AC_FUNC_ALLOCA
-AC_CHECK_FUNCS([strdup strerror strrchr strtoul])
+AC_CHECK_FUNCS([strdup strerror strrchr strtoul sysconf getdtablesize])
 
 gl_INIT
 

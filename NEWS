@@ -5,6 +5,7 @@ See the end of file for copying conditions.
 Please send bug reports to <bug-rush@gnu.org.ua>
 
 
+Version 1.0.90 (Git)
 
 * A condition can be negated.
 
@@ -14,6 +15,9 @@ its negation, e.g.:
   command ! ^cvs
 
 matches any command line that does not begin with `cvs'  
+
+* New action `exit'
+
 
 
 Version 1.0, 2008-08-26
