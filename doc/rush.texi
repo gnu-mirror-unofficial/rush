@@ -855,18 +855,61 @@ rule scp-from
 @node git
 @section git
 @cindex git
-@UNREVISED
+@cindex git-receive-pack
+@cindex git-upload-pack
+@cindex git-shell
+Remote access to Git repositories over ssh causes execution of
+@code{git-receive-pack} and @code{git-upload-pack} on the server.
+It is preferred to execute them via @code{git-shell}@footnote{See
+@uref{http://www.kernel.org/pub/software/scm/git/docs/git-shell.html}.}.
+So, the simplest rule for Git would be:
 
 @smallexample
+@group
 rule git
   command ^git-.+
-  match[1] ^/vcs-roots/git/[^ ]+\.git$
   transform s|.*|/usr/bin/git-shell -c "&"|
+@end group
+@end smallexample
 
-# Trap the rest of Git requests:
+It catches all commands beginnig with @samp{git-} and rewrites the
+command line to pass them as argument to @code{git-shell}.  The latter
+is rather picky about its argument syntax, in particular it requires
+that the argument to @code{git-receive-pack} (or
+@code{git-upload-pack}) be enclosed in single quotes.  For Rush
+versions up to @value{VERSION} this means that you cannot use
+@code{transform[@var{n}]} with Git rules.  This is because this construct
+triggers field-splitting of the request and subsequent rebuilding.
+The rebuilding stage, however, will quote its arguments only if it is
+necessary (e.g. if they contain white space).  Thus it will remove
+single quotes in the vast majority of cases.  This limitation will be
+removed in future releases.  Fortunately, @code{transform[@var{n}]} is
+almost never needed with Git. 
+
+To limit Git accesses to a subset of root directories, use
+@code{match[1]} construct.  For example, the following rule allows
+execution of Git requests only for repositories residing under one of
+@file{/git/src}, @file{/git/web}, and @file{/git/doc} directories:
+
+@smallexample
+@group
+rule git
+  command ^git-.+
+  match[1] ^/git/(source|web|doc)[^ ]+\.git$
+  transform s|.*|/usr/bin/git-shell -c "&"|
+@end group
+@end smallexample
+
+To provide more helpful error messages, you may follow this rule by a
+trap rule (@pxref{Exit, trap rules}):
+
+@smallexample
+@group
+# @r{Trap the rest of Git requests:}
 rule git-trap
-  command ^git-(receive|upload)-pack
+  command ^git-.+
   exit fatal: access to this repository is denied.
+@end group
 @end smallexample
 
 @node rsync
