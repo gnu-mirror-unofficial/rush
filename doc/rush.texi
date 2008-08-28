@@ -105,9 +105,11 @@ Configuration File
 Usage Tips
 
 * scp::
-* git::
 * rsync::
 * sftp::
+* cvs::
+* svn::
+* git::
 
 @end detailmenu
 @end menu
@@ -828,106 +830,73 @@ interpretation, as described in @ref{Exit, backslash interpretation}.
 
 @menu
 * scp::
-* git::
 * rsync::
 * sftp::
+* cvs::
+* svn::
+* git::
 @end menu
 
 @node scp
 @section scp
 @cindex scp
-@UNREVISED
+When copying files via @code{scp}, it is executed on the server side
+with option @option{-t} when copying files to server, and with
+@option{-f} when copying from it.  Thus, the basic templates for
+@code{scp} rules are:
+
+@smallexample
+# Copying to server:
+rule scp-to
+  command ^scp -t
+  ...
+
+# Copying from server:  
+rule scp-from
+  command ^scp -f
+  ...
+@end smallexample
+
+You may also wish to allow for @option{-v} (@samp{verbose}) command
+line option.  In this case, the @samp{scp-to} rule will become:
+
+@smallexample
+rule scp-to
+  command ^scp (-v )?-t
+  ...
+@end smallexample
+
+The following is a Rush rule for copying files to server.  Users are
+allowed to copy files to @file{/incoming}. On the server, however,
+this directory is located in @file{/var}:
 
 @smallexample
 # Secure cp requests
 rule scp-to
-  command ^scp (-v )?-t /incoming/(alpha|ftp)
+  command ^scp (-v )?-t /incoming
   transform[0] s|.*|/bin/scp|
-  chroot /var/spool/sftp-upload
-  chdir /incoming
-
-# A trap rule for outbound scp requests
-rule scp-from
-  command ^scp (-v )?-f
-  exit Error: Secure copy from this server is not allowed
-@end smallexample
-
-@node git
-@section git
-@cindex git
-@cindex git-receive-pack
-@cindex git-upload-pack
-@cindex git-shell
-Remote access to Git repositories over ssh causes execution of
-@code{git-receive-pack} and @code{git-upload-pack} on the server.
-It is preferred to execute them via @code{git-shell}@footnote{See
-@uref{http://www.kernel.org/pub/software/scm/git/docs/git-shell.html}.}.
-So, the simplest rule for Git would be:
-
-@smallexample
-@group
-rule git
-  command ^git-.+
-  transform s|.*|/usr/bin/git-shell -c "&"|
-@end group
-@end smallexample
-
-It catches all commands beginnig with @samp{git-} and rewrites the
-command line to pass them as argument to @code{git-shell}.  The latter
-is rather picky about its argument syntax, in particular it requires
-that the argument to @code{git-receive-pack} (or
-@code{git-upload-pack}) be enclosed in single quotes.  For Rush
-versions up to @value{VERSION} this means that you cannot use
-@code{transform[@var{n}]} with Git rules.  This is because this construct
-triggers field-splitting of the request and subsequent rebuilding.
-The rebuilding stage, however, will quote its arguments only if it is
-necessary (e.g. if they contain white space).  Thus it will remove
-single quotes in the vast majority of cases.  This limitation will be
-removed in future releases.  Fortunately, @code{transform[@var{n}]} is
-almost never needed with Git. 
-
-To limit Git accesses to a subset of root directories, use
-@code{match[1]} construct.  For example, the following rule allows
-execution of Git requests only for repositories residing under one of
-@file{/git/src}, @file{/git/web}, and @file{/git/doc} directories:
-
-@smallexample
-@group
-rule git
-  command ^git-.+
-  match[1] ^/git/(source|web|doc)[^ ]+\.git$
-  transform s|.*|/usr/bin/git-shell -c "&"|
-@end group
-@end smallexample
-
-To provide more helpful error messages, you may follow this rule by a
-trap rule (@pxref{Exit, trap rules}):
-
-@smallexample
-@group
-# @r{Trap the rest of Git requests:}
-rule git-trap
-  command ^git-.+
-  exit fatal: access to this repository is denied.
-@end group
+  chroot /var
 @end smallexample
 
 @node rsync
 @section rsync
 @cindex rsync
-@UNREVISED
+On the server side, @command{rsync} is executed with the
+@option{--server} command line option.  When copying files from the
+server, the @option{--sender} option is used.  This allows to discern
+between incoming and outgoing requests.
+
+The following example shows a rule that allows to use @command{rsync}
+to upload files to @file{/incoming}, actually located in
+@file{/var/incoming} on the server:
 
 @smallexample
-rule rsync-out
-  command ^rsync --server
-  command --sender
-  exit Error: Command administratively prohibited
-
 rule rsync-in
   command ^rsync --server
-  match[$] /incoming/(alpha|ftp)
-  transform[0] s|rsync|/usr/bin/rsync|
-  transform[$] s|^|/var/spool/sftp-upload|
+  command ! --sender
+  match[$] /incoming/
+  transform[0] s|^|/usr/bin/|
+  transform[$] s|^|/var|
 @end smallexample
 
 @node sftp
@@ -935,6 +904,7 @@ rule rsync-in
 @cindex sftp
 @UNREVISED
 
+@smallexample
 rule sftp-upload
   command ^.*/sftp-server
   group svusers
@@ -950,6 +920,107 @@ rule sftp-user
   umask 002
   chroot ~
   chdir /public_html
+@end smallexample
+
+@node cvs
+@section cvs
+@UNREVISED
+
+@smallexample
+@group
+rule cvs
+  command ^cvs server
+  transform s|^cvs|/usr/bin/cvs -f
+@end group
+@end smallexample
+
+@node svn
+@section svn
+@UNREVISED
+
+@smallexample
+@group
+rule svn
+  command ^svnserve -t
+  transform s|-r *[^ ]*||;s|^svnserve |/usr/bin/svnserve -r /svnroot|
+@end group
+@end smallexample
+
+@node git
+@section git
+@cindex git
+@cindex git-receive-pack
+@cindex git-upload-pack
+@cindex git-shell
+Remote access to Git repositories over ssh causes execution of
+@code{git-receive-pack} and @code{git-upload-pack} on the server.
+The simplest rule for Git is:
+
+@smallexample
+@group
+rule git
+  command ^git-(receive|upload)-pack
+  transform[0] s|^|/usr/bin/|
+@end group
+@end smallexample
+
+The @code{transform} action is necessary to ensure the proper location
+of Git binaries to use.  This example supposes they are placed in
+@file{/usr/bin}, you will have to tailor it if they are located
+elsewhere on your system.
+
+To limit Git accesses to a subset of root directories, use
+@code{match[1]} construct.  For example, the following rule allows
+execution of Git requests only for repositories residing under one of
+@file{/git/src}, @file{/git/web}, and @file{/git/doc} directories:
+
+@smallexample
+@group
+rule git
+  command ^git-(receive|upload)-pack
+  match[1] ^/git/(source|web|doc)[^ ]+\.git$
+  transform[0] s|^|/usr/bin/|
+@end group
+@end smallexample
+
+To provide more helpful error messages, you may follow this rule by a
+trap rule (@pxref{Exit, trap rules}):
+
+@smallexample
+@group
+# @r{Trap the rest of Git requests:}
+rule git-trap
+  command ^git-.+
+  exit fatal: access to this repository is denied.
+@end group
+@end smallexample
+
+Use of @code{git-shell}@footnote{See
+@uref{http://www.kernel.org/pub/software/scm/git/docs/git-shell.html}.}
+is not necessary if you use Rush.  If, however, you decide to use it
+in your rules, make sure you they do not contain
+@code{transform[@var{n}]} actions.  It is because this actions may alter
+the quotation style of the command fields.  @code{Git-shell} is picky
+about its argument syntax.  In particular, it requires that the
+argument to @code{git-receive-pack} (or @code{git-upload-pack}) be
+enclosed in single quotes.  Now, the @code{transform[@var{n}]}
+construct triggers field-splitting of the request and subsequent
+rebuilding.  The rebuilding stage, however, will quote its arguments
+only if it is necessary (e.g. if they contain white space).  Thus it
+will remove single quotes in the vast majority of cases, which will
+cause @code{git-shell} to complain and exit. 
+
+To summarize, the following is the recommended way to use Git via
+@code{git-shell}: 
+
+@smallexample
+@group
+rule git
+  command ^git-.+
+  match[1] ^/git/(source|web|doc)[^ ]+\.git$
+  transform s|.*|/usr/bin/git-shell -c "&"|
+@end group
+@end smallexample
 
 @node Reporting Bugs
 @chapter How to Report a Bug
