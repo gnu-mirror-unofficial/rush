@@ -826,7 +826,34 @@ interpretation, as described in @ref{Exit, backslash interpretation}.
 
 @node Usage Tips
 @chapter Usage Tips
-@UNREVISED
+In this chapter we will explain how to write Rush configuration rules
+for the most popular remote copy and version control system
+utilities.  For this purpose, we assume the following setup:
+
+@itemize @bullet
+@item Users are allowed to use @code{scp} and @code{rsync} to upload
+files to the @file{/incoming} directory and to copy files to and from
+their @file{~/public_html} directory.  
+The @file{/incoming} directory is located on server in @file{/home/ftp}
+directory, but that is transparent to users, i.e. they use
+@code{scp @var{file} @var{host}:/incoming} (not
+@code{@var{host}:/home/ftp/incoming}) to upload files.
+
+@item Additionally, users may use @command{sftp} to manage their
+@file{~/public_html} directory.  In this case, to prevent users from
+accessing other directories, @command{sftp-server} is executed in a
+chrooted environment. 
+
+@item The server runs three version control system repositories, which
+are located in:
+
+@multitable @columnfractions 0.3 0.7
+@headitem VCS @tab Repository
+@item cvs     @tab /cvsroot
+@item svn     @tab /svnroot
+@item git     @tab /gitroot
+@end multitable
+@end itemize
 
 @menu
 * scp::
@@ -841,7 +868,7 @@ interpretation, as described in @ref{Exit, backslash interpretation}.
 @section scp
 @cindex scp
 When copying files via @code{scp}, it is executed on the server side
-with option @option{-t} when copying files to server, and with
+with option @option{-t}, when copying files to server, and with
 @option{-f} when copying from it.  Thus, the basic templates for
 @code{scp} rules are:
 
@@ -866,16 +893,58 @@ rule scp-to
   ...
 @end smallexample
 
-The following is a Rush rule for copying files to server.  Users are
-allowed to copy files to @file{/incoming}. On the server, however,
-this directory is located in @file{/var}:
+First, we want users to be able to upload files to
+@file{/home/ftp/incoming} directory.  Moreover, the @file{/home/ftp}
+directory prefix must be incisible to them.  We must also make sure
+that the user cannod get outside the  incoming directory by using
+@file{../} components in its upload path.  So, our first rule for
+@code{scp} uploads will be:
 
 @smallexample
-# Secure cp requests
-rule scp-to
-  command ^scp (-v )?-t /incoming
+rule scp-to-incoming
+  command ^scp (-v )?-t /incoming/
+  match[$] ! \.\./
   transform[0] s|.*|/bin/scp|
-  chroot /var
+  transform[$] s|^|/home/ftp/|
+@end smallexample
+
+The @code{match[$]} statement ensures that no relative components are
+used.  Two transform rules ensure that the right @command{scp} binary
+is used and that @file{/home/ftp} prefix is prepended to the upload
+path.
+
+Other than uploading to @file{/incoming}, users must be able to use
+@command{scp} to manage @file{public_html} directories located in
+their homes.  They should use relative paths for that, i.e., the
+command:
+
+@smallexample
+$ scp file.html server:
+@end smallexample
+
+@noindent
+will copy file @file{file.html} to @file{~/public_html/file.html} on
+the server.  The corresponding rule is:
+
+@smallexample
+rule scp-home
+  command ^scp (-v )?-[tf] [^/].*
+  match[$] ! \.\./
+  transform[0] s|.*|/bin/scp|
+  transform[$] s|^|public_html/|
+  chdir ~
+@end smallexample
+
+Finally, we provide two trap rules for diagnostic purposes:
+
+@smallexample
+rule scp-to-trap
+  command ^scp (-v )?-t
+  exit Error: Uploads to this directory prohibited
+
+rule scp-from  
+  command ^scp (-v )?-f
+  exit Error: Downloads from this directory prohibited
 @end smallexample
 
 @node rsync
@@ -886,45 +955,77 @@ On the server side, @command{rsync} is executed with the
 server, the @option{--sender} option is used.  This allows to discern
 between incoming and outgoing requests.
 
-The following example shows a rule that allows to use @command{rsync}
-to upload files to @file{/incoming}, actually located in
-@file{/var/incoming} on the server:
+In our setup @command{rsync} is used the same way as @command{scp}, so
+the two rules will be:
 
 @smallexample
-rule rsync-in
+rule rsync-incoming
   command ^rsync --server
   command ! --sender
   match[$] /incoming/
+  match[$] ! \.\./
   transform[0] s|^|/usr/bin/|
-  transform[$] s|^|/var|
+  transform[$] s|^|/home/ftp/|
+
+rule rsync-home
+  command ^rsync
+  match[$] ! ^[^/]
+  match[$] ! \.\./
+  transform[0] s|^|/usr/bin/|
+  transform[$] s|^|public_html/|
+  chdir ~
+@end smallexample
+
+The trap rules for @command{rsync} are trivial:
+
+@smallexample
+rule rsync-to-trap
+  command ^rsync
+  command --sender
+  exit Error: Downloads from this directory prohibited
+
+rule rsync-from-trap
+  command ^rsync
+  exit Error: Uploads to this directory prohibited
 @end smallexample
 
 @node sftp
 @section sftp
 @cindex sftp
-@UNREVISED
+Executing @command{sftp} on the client machine invokes
+@command{sftp-server}, without arguments, on the server. 
+
+We want to allow our users to use @command{sftp} to manage their
+@file{public_html} directories.  The @command{sftp-server} will be
+executed with the user's home directory as root, in a chrooted
+environment.  For this to work, each user's home must contain a copy
+of @command{sftp-server} (which we'll place in @file{~/bin}
+subdirectory) and all files it needs for normal execution: 
+@file{/etc/group} and @file{/etc/passwd} with one entry
+(for the user and his group), and, unless the binary is linked
+statically, all the shared libraries it is linked with, in a
+subdirectory @file{~/lib}.
+
+Given these prerequisites, the following rule will ensure proper
+@command{sftp} interaction:
 
 @smallexample
-rule sftp-upload
-  command ^.*/sftp-server
-  group svusers
-  transform[0] s,.*,/bin/sftp-server,
-  chroot /var/spool/sftp-upload
-  chdir /incoming
-
-# Sftp-server requests: chroot into the user's home directory, set umask
-# 002 and execute bin/sftp-server.
-rule sftp-user
+rule sftp-incoming
   command ^.*/sftp-server
   transform[0] s,.*,/bin/sftp-server,
-  umask 002
   chroot ~
-  chdir /public_html
+  chdir public_html
 @end smallexample
+
+Notice the last action.  Due to it, users dont have to type @code{cd
+public_html} at the beginning of their sftp sessions.
 
 @node cvs
 @section cvs
-@UNREVISED
+@cindex cvs
+Using @command{cvs} over @code{ssh} invokes @command{cvs server} on
+the server machine.  In the simplest case, the following rule will do
+to give users access to @acronym{CVS} repositories:
 
 @smallexample
 @group
@@ -934,9 +1035,30 @@ rule cvs
 @end group
 @end smallexample
 
+However, @code{cvs} as of version 1.12.13 does not allow to limit root
+directories that users are allowed to use.  It does have
+@option{--allow-root} option, but unfortunately it is ignored when
+invoked as @command{cvs server}.  To restrict possible roots, we have
+to run it in chrooted environment.  Let's suppose we created an environment
+for @command{cvs} in directory @file{/var/cvs}, with the @command{cvs}
+binary located in @file{/var/cvs/bin} and repository root directory
+being @file{/var/cvs/cvsroot}.  Then, the following rule can be used:
+
+@smallexample
+rule cvs
+  command ^cvs server
+  transform s|^|/bin/cvs
+  chroot /var/cvs
+@end smallexample
+
 @node svn
 @section svn
-@UNREVISED
+@cindex svn
+Remote access to @acronym{SVN} repositories is done via
+@command{svnserve} binary.  It is executed on server with @option{-t}
+option.  The @option{-r} option can be used to restrict access to a
+subset of root directories.  To summarize, we can use the following
+rule:
 
 @smallexample
 @group
@@ -944,6 +1066,14 @@ rule svn
   command ^svnserve -t
   transform s|-r *[^ ]*||;s|^svnserve |/usr/bin/svnserve -r /svnroot|
 @end group
+@end smallexample
+
+The @code{transform} action removes any @option{-r} options the user
+might have specified and enforces a singe root directory.  A more
+restrictive action cannot be used to improve security:
+
+@smallexample
+  transform s|.*|/usr/bin/svnserve -r /svnroot|
 @end smallexample
 
 @node git

@@ -35,7 +35,7 @@ rule svn
 # For git requests, allow access to repositories located under
 # /vcs-roots/git
 rule git
-  command ^git-.+
+  command ^git-(receive|upload)-pack
   match[1] ^/vcs-roots/git/[^ ]+\.git$
   transform s|.*|/usr/bin/git-shell -c "&"|
 
