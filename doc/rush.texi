@@ -895,8 +895,8 @@ rule scp-to
 
 First, we want users to be able to upload files to
 @file{/home/ftp/incoming} directory.  Moreover, the @file{/home/ftp}
-directory prefix must be incisible to them.  We must also make sure
-that the user cannod get outside the  incoming directory by using
+directory prefix must be invisible to them.  We must also make sure
+that the user cannot get outside the  incoming directory by using
 @file{../} components in its upload path.  So, our first rule for
 @code{scp} uploads will be:
 
