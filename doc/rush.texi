@@ -1017,7 +1017,7 @@ rule sftp-incoming
   chdir public_html
 @end smallexample
 
-Notice the last action.  Due to it, users dont have to type @code{cd
+Notice the last action.  Due to it, users don't have to type @code{cd
 public_html} at the beginning of their sftp sessions.
 
 @node cvs
@@ -1070,7 +1070,7 @@ rule svn
 
 The @code{transform} action removes any @option{-r} options the user
 might have specified and enforces a singe root directory.  A more
-restrictive action cannot be used to improve security:
+restrictive action can be used to improve security:
 
 @smallexample
   transform s|.*|/usr/bin/svnserve -r /svnroot|
