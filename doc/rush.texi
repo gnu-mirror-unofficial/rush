@@ -119,8 +119,8 @@ Usage Tips
   Rush is a Restricted User Shell, intended for use with ssh,
 rsh and similar remote access programs.  Using a sophisticated
 configuration file, Rush gives you complete control over the command
-lines that users execute, the usage of system resources, such as
-virtual memory, CPU time, etc. 
+lines that users execute remotely, and over the usage of system
+resources, such as virtual memory, CPU time, etc. 
 
 @node Operation
 @chapter Operation
@@ -142,8 +142,8 @@ for the user who executes @command{rush} are said to form a
   After startup, @command{rush} reads a set of @dfn{rules} from its
 configuration file.  Each rule consists of @dfn{conditions}
 and @dfn{actions}.  Conditions are used to match the rule
-against the request.  They can include regular expression matching
-against the command line or its particular arguments, user name or
+with the request.  They can include regular expression matching
+with entire command line or particular arguments, user name or
 group comparisons, etc.  If all conditions match the request, the
 actions are executed.  Actions allow to:
 
@@ -168,7 +168,7 @@ provided.  Fall-through rules differ from other rules in that they do
 not execute the command.  After all actions in a fall-through rule
 have been executed, Rush continues to search for another matching rule
 in its configuration and applies it, if found.  Fall-through rules
-allow to set default values for rules that follow them.
+allow to set default values for subsequent rules.
 
 @node Quick Start
 @chapter Quick Start
@@ -192,21 +192,24 @@ rule sftp
   The first clause, @code{rule}, defines a new rule.  Its argument
 serves as a rule identifier in diagnostic messages.
 
+  Lines beginning with @samp{#} are comments, they are intended for a
+human reader and are ignored by @code{rush}.
+ 
   Next two statements, @code{command} and @code{uid}, define
 conditions that must be met for this rule to become active.  The
 @code{command} statement introduces a regular expression to match
-against the command line.  In this example, the command line must
-begin with @samp{/sftp-server}, preceded by arbitrary directory
-components. 
+with the command line.  In this example, the command line must
+begin with @samp{/sftp-server}, optionally preceded by arbitrary
+directory components. 
 
   The @code{uid} statement tells that this rule applies only to users
-with @acronym{UID}s greater than or equal to 100. 
+whose @acronym{UID}s are greater than or equal to 100. 
 
   Subsequent clauses define actions associated with this rule.
 
   The @code{transform[0]} clause contains instructions on how to
 modify the first argument of the command line (i.e. the command
-name).  These instructions use the form of @code{sed} replace
+name).  These instructions are in the form of @code{sed} replace
 expression (@pxref{Transformations, transformation expression}).  The
 supplied expression tells to replace the command name with
 @samp{bin/sftp-server}. 
@@ -255,7 +258,7 @@ information about how to debug your configurations.
   A @dfn{comment} is any line whose first non-whitespace character is
 @samp{#}.  Empty lines and comments are ignored.
 
-  A @dfn{statement} consists of a keyword and optional value.  If the
+  A @dfn{statement} consists of a keyword and an optional value.  If the
 value is supplied, it must be separated from the keyword by any amount
 of white space.  Statements are delimited by newline characters.
 Length of a statement line is not limited.  Long statements
@@ -296,7 +299,7 @@ the following debugging levels are supported:
 @item 1
 A minimum debugging level, and the only one whose messages are logged
 using the priority @samp{notice}.  At this level, @command{rush} only
-logs requests and rules that are used to serve them.  For example:
+logs requests and rules selected to handle them.  For example:
 
 @smallexample
 rush[16821]: Serving request "/usr/libexec/sftp-server"
@@ -317,9 +320,10 @@ Verbosely describe parsing of the configuration file.
 @cindex conditions
   These statements define conditions that are used to match the rule with
 the request.  A rule may contain any number of conditions.  All
-conditions are tested using boolean shortcut @samp{and}
-evaluation: if any of them yields false, the rest is not considered
-and control is transferred to subsequent rule.
+conditions are tested in order of their appearence in the rule and are
+tied together using boolean shortcut @samp{and} evaluation: if any of
+them yields false, the rest is not considered and control is
+transferred to subsequent rule. 
 
 @table @code
 @kwindex command
@@ -333,16 +337,21 @@ For example:
 command ^scp (-v )?-t /incoming/(alpha|ftp)
 @end smallexample
 
+By default, @acronym{POSIX} extended regular expressions are used.
+This, however can be changed using @code{regex} statement (@pxref{regex}).
+
 @kwindex match
 @item match[@var{n}] @var{regexp}
-True, if @var{n}th @dfn{word} from the command line matches regular
-expression @var{regexp}.  A special value @samp{$} can be used instead
-of @var{n} to denote the last word.
+True, if @var{n}th @dfn{word} from the command line matches
+regular expression @var{regexp}.  A special value @samp{$} can be used
+instead of @var{n} to denote the last word.  Unless changed by
+previous @code{regex} statement (@pxref{regex}), @acronym{POSIX}
+extended regular expressions are used. 
 
 The command line is split into words using the same rules as used in
 @code{/bin/sh}.
 
-For example, the condition below yields true if the last arguments is
+For example, the condition below yields true if the last argument is
 an absolute path name:
 
 @smallexample
@@ -351,9 +360,9 @@ match[$] ^/.*
 
 @kwindex argc
 @item argc @var{op} @var{num}
-True, if the number of command line arguments compares to @var{num}.
+Compare the number of command line arguments to @var{num}.
 The comparison operator is given by @var{op}, which can be one 
-of the following: @samp{=} (@samp{==}), @samp{!=}, @samp{<},
+of the following: @samp{=} (or @samp{==}), @samp{!=}, @samp{<},
 @samp{<=}, @samp{>}, @samp{>=}.
 
 For example, the following condition matches if the number of
@@ -365,27 +374,27 @@ argc < 3
 
 @kwindex uid
 @item uid @var{op} @var{num}
-True, if the @acronym{UID} compares to @var{num}.
+Compare current @acronym{UID} to @var{num}.
 The comparison operator is given by @var{op}, which can be one 
 of the following: @samp{=} (@samp{==}), @samp{!=}, @samp{<},
 @samp{<=}, @samp{>}, @samp{>=}.
 
 @kwindex gid
 @item gid @var{op} @var{num}
-True, if the @acronym{GID} compares to @var{num}.
+Compare current @acronym{GID} to @var{num}.
 The comparison operator is given by @var{op}, which can be one
 of the following: @samp{=} (@samp{==}), @samp{!=}, @samp{<},
 @samp{<=}, @samp{>}, @samp{>=}.
 
 @kwindex user
 @item user @var{names}
-Argument is a whitespace-delimited list of user names.  This condition
+Argument is a whitespace-separated list of user names.  This condition
 yields true, if the user name matches one of the listed names.
 String comparisons are case-sensitive.
 
 @kwindex group
 @item group @var{names}
-Argument is a whitespace-delimited list of group names.  This condition
+Argument is a whitespace-separated list of group names.  This condition
 yields true, if the the name of any group the user is a member of
 matches one of listed names. String comparisons are case-sensitive.
 
@@ -410,16 +419,16 @@ True if command line does not begin with @samp{scp}.
 @node Transformations
 @section Transformations
 @cindex transformations
-  Special actions that allow to rewrite the command line are called
+  Special actions that allow to rewrite command line are called
 @dfn{transformations}.
 
 @kwindex transform
 @table @code
 @item transform @var{expr}
-Apply the expression @var{expr} to the entire command line.
+Apply expression @var{expr} to entire command line.
 
 @item transform[@var{n}] @var{expr}
-Apply the expression @var{expr} to @var{n}th @dfn{word} from the
+Apply expression @var{expr} to @var{n}th @dfn{word} from the
 command line.  A special value @samp{$} can be used instead
 of @var{n} to denote the last word.
 @end table
@@ -461,7 +470,7 @@ sed, GNU sed}).
 @item @var{number}
 Only replace the @var{number}th match of the @var{regexp}.
 
-Note: the @var{posix} standard does not specify what should happen
+Note: the @acronym{POSIX} standard does not specify what should happen
 when you mix the @samp{g} and @var{number} modifiers.  Rush
 follows the GNU @command{sed} implementation in this regard, so
 the interaction is defined to be: ignore matches before the
@@ -507,7 +516,8 @@ rule svn
 
   This transform expression first removes all occurrences of
 @option{-r} option and its arguments from the command line, and then
-adds its own @option{-r} option and ensures the proper binary name.
+adds its own @option{-r} option and replaces @samp{svnserve} with a
+full name of the program.
 
 @node System Actions
 @section System Actions
@@ -650,8 +660,8 @@ before assignment.
 @node Fall-through
 @section Fall-through
 @cindex fall-through rule
-A @dfn{fall-through} rule is such a rule that does not execute the
-requested commands.  It is declared using the following statement:
+A @dfn{fall-through} rule is a rule that does not execute the
+requested command.  It is declared using the following statement:
 
 @table @code
 @kwindex fall-through
@@ -685,7 +695,7 @@ rule default
 @end group
 @end smallexample
 
-This rule will remove all path components from the first argument.
+It will remove all path components from the first comman line argument.
 As a result, all subsequent rules may expect a bare binary name as the
 first argument.
 
@@ -693,7 +703,7 @@ first argument.
 @section Exit rule
 @cindex exit rule
   An @dfn{exit} rule does not execute the command.  Instead, it writes
-a supplied error message to the specified file descriptor and exits
+the supplied error message to the specified file descriptor and exits
 immediately.  An exit rule is defined using the following statement:
 
 @kwindex exit
@@ -706,7 +716,7 @@ error) is used.
 
 The @var{message} argument is subject to backslash interpretation,
 during which the following @dfn{escape sequences} are replaced with
-the corresponding single characters:
+the corresponding single characters, as described in the table below:
 
 @float Table, backslash-interpretation
 @caption{Backslash escapes}
@@ -722,7 +732,7 @@ the corresponding single characters:
 @end multitable
 @end float
 
-Any escape sequence not listed in the table above is copied verbatim.
+Any escape sequence not listed in this table is copied verbatim.
 
 For example (note the use of line continuation character):
 
@@ -771,7 +781,44 @@ This rule will trap all git invocations that do not match the
 Global actions affect the behavior of @command{rush} as a whole.
 
 @table @code
-@kwindex sleep-time @var{number}
+@kwindex regex
+@cindex regular expressions
+@cindex extended regular expressions
+@cindex basic regular expressions
+@anchor{regex}
+@item regex @var{regex-flags}
+@var{Regex-flags} is a whitespace-separated list of flags.
+Each flag is a word specifying some regular expression 
+feature.  It can be preceded by @samp{+} to enable this feature (this
+is the default), or by @samp{-} to disable it.  Valid flags are:
+
+@table @samp
+@item extended
+Use @acronym{POSIX} Extended Regular Expression syntax when
+interpreting regex.  This is the default.
+
+@item basic
+Use basic regular expressions.  Equivalent to @samp{-extended}.
+
+@item icase
+Do not differentiate case.  Subsequent regex matches will be case
+insensitive. 
+@end table
+
+For example, the following statement enables @acronym{POSIX} extended,
+case insensitive matching:
+
+@smallexample
+regex +extended +icase
+@end smallexample
+
+The @code{regex} settings affect subsequent @code{cmdline} and
+@code{match} statements (@pxref{Conditions}), and remain in effect
+until next @code{regex} statement or the end of configuration file,
+whichever occurs first.
+                       
+@kwindex sleep-time
+@item sleep-time @var{number}
 Set the time in seconds to sleep before exiting on error.  This
 is intended as a measure against brute-force attacks.  The default
 is 5 seconds.
@@ -779,7 +826,7 @@ is 5 seconds.
 @kwindex usage-error
 @item usage-error @var{text}
 Set the textual message which is returned to the remote user if a
-usage error occurs.  See below for a description of @var{text}.
+usage error occurs.  
 The default is:
 
 @smallexample
@@ -789,8 +836,7 @@ You are not permitted to execute this command.
 @kwindex nologin-error
 @item nologin-error @var{text}
 Set the textual message which is returned to the remote user if
-there is no such user name in the password database.  See below for a
-description of @var{text}. 
+there is no such user name in the password database.  
 
 The default is:
 
@@ -801,7 +847,7 @@ You do not have interactive login access to this machine.
 @kwindex config-error
 @item config-error @var{text}
 Set the textual message which is returned to the remote user on
-Rush configuration errors.  See below for a description of @var{text}.
+Rush configuration errors.  
 
 The default is:
 
@@ -812,7 +858,7 @@ Local configuration error occurred.
 @kwindex system-error
 @item system-error @var{text}
 Set the textual message which is returned to the remote user if
-a system error occurs.  See below for a description of @var{text}.
+a system error occurs. 
 
 The default message is:
 
@@ -827,7 +873,7 @@ interpretation, as described in @ref{Exit, backslash interpretation}.
 @node Usage Tips
 @chapter Usage Tips
 In this chapter we will explain how to write Rush configuration rules
-for the most popular remote copy and version control system
+for several popular remote copy and version control system
 utilities.  For this purpose, we assume the following setup:
 
 @itemize @bullet
@@ -845,10 +891,10 @@ accessing other directories, @command{sftp-server} is executed in a
 chrooted environment. 
 
 @item The server runs three version control system repositories, which
-are located in:
+are located in the following directories:
 
 @multitable @columnfractions 0.3 0.7
-@headitem VCS @tab Repository
+@headitem VCS @tab Repository Root
 @item cvs     @tab /cvsroot
 @item svn     @tab /svnroot
 @item git     @tab /gitroot
@@ -867,7 +913,7 @@ are located in:
 @node scp
 @section scp
 @cindex scp
-When copying files via @code{scp}, it is executed on the server side
+The @code{scp} utility is executed on the server side
 with option @option{-t}, when copying files to server, and with
 @option{-f} when copying from it.  Thus, the basic templates for
 @code{scp} rules are:
@@ -896,8 +942,8 @@ rule scp-to
 First, we want users to be able to upload files to
 @file{/home/ftp/incoming} directory.  Moreover, the @file{/home/ftp}
 directory prefix must be invisible to them.  We must also make sure
-that the user cannot get outside the  incoming directory by using
-@file{../} components in its upload path.  So, our first rule for
+that the user cannot get outside the @file{incoming} directory by using
+@file{../} components in his upload path.  So, our first rule for
 @code{scp} uploads will be:
 
 @smallexample
@@ -955,7 +1001,7 @@ On the server side, @command{rsync} is executed with the
 server, the @option{--sender} option is used.  This allows to discern
 between incoming and outgoing requests.
 
-In our setup @command{rsync} is used the same way as @command{scp}, so
+In our setup, @command{rsync} is used the same way as @command{scp}, so
 the two rules will be:
 
 @smallexample
@@ -1003,7 +1049,7 @@ of @command{sftp-server} (which we'll place in @file{~/bin}
 subdirectory) and all files it needs for normal execution: 
 @file{/etc/group} and @file{/etc/passwd} with one entry
 (for the user and his group), and, unless the binary is linked
-statically, all the shared libraries it is linked with, in a
+statically, all the shared libraries it is linked with, in the
 subdirectory @file{~/lib}.
 
 Given these prerequisites, the following rule will ensure proper
@@ -1036,13 +1082,13 @@ rule cvs
 @end smallexample
 
 However, @code{cvs} as of version 1.12.13 does not allow to limit root
-directories that users are allowed to use.  It does have
+directories that users are allowed to access.  It does have
 @option{--allow-root} option, but unfortunately it is ignored when
 invoked as @command{cvs server}.  To restrict possible roots, we have
 to run it in chrooted environment.  Let's suppose we created an environment
 for @command{cvs} in directory @file{/var/cvs}, with the @command{cvs}
 binary located in @file{/var/cvs/bin} and repository root directory
-being @file{/var/cvs/cvsroot}.  Then, the following rule can be used:
+being @file{/var/cvs/cvsroot}.  Then, we can use the following rule:
 
 @smallexample
 rule cvs
@@ -1099,16 +1145,14 @@ of Git binaries to use.  This example supposes they are placed in
 @file{/usr/bin}, you will have to tailor it if they are located
 elsewhere on your system.
 
-To limit Git accesses to a subset of root directories, use
-@code{match[1]} construct.  For example, the following rule allows
-execution of Git requests only for repositories residing under one of
-@file{/git/src}, @file{/git/web}, and @file{/git/doc} directories:
+To limit Git accesses to repositories under @file{/gitroot} directory, use
+@code{match[1]} construct, as shown in the example below:
 
 @smallexample
 @group
 rule git
   command ^git-(receive|upload)-pack
-  match[1] ^/git/(source|web|doc)[^ ]+\.git$
+  match[1] ^/gitroot[^ ]+\.git$
   transform[0] s|^|/usr/bin/|
 @end group
 @end smallexample
@@ -1122,33 +1166,6 @@ trap rule (@pxref{Exit, trap rules}):
 rule git-trap
   command ^git-.+
   exit fatal: access to this repository is denied.
-@end group
-@end smallexample
-
-Use of @code{git-shell}@footnote{See
-@uref{http://www.kernel.org/pub/software/scm/git/docs/git-shell.html}.}
-is not necessary if you use Rush.  If, however, you decide to use it
-in your rules, make sure you they do not contain
-@code{transform[@var{n}]} actions.  It is because this actions may alter
-the quotation style of the command fields.  @code{Git-shell} is picky
-about its argument syntax.  In particular, it requires that the
-argument to @code{git-receive-pack} (or @code{git-upload-pack}) be
-enclosed in single quotes.  Now, the @code{transform[@var{n}]}
-construct triggers field-splitting of the request and subsequent
-rebuilding.  The rebuilding stage, however, will quote its arguments
-only if it is necessary (e.g. if they contain white space).  Thus it
-will remove single quotes in the vast majority of cases, which will
-cause @code{git-shell} to complain and exit. 
-
-To summarize, the following is the recommended way to use Git via
-@code{git-shell}: 
-
-@smallexample
-@group
-rule git
-  command ^git-.+
-  match[1] ^/git/(source|web|doc)[^ ]+\.git$
-  transform s|.*|/usr/bin/git-shell -c "&"|
 @end group
 @end smallexample
 
@@ -1175,7 +1192,6 @@ file along with your bug report. This file is created after running
 @include fdl.texi
 
 @node Concept Index
-@comment node-name,  next,  previous,  up
 @unnumbered Concept Index
 
 This is a general index of all issues discussed in this manual.

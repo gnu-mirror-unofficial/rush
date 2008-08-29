@@ -1,11 +1,11 @@
-Rush NEWS -- history of user-visible changes. 2008-08-28
+Rush NEWS -- history of user-visible changes. 2008-08-30
 Copyright (C) 2008 Sergey Poznyakoff
 See the end of file for copying conditions.
 
 Please send bug reports to <bug-rush@gnu.org.ua>
 
 
-Version 1.0.90 (Git)
+Version 1.1, 2008-08-30
 
 * A condition can be negated.
 
@@ -18,6 +18,22 @@ matches any command line that does not begin with `cvs'
 
 * New action `exit'
 
+The `exit' statement insructs rush to write the supplied error message
+to the specified file descriptor and exit immediately.  If file
+descriptor is not given, 2 (standard error) is used.
+
+Exit actions are useful for writing ``trap rules'', i.e. rules that
+are intended to trap incorrect or prohibited command lines and to return
+customized reply messages in such cases. 
+
+* New statement `regexp'
+
+Configures the style of regular expressions used in subsequent
+`cmdline' and `match' clauses.  For example:
+
+  regex +icase +extended
+
+sets case-insensitive extended regular expressions.  
 
 
 Version 1.0, 2008-08-26

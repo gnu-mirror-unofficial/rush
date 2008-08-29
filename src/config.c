@@ -16,6 +16,8 @@
 
 #include <rush.h>
 
+static int re_flags = REG_EXTENDED;
+
 static char *
 skipws(char *p)
 {
@@ -368,16 +370,71 @@ regexp_error(struct input_buf *ibuf, regex_t *regex, int rc)
 }
 
 static int
+_parse_re_flags(struct input_buf *ibuf, struct rush_rule *rule,
+		char *kw, char *val)
+{
+	int fc, i;
+	char **fv;
+
+	if ((i = argcv_get(val, NULL, "#", &fc, &fv))) {
+		syslog(LOG_NOTICE,
+		       "%s:%d: failed to parse value: %s",
+		       ibuf->file, ibuf->line, strerror (i));
+		return 1;
+	}
+	for (i = 0; i < fc; i++) {
+		int enable, flag;
+		char *p = fv[i];
+		
+		switch (*p) {
+		case '+':
+			p++;
+			enable = 1;
+			break;
+
+		case '-':
+			p++;
+			enable = 0;
+			break;
+
+		default:
+			enable = 1;
+		}
+		
+		if (strcmp(p, "extended") == 0) 
+			flag = REG_EXTENDED;
+		else if (strcmp(fv[i], "basic") == 0) {
+			flag = REG_EXTENDED;
+			enable = !enable;
+		} else if (strcmp(fv[i], "icase") == 0
+			 || strcmp(fv[i], "ignore-case") == 0)
+			flag = REG_ICASE;
+		else {
+			syslog(LOG_NOTICE,
+			       "%s:%d: unknown regexp flag: %s",
+			       ibuf->file, ibuf->line, p);
+			return 1;
+		}
+
+		if (enable)
+			re_flags |= flag;
+		else
+			re_flags &= ~flag;
+	}
+	argcv_free(fc, fv);
+	return 0;
+}
+
+static int
 _parse_command(struct input_buf *ibuf, struct rush_rule *rule,
 	       char *kw, char *val)
 {
-	int cflags = REG_EXTENDED;
 	int rc;
 	struct test_node *node;
 
 	node = new_test_node(rule, test_cmdline);
 	val = _parse_negation(node, val);
-	rc = regcomp(&node->v.regex, val, cflags);
+	rc = regcomp(&node->v.regex, val, re_flags|REG_NOSUB);
 	if (rc) 
 		regexp_error(ibuf, &node->v.regex, rc);
 	return rc;
@@ -387,7 +444,6 @@ static int
 _parse_match(struct input_buf *ibuf, struct rush_rule *rule,
 	     char *kw, char *val)
 {
-	int cflags = REG_EXTENDED;
 	char *q;
 	struct test_node *node;
 	int rc, n;
@@ -406,7 +462,7 @@ _parse_match(struct input_buf *ibuf, struct rush_rule *rule,
 	node = new_test_node(rule, test_arg);
 	node->v.arg.arg_no = n;
 	val = _parse_negation(node, val);
-	rc = regcomp(&node->v.arg.regex, val, cflags);
+	rc = regcomp(&node->v.arg.regex, val, re_flags|REG_NOSUB);
 	if (rc) 
 		regexp_error(ibuf, &node->v.regex, rc);
 	return rc;
@@ -693,6 +749,7 @@ struct token toktab[] = {
 	{ "nologin-error", TOK_ARG, _parse_nologin_error },
 	{ "config-error",  TOK_ARG, _parse_config_error },
 	{ "system-error",  TOK_ARG, _parse_system_error },
+	{ "regexp",        TOK_ARG, _parse_re_flags },
 	{ NULL }
 };
 
