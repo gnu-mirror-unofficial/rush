@@ -159,6 +159,8 @@ struct rush_rule {
 	limits_record_t limits;      /* resource limits */
 };
 
+extern char *rush_config_file;
+extern int lint_option;
 extern unsigned sleep_time;
 extern char *error_msg[];
 extern struct rush_rule *rule_head, *rule_tail;
@@ -169,44 +171,45 @@ extern unsigned debug_level;
 #define debug(lev,msg)					\
 	do {						\
 		if (__debug_p(lev))			\
-			syslog(LOG_DEBUG, "%s", msg);	\
+			logmsg(LOG_DEBUG, "%s", msg);	\
 	} while(0)	
 #define debug1(lev,fmt,x1)				\
 	do {						\
 		if (__debug_p(lev))			\
-			syslog(LOG_DEBUG, fmt, x1);	\
+			logmsg(LOG_DEBUG, fmt, x1);	\
 	} while(0)
 #define debug2(lev,fmt,x1,x2)				\
 	do {						\
 		if (__debug_p(lev))			\
-			syslog(LOG_DEBUG, fmt, x1, x2);	\
+			logmsg(LOG_DEBUG, fmt, x1, x2);	\
 	} while(0)
 #define debug3(lev,fmt,x1,x2,x3)		        \
 	do {						\
 		if (__debug_p(lev))			\
-			syslog(LOG_DEBUG, fmt, x1, x2,	\
+			logmsg(LOG_DEBUG, fmt, x1, x2,	\
 			       x3);			\
 	} while(0)
 #define debug4(lev,fmt,x1,x2,x3,x4)		        \
 	do {						\
 		if (__debug_p(lev))			\
-			syslog(LOG_DEBUG, fmt, x1, x2,	\
+			logmsg(LOG_DEBUG, fmt, x1, x2,	\
 			       x3, x4);			\
 	} while(0)
 #define debug5(lev,fmt,x1,x2,x3,x4,x5)		        \
 	do {						\
 		if (__debug_p(lev))			\
-			syslog(LOG_DEBUG, fmt, x1, x2,	\
+			logmsg(LOG_DEBUG, fmt, x1, x2,	\
 			       x3, x4, x5);		\
 	} while(0)
 #define debug6(lev,fmt,x1,x2,x3,x4,x5)		        \
 	do {						\
 		if (__debug_p(lev))			\
-			syslog(LOG_DEBUG, fmt, x1, x2,	\
+			logmsg(LOG_DEBUG, fmt, x1, x2,	\
 			       x3, x4, x5, x6);		\
 	} while(0)
 
 void die(enum error_type type, const char *fmt, ...) ATTRIBUTE_NORETURN;
+void logmsg(int prio, const char *fmt, ...);
 
 int parse_limits(limits_record_t *plrec, char *str, char **endp);
 int set_user_limits(const char *name, struct limits_rec *lrec);

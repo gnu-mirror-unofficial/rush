@@ -56,7 +56,7 @@ do_set_limit(int rlimit, rlim_t limit)
         rlim.rlim_max = limit;
 
         if (setrlimit(rlimit, &rlim)) {
-                syslog(LOG_NOTICE, "error setting limit: %s", strerror(errno));
+                logmsg(LOG_NOTICE, "error setting limit: %s", strerror(errno));
                 return 1;
         }
         return 0;
@@ -67,7 +67,7 @@ set_prio(int prio)
 {
         debug1(2, "Setting priority to %d", prio);
         if (setpriority(PRIO_PROCESS, 0, prio)) {
-                syslog(LOG_NOTICE, "error setting priority: %s",
+                logmsg(LOG_NOTICE, "error setting priority: %s",
                        strerror(errno));
                 return 1;
         }
@@ -84,7 +84,7 @@ check_logins(const char *name, int limit)
         
         if (limit == 0) /* maximum 0 logins ? */ {
                 debug1(2, "No logins allowed for `%s'\n", name);
-                syslog(LOG_ERR, "No logins allowed for `%s'", name);
+                logmsg(LOG_ERR, "No logins allowed for `%s'", name);
                 return 1;
         }
 
@@ -108,7 +108,7 @@ check_logins(const char *name, int limit)
         if (count > limit) {
                 debug2(2, "Too many logins (max %d) for %s",
 		       limit, name);
-                syslog(LOG_ERR, "Too many logins (max %d) for %s",
+                logmsg(LOG_ERR, "Too many logins (max %d) for %s",
                        limit, name);
                 return 1;
         }

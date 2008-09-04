@@ -2,6 +2,7 @@
 # A module name per line. Empty lines and comments are ignored.
 
 c-ctype
+getopt
 gitlog-to-changelog
 malloc
 readutmp

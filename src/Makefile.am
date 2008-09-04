@@ -28,7 +28,7 @@ rush_SOURCES=\
 
 INCLUDES=-I$(top_srcdir)/gnu -I$(top_builddir)/gnu
 LDADD=../gnu/libgnu.a
-AM_INSTALLCHECK_STD_OPTIONS_EXEMPT=rush
+
 sbinPROGRAMS_INSTALL = $(INSTALL_PROGRAM) -m 4755
 
 BUILT_SOURCES = defines.h

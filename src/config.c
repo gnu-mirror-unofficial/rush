@@ -68,7 +68,7 @@ init_input_buf(struct input_buf *ibuf, const char *file)
 	int fd;
 	
 	if (stat (file, &st)) {
-		if (errno == ENOENT) {
+		if (errno == ENOENT && !lint_option) {
 			debug1(1, "File %s does not exist", file);
 			return 1;
 		}
@@ -242,27 +242,27 @@ check_dir(const char *dir, struct input_buf *ibuf)
 
 	if (dir[0] == '~') {
 		if (dir[1] && !absolute_dir_p(dir + 1)) {
-			syslog(LOG_NOTICE,
+			logmsg(LOG_NOTICE,
 			       "%s:%d: not an absolute directory",
 			       ibuf->file, ibuf->line);
 			return 1;
 		}
 		return 0;
 	} else if (!absolute_dir_p(dir)) {
-		syslog(LOG_NOTICE,
+		logmsg(LOG_NOTICE,
 		       "%s:%d: not an absolute directory",
 		       ibuf->file, ibuf->line);
 		return 1;
 	}
 
 	if (stat(dir, &st)) {
-		syslog(LOG_NOTICE,
+		logmsg(LOG_NOTICE,
 		       "%s:%d: cannot stat %s: %s",
 		       ibuf->file, ibuf->line, dir,
 		       strerror(errno));
 		return 1;
 	} else if (!S_ISDIR(st.st_mode)) {
-		syslog(LOG_NOTICE,
+		logmsg(LOG_NOTICE,
 		       "%s:%d: %s is not a directory",
 		       ibuf->file, ibuf->line, dir);
 		return 1;
@@ -334,14 +334,14 @@ parse_numtest(struct input_buf *ibuf, struct test_numeric_node *numtest,
 	char *q;
 	
 	if (parse_cmp_op (&numtest->op, &val)) {
-		syslog(LOG_NOTICE,
+		logmsg(LOG_NOTICE,
 		       "%s:%d: invalid opcode",
 		       ibuf->file, ibuf->line);
 		return 1;
 	}
 	numtest->val = strtoul(val, &q, 10);
 	if (*q) {
-		syslog(LOG_NOTICE,
+		logmsg(LOG_NOTICE,
 		       "%s:%d: invalid number: %s",
 		       ibuf->file, ibuf->line, val);
 		return 1;
@@ -354,7 +354,7 @@ parse_strv(struct input_buf *ibuf, struct test_node *node, char *val)
 {
 	int n, rc = argcv_get(val, NULL, "#", &n, &node->v.strv);
 	if (rc)
-		syslog(LOG_NOTICE,
+		logmsg(LOG_NOTICE,
 		       "%s:%d: failed to parse value: %s",
 		       ibuf->file, ibuf->line, strerror (rc));
 	return rc;
@@ -365,7 +365,7 @@ regexp_error(struct input_buf *ibuf, regex_t *regex, int rc)
 {
 	char errbuf[512];
 	regerror(rc, regex, errbuf, sizeof(errbuf));
-	syslog(LOG_NOTICE, "%s:%d: invalid regexp: %s",
+	logmsg(LOG_NOTICE, "%s:%d: invalid regexp: %s",
 	       ibuf->file, ibuf->line, errbuf);
 }
 
@@ -377,7 +377,7 @@ _parse_re_flags(struct input_buf *ibuf, struct rush_rule *rule,
 	char **fv;
 
 	if ((i = argcv_get(val, NULL, "#", &fc, &fv))) {
-		syslog(LOG_NOTICE,
+		logmsg(LOG_NOTICE,
 		       "%s:%d: failed to parse value: %s",
 		       ibuf->file, ibuf->line, strerror (i));
 		return 1;
@@ -410,7 +410,7 @@ _parse_re_flags(struct input_buf *ibuf, struct rush_rule *rule,
 			 || strcmp(fv[i], "ignore-case") == 0)
 			flag = REG_ICASE;
 		else {
-			syslog(LOG_NOTICE,
+			logmsg(LOG_NOTICE,
 			       "%s:%d: unknown regexp flag: %s",
 			       ibuf->file, ibuf->line, p);
 			return 1;
@@ -454,7 +454,7 @@ _parse_match(struct input_buf *ibuf, struct rush_rule *rule,
 	} else 
 		n = strtoul(kw + 1, &q, 10);
 	if (*q != ']') {
-		syslog(LOG_NOTICE,
+		logmsg(LOG_NOTICE,
 		       "%s:%d: missing ]",
 			       ibuf->file, ibuf->line);
 		return 1;
@@ -520,7 +520,7 @@ _parse_umask(struct input_buf *ibuf, struct rush_rule *rule,
 	char *q;
 	unsigned int n = strtoul(val, &q, 8);
 	if (*q || (n & ~0777)) {
-		syslog(LOG_NOTICE,
+		logmsg(LOG_NOTICE,
 		       "%s:%d: invalid umask: %s",
 		       ibuf->file, ibuf->line, val);
 		return 1;
@@ -535,7 +535,7 @@ _parse_chroot(struct input_buf *ibuf, struct rush_rule *rule,
 {
 	char *chroot_dir = xstrdup(val);
 	if (trimslash(chroot_dir) == 0) {
-		syslog(LOG_NOTICE,
+		logmsg(LOG_NOTICE,
 		       "%s:%d: invalid chroot directory",
 		       ibuf->file, ibuf->line);
 		return 1;
@@ -552,7 +552,7 @@ _parse_limits(struct input_buf *ibuf, struct rush_rule *rule,
 	char *q;
 			
 	if (parse_limits(&rule->limits, val, &q)) {
-		syslog(LOG_NOTICE,
+		logmsg(LOG_NOTICE,
 		       "%s:%d: unknown limit: %s",
 		       ibuf->file, ibuf->line, q);
 		return 1;
@@ -584,7 +584,7 @@ _parse_transform_ar(struct input_buf *ibuf, struct rush_rule *rule,
 	} else 
 		n = strtoul(kw + 1, &q, 10);
 	if (*q != ']') {
-		syslog(LOG_NOTICE,
+		logmsg(LOG_NOTICE,
 		       "%s:%d: missing ]",
 		       ibuf->file, ibuf->line);
 		return 1;
@@ -601,7 +601,7 @@ _parse_chdir(struct input_buf *ibuf, struct rush_rule *rule,
 {
 	char *home_dir = rule->home_dir = xstrdup(val);
 	if (trimslash(home_dir) == 0) {
-		syslog(LOG_NOTICE,
+		logmsg(LOG_NOTICE,
 		       "%s:%d: invalid home directory",
 		       ibuf->file, ibuf->line);
 		return 1;
@@ -619,7 +619,7 @@ _parse_env(struct input_buf *ibuf, struct rush_rule *rule,
 	int rc, n;
 	rc = argcv_get(val, NULL, "#", &n, &rule->env);
 	if (rc) 
-		syslog(LOG_NOTICE,
+		logmsg(LOG_NOTICE,
 		       "%s:%d: failed to parse value: %s",
 		       ibuf->file, ibuf->line, strerror (rc));
 	return rc;
@@ -642,7 +642,7 @@ _parse_sleep_time(struct input_buf *ibuf, struct rush_rule *rule,
 	char *q;
 	sleep_time = strtoul(val, &q, 10);
 	if (*q) {
-		syslog(LOG_NOTICE,
+		logmsg(LOG_NOTICE,
 		       "%s:%d: invalid time: %s",
 		       ibuf->file, ibuf->line, val);
 		return 1;
@@ -697,7 +697,7 @@ _parse_exit(struct input_buf *ibuf, struct rush_rule *rule,
 	if (c_isdigit(val[0])) {
 		unsigned long n = strtoul(val, &val, 10);
 		if (!ISWS(val[0]) || n > getmaxfd()) {
-			syslog(LOG_NOTICE,
+			logmsg(LOG_NOTICE,
 			       "%s:%d: invalid file descriptor",
 			       ibuf->file, ibuf->line);
 			return 1;
@@ -809,7 +809,7 @@ parse_input_buf(struct input_buf *ibuf)
 
 		tok = find_token(kw, &len);
 		if (!tok) {
-			syslog(LOG_NOTICE,
+			logmsg(LOG_NOTICE,
 			       "%s:%d: unknown statement: %s",
 			       ibuf->file, ibuf->line, kw);
 			err = 1;
@@ -817,7 +817,7 @@ parse_input_buf(struct input_buf *ibuf)
 		}
 
 		if (tok->flags & TOK_ARG && !(val && *val)) {
-			syslog(LOG_NOTICE,
+			logmsg(LOG_NOTICE,
 			       "%s:%d: invalid statement: missing value",
 			       ibuf->file, ibuf->line);
 			err = 1;
@@ -826,7 +826,7 @@ parse_input_buf(struct input_buf *ibuf)
 
 		if (tok->flags & TOK_RUL) {
 			if (!rule) {
-				syslog(LOG_NOTICE,
+				logmsg(LOG_NOTICE,
 				       "%s:%d: statement cannot be used outside a rule",
 				       ibuf->file, ibuf->line);
 				err = 1;
@@ -853,7 +853,7 @@ parse_config()
 {
 	struct input_buf buf;
 
-	if (init_input_buf(&buf, CONFIG_FILE) == 0) {
+	if (init_input_buf(&buf, rush_config_file) == 0) {
 		parse_input_buf(&buf);
 		free_input_buf(&buf);
 #ifdef RUSH_DEFAULT_CONFIG
