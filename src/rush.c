@@ -23,6 +23,7 @@ char *rush_config_file = CONFIG_FILE;
 int lint_option = 0;
 unsigned sleep_time = 5;
 unsigned debug_level;
+int debug_option;
 unsigned default_umask = 022;
 struct rush_rule *rule_head, *rule_tail;
 
@@ -580,6 +581,8 @@ run_rule(struct rush_rule *rule, struct rush_request *req)
         umask(default_umask);
 
         debug1(2, "executing %s", req->cmdline);
+	if (lint_option)
+		exit(0);
         execve(req->argv[0], req->argv, new_env);
         die(system_error, "%s:%d: %s: cannot execute %s: %s",
             rule->file, rule->line, rule->tag ? rule->tag : "(untagged)",
@@ -592,31 +595,45 @@ run_rule(struct rush_rule *rule, struct rush_request *req)
 struct option longopts[] = {
         { "debug", required_argument, 0, 'd' },
         { "lint", no_argument, 0, 't' },
+        { "test", no_argument, 0, 't' },
         { "version", no_argument, 0, 'v' },
         { "help", no_argument, 0, 'h' },
         { "usage", no_argument, 0, USAGE_OPTION },
         { NULL }
 };
 
+const char help_msg[] = "\
+Rush - a restricted user shell.\n\
+Usage: rush -c command\n\
+       rush OPTIONS [FILE]\n\
+\n\
+OPTIONS are:\n\
+       -d, --debug=NUMBER        Set debugging level.\n\
+       -t, --test, --lint        Run in test mode.\n\
+       -c COMMAND                Emulate execution of COMMAND.\n\
+\n\
+       -v, --version             Display program version.\n\
+       -h, --help                Display this help message.\n\
+       --usage                   Display a concise usage summary.\n\
+\n\
+Optional specifies alternative configuration file to use instead of the\n\
+default.  It is valid only in conjunction with --lint argument.\n";
+	       
 void
 help()
 {
-        fputs("Rush - a restricted user shell.\n", stdout);
-        fputs("Usage: rush -c command\n\n", stdout);
-        fputs("To test configuration file syntax:\n", stdout);
-        fputs("       rush -t [FILE]\n", stdout);
-        fputs("       rush --lint [FILE]\n\n", stdout);
-        fputs("Additional option:\n", stdout);
-        fputs("  -d, --debug=NUM           Set debug level.\n", stdout);
-        fputs("\n", stdout);
-        fputs("Informational options:\n", stdout);
-        fputs("  -v, --version             Display program version.\n",
-              stdout);
-        fputs("  -h, --help                Display this help list.\n",
-	      stdout);
-        fputs("  --usage                   Display a concise usage summary.\n",
-              stdout);
+        fputs(help_msg, stdout);
 	printf("\nReport bugs to <%s>.\n", PACKAGE_BUGREPORT);
+}
+
+const char user_msg[] = "\
+rush [-htv] [-d N] [-c COMMAND] [--debug=NUMBER] [--help] [--lint]\n\
+     [--version] [--usage] [FILE]\n";
+
+void
+usage()
+{
+	fputs(user_msg, stdout);
 }
 
 void
@@ -641,7 +658,8 @@ main(int argc, char **argv)
         struct passwd *pw;
         struct rush_rule *rule;
         struct rush_request req;
-
+	char *command = NULL;
+	
         progname = strrchr(argv[0], '/');
         if (progname)
                 progname++;
@@ -651,47 +669,51 @@ main(int argc, char **argv)
         
         openlog(progname, LOG_NDELAY|LOG_PID, LOG_AUTHPRIV);
 
-        if (argc != 3 || strcmp(argv[1], "-c")) {
-                int c;
-                
-                while ((c = getopt_long(argc, argv, "d:tvh", longopts, NULL))
-                       != EOF) {
-                        switch (c) {
-                        case 'd':
-                                debug_level = atoi(optarg);
-                                break;
+	while ((rc = getopt_long(argc, argv, "c:d:tvh", longopts, NULL))
+	       != EOF) {
+		switch (rc) {
+		case 'c':
+			command = optarg;
+			break;
+			
+		case 'd':
+			debug_level = atoi(optarg);
+			debug_option = 1;
+			break;
                                 
-                        case 't':
-                                lint_option = 1;
-                                break;
+		case 't':
+			lint_option = 1;
+			break;
                                 
-                        case 'v':
-                                version();
-                                exit(0);
+		case 'v':
+			version();
+			exit(0);
                                 
-                        case 'h':
-                        case USAGE_OPTION:
-                                help();
-                                exit(0);
-                        }
-                        
-                        if (lint_option) {
-                                argc -= optind;
-                                argv += optind;
-                                switch (argc) {
-                                case 1:
-                                        rush_config_file = argv[0];
-                                        /* fall through */
-                                case 0:
-                                        parse_config();
-                                        exit(0);
-                                }
-                        }
-                }
-                die(usage_error, "invalid command line");
-        }
-
+		case 'h':
+			help();
+			exit(0);
+			
+		case USAGE_OPTION:
+			usage();
+			exit(0);
+		}
+	}
+	
+	if (argc == optind + 1) {
+		if (lint_option)
+			rush_config_file = argv[optind];
+		else
+			die(usage_error, "invalid command line");
+	} else if (argc > optind)
+		die(usage_error, "invalid command line");
+	
         parse_config();
+
+	if (!command) {
+		if (lint_option)
+			exit(0);
+		die(usage_error, "invalid command line");
+	}
 
         if (__debug_p(2)) {
                 int i;
@@ -710,7 +732,7 @@ main(int argc, char **argv)
         debug2(2, "user %s, uid %lu", pw->pw_name,
                (unsigned long) pw->pw_uid);
 
-        req.cmdline = xstrdup(argv[2]);
+        req.cmdline = xstrdup(command);
         req.pw = pw;
         req.home_dir = NULL;
         rc = argcv_get(req.cmdline, NULL, NULL, &req.argc, &req.argv);
@@ -728,7 +750,7 @@ main(int argc, char **argv)
                 if (debug_level && rule->tag) 
                         logmsg(LOG_NOTICE,
                                "Serving request \"%s\" for %s by rule %s",
-                               argv[2], pw->pw_name, rule->tag);
+                               command, pw->pw_name, rule->tag);
                 run_rule(rule, &req);
         } 
         

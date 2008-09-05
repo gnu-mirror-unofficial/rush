@@ -80,6 +80,8 @@ documents Rush Version @value{VERSION}.
 * Quick Start::
 * Configuration File::
 * Usage Tips::
+* Test Mode::
+* Option Summary::
 * Reporting Bugs::       How to Report a Bug.
 
 Appendices
@@ -232,10 +234,10 @@ file @file{INSTALL} in the Rush source directory for more information}.
 
   The configuration file is read and parsed right after start up.  Any
 errors occurred in parsing are reported using @code{syslog} facility
-@samp{authpriv} and priority @samp{notice}.  The simplest way to
-test your configuration is to run @command{rush} from the command
-line and check the syslog output for details.  @xref{Debugging}, for
-information about how to debug your configurations.
+@samp{authpriv} and priority @samp{notice}.  When run in @samp{test}
+mode, all diagnostics is displayed on standard error
+output. @xref{Test Mode}, for a detailed description of ways to debug
+and test your configurations.
 
 @menu
 * Syntax::
@@ -1168,6 +1170,114 @@ rule git-trap
   exit fatal: access to this repository is denied.
 @end group
 @end smallexample
+
+@node Test Mode
+@chapter Test Mode
+@cindex test mode
+@cindex testing configuration file
+@cindex configuration file, testing
+@opindex --test
+@opindex --lint
+@opindex -c
+  Rush provides a special @dfn{test mode}, intended to test
+configuration files and to emulate execution of commands.  The test
+mode is enabled by @option{--test} command line option (aliases:
+@option{--lint}, @option{-t}).  When Rush is given this option, the 
+following occurs:
+
+@enumerate 1
+@item All diagnostic messages are redirected to standard error, instead of
+syslog.
+
+@item If a single non-option argument is present, it is taken as a
+name of the configuration file to use.
+
+@item The configuration file is parsed.  If parsing fails, the program
+exits with code 1.
+
+@item If the @option{-c} option is present, @command{rush} processes
+its argument as usual (@pxref{Operation}), except that the command
+itself is not executed.
+@end enumerate
+
+An exit status of 0 means no errors, 1 means an error has occurred.
+
+@opindex --debug
+@opindex -d
+In test mode, you may set debugging level (@pxref{Debugging}) from the
+command line, using the @option{--debug} (@option{-d}) command line
+option.  It expects a single number specifying debugging level, as its
+argument.  The debugging level set this way overrides settings
+from the configuration file.
+
+  Following are several examples that illustrate the use of test mode
+in various cases:
+
+@enumerate 1
+@item Test default configuration file:
+
+@smallexample
+$ rush --test
+@end smallexample
+
+@item Test configuration file @file{sample.rc}:
+
+@smallexample
+$ rush --test sample.rc
+@end smallexample
+
+@item Test the configuration file and emulate execution of the command
+@command{cvs server}.  Use debugging level 2:
+
+@smallexample
+$ rush --test --debug=2 -c "cvs server"
+@end smallexample
+
+@item Same, but use @file{sample.rc} instead of the default
+configuration file:
+
+@smallexample
+$ rush --test --debug=2 -c "cvs server" sample.rc
+@end smallexample
+@end enumerate
+
+@node Option Summary
+@chapter Option Summary
+@cindex options, command line
+This chapter provides a short summary of Rush command line options.
+
+@table @option
+@item -c @var{command}
+Specify the command to run.
+
+@item --debug=@var{number}
+@itemx -d @var{number}
+Set debugging level.
+
+@item --test
+@itemx --lint
+@itemx -t
+Run in test mode. An optional argument may be used with this option
+to specify alternative configuration file name, e.g.:
+
+@smallexample
+$ rush --lint ./test.rc
+@end smallexample
+
+If the @option{-c} option is also specified, @command{rush} emulates the
+normal processing for the command, but does not execute it.
+
+@item --version
+@itemx -v
+Display program version.
+
+@item --help
+@itemx -h
+Display a short help message.
+
+@item --usage
+Display a concise usage summary.
+@end table
 
 @node Reporting Bugs
 @chapter How to Report a Bug

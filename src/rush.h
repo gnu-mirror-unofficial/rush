@@ -165,6 +165,7 @@ extern unsigned sleep_time;
 extern char *error_msg[];
 extern struct rush_rule *rule_head, *rule_tail;
 extern unsigned debug_level;
+extern int debug_option;
 
 #define __debug_p(x) ((x) <= debug_level)
 

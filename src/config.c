@@ -630,8 +630,10 @@ static int
 _parse_debug(struct input_buf *ibuf, struct rush_rule *rule,
 	     char *kw, char *val)
 {
-	debug_level = strtoul(val, NULL, 0);
-	debug1(0, "debug level set to %d", debug_level);
+	if (!debug_option) {
+		debug_level = strtoul(val, NULL, 0);
+		debug1(0, "debug level set to %d", debug_level);
+	}
 	return 0;
 }
 
