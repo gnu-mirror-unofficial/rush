@@ -1,11 +1,11 @@
-Rush NEWS -- history of user-visible changes. 2008-09-05
+Rush NEWS -- history of user-visible changes. 2008-09-06
 Copyright (C) 2008 Sergey Poznyakoff
 See the end of file for copying conditions.
 
 Please send bug reports to <bug-rush@gnu.org.ua>
 
 
-Version 1.1.90 (Git)
+Version 1.2, 2008-09-06
 
 * Test mode
 

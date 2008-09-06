@@ -120,7 +120,7 @@ Usage Tips
 @chapter Introduction
   Rush is a Restricted User Shell, intended for use with ssh,
 rsh and similar remote access programs.  Using a sophisticated
-configuration file, Rush gives you complete control over the command
+configuration file, Rush gives you complete control over command
 lines that users execute remotely, and over the usage of system
 resources, such as virtual memory, CPU time, etc. 
 
@@ -133,7 +133,7 @@ executed.  Rush must be called with exactly two arguments: the
 the host machine.  If wrong arguments are supplied, the shell aborts.
 
 @cindex request
-  The third argument to @command{rush} supplies the command line to be
+  The third argument to @command{rush} supplies a command line to be
 executed.  This command line along with the password database entry
 for the user who executes @command{rush} are said to form a
 @dfn{request}.
@@ -145,8 +145,8 @@ for the user who executes @command{rush} are said to form a
 configuration file.  Each rule consists of @dfn{conditions}
 and @dfn{actions}.  Conditions are used to match the rule
 with the request.  They can include regular expression matching
-with entire command line or particular arguments, user name or
-group comparisons, etc.  If all conditions match the request, the
+with entire command line or particular fields thereof, user name or
+group comparisons, etc.  If all conditions match the request, 
 actions are executed.  Actions allow to:
 
 @itemize @bullet
@@ -192,12 +192,12 @@ rule sftp
 @end smallexample
 
   The first clause, @code{rule}, defines a new rule.  Its argument
-serves as a rule identifier in diagnostic messages.
+serves as a rule identifier for diagnostic messages.
 
   Lines beginning with @samp{#} are comments, they are intended for a
 human reader and are ignored by @code{rush}.
  
-  Next two statements, @code{command} and @code{uid}, define
+  Following two statements, @code{command} and @code{uid}, define
 conditions that must be met for this rule to become active.  The
 @code{command} statement introduces a regular expression to match
 with the command line.  In this example, the command line must
@@ -213,7 +213,7 @@ whose @acronym{UID}s are greater than or equal to 100.
 modify the first argument of the command line (i.e. the command
 name).  These instructions are in the form of @code{sed} replace
 expression (@pxref{Transformations, transformation expression}).  The
-supplied expression tells to replace the command name with
+expression in our example instructs Rush to replace the command name with
 @samp{bin/sftp-server}. 
 
   The @code{umask} clause sets the file creation mask.
@@ -325,7 +325,7 @@ the request.  A rule may contain any number of conditions.  All
 conditions are tested in order of their appearence in the rule and are
 tied together using boolean shortcut @samp{and} evaluation: if any of
 them yields false, the rest is not considered and control is
-transferred to subsequent rule. 
+transferred to the subsequent rule. 
 
 @table @code
 @kwindex command
@@ -556,7 +556,7 @@ rule sftp
 @end smallexample
 
 For this to work, each user's home must contain the directory
-@file{bin} with a copy of @file{sftp-server} in it, as well as all the
+@file{bin} with a copy of @file{sftp-server} in it, as well as all 
 directories and files that are needed for executing it, in particular
 @file{lib}.
 
@@ -814,7 +814,7 @@ case insensitive matching:
 regex +extended +icase
 @end smallexample
 
-The @code{regex} settings affect subsequent @code{cmdline} and
+The @code{regex} settings affect subsequent @code{command} and
 @code{match} statements (@pxref{Conditions}), and remain in effect
 until next @code{regex} statement or the end of configuration file,
 whichever occurs first.
@@ -822,14 +822,15 @@ whichever occurs first.
 @kwindex sleep-time
 @item sleep-time @var{number}
 Set the time in seconds to sleep before exiting on error.  This
-is intended as a measure against brute-force attacks.  The default
+is intended as a measure against brute-force attacks.  Default
 is 5 seconds.
 
 @kwindex usage-error
 @item usage-error @var{text}
-Set the textual message which is returned to the remote user if a
+Define a textual message which is returned to the remote party if a
 usage error occurs.  
-The default is:
+
+Default is:
 
 @smallexample
 You are not permitted to execute this command.
@@ -837,10 +838,10 @@ You are not permitted to execute this command.
 
 @kwindex nologin-error
 @item nologin-error @var{text}
-Set the textual message which is returned to the remote user if
+Define a textual message which is returned to the remote user if
 there is no such user name in the password database.  
 
-The default is:
+Default is:
 
 @smallexample
 You do not have interactive login access to this machine.
@@ -848,10 +849,10 @@ You do not have interactive login access to this machine.
 
 @kwindex config-error
 @item config-error @var{text}
-Set the textual message which is returned to the remote user on
+Define a textual message which is returned to the remote party on
 Rush configuration errors.  
 
-The default is:
+Default is:
 
 @smallexample
 Local configuration error occurred.
@@ -859,10 +860,10 @@ Local configuration error occurred.
 
 @kwindex system-error
 @item system-error @var{text}
-Set the textual message which is returned to the remote user if
+Define a textual message which is returned to the remote party if
 a system error occurs. 
 
-The default message is:
+Default message is:
 
 @smallexample
 A system error occurred while attempting to execute command.
@@ -892,8 +893,8 @@ directory, but that is transparent to users, i.e. they use
 accessing other directories, @command{sftp-server} is executed in a
 chrooted environment. 
 
-@item The server runs three version control system repositories, which
-are located in the following directories:
+@item The server runs three version control system repositories, whose
+corresponding repositories are located in the following directories:
 
 @multitable @columnfractions 0.3 0.7
 @headitem VCS @tab Repository Root
@@ -999,9 +1000,9 @@ rule scp-from
 @section rsync
 @cindex rsync
 On the server side, @command{rsync} is executed with the
-@option{--server} command line option.  When copying files from the
-server, the @option{--sender} option is used.  This allows to discern
-between incoming and outgoing requests.
+@option{--server} command line option.  In addition, when copying
+files from the server, the @option{--sender} option is used.  This
+allows to discern between incoming and outgoing requests.
 
 In our setup, @command{rsync} is used the same way as @command{scp}, so
 the two rules will be:
@@ -1083,14 +1084,15 @@ rule cvs
 @end group
 @end smallexample
 
-However, @code{cvs} as of version 1.12.13 does not allow to limit root
+However, @command{cvs} as of version 1.12.13 does not allow to limit root
 directories that users are allowed to access.  It does have
-@option{--allow-root} option, but unfortunately it is ignored when
+@option{--allow-root} option, but unfortunately this option is ignored when
 invoked as @command{cvs server}.  To restrict possible roots, we have
-to run it in chrooted environment.  Let's suppose we created an environment
-for @command{cvs} in directory @file{/var/cvs}, with the @command{cvs}
-binary located in @file{/var/cvs/bin} and repository root directory
-being @file{/var/cvs/cvsroot}.  Then, we can use the following rule:
+to run @command{cvs} in a chrooted environment.  Let's suppose we
+created an environment for @command{cvs} in directory @file{/var/cvs},
+with the @command{cvs} binary located in @file{/var/cvs/bin} and
+repository root directory being @file{/var/cvs/cvsroot}.  Then, we can
+use the following rule: 
 
 @smallexample
 rule cvs
@@ -1105,8 +1107,7 @@ rule cvs
 Remote access to @acronym{SVN} repositories is done via
 @command{svnserve} binary.  It is executed on server with @option{-t}
 option.  The @option{-r} option can be used to restrict access to a
-subset of root directories.  To summarize, we can use the following
-rule:
+subset of root directories.  So, we can use the following rule:
 
 @smallexample
 @group
@@ -1206,7 +1207,7 @@ An exit status of 0 means no errors, 1 means an error has occurred.
 @opindex -d
 In test mode, you may set debugging level (@pxref{Debugging}) from the
 command line, using the @option{--debug} (@option{-d}) command line
-option.  It expects a single number specifying debugging level, as its
+option.  It expects a single number specifying debugging level as its
 argument.  The debugging level set this way overrides settings
 from the configuration file.
 
