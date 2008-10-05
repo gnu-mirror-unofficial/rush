@@ -616,7 +616,7 @@ OPTIONS are:\n\
        -h, --help                Display this help message.\n\
        --usage                   Display a concise usage summary.\n\
 \n\
-Optional specifies alternative configuration file to use instead of the\n\
+Optional FILE specifies alternative configuration file to use instead of the\n\
 default.  It is valid only in conjunction with --lint argument.\n";
 	       
 void
