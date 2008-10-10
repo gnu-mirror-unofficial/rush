@@ -35,6 +35,7 @@
 #include <regex.h>
 #include <c-ctype.h>
 #include <argcv.h>
+#include <inttostr.h>
 
 #include <defines.h>
 
@@ -130,10 +131,12 @@ struct test_node {
 	} v;
 };
 
+enum rush_three_state { rush_undefined = -1, rush_false, rush_true };
+
 struct rush_rule {
 	struct rush_rule *next;      /* Next config in the list */
 
-	const char *tag;
+	char *tag;
 	int fall_through;
 	
 	/* Source location */
@@ -157,6 +160,10 @@ struct rush_rule {
 	char *chroot_dir;            /* chroot directory */ 
 	char *home_dir;              /* home directory */
 	limits_record_t limits;      /* resource limits */
+
+	enum rush_three_state fork;  /* Fork a subprocess */
+	char *prologue;
+	char *epilogue;
 };
 
 extern char *rush_config_file;

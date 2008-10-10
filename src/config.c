@@ -197,6 +197,7 @@ new_rush_rule()
 {
 	struct rush_rule *p = xzalloc(sizeof(*p));
 	LIST_APPEND(p, rule_head, rule_tail);
+	p->fork = rush_undefined;
 	return p;
 }
 
@@ -712,6 +713,41 @@ _parse_exit(struct input_buf *ibuf, struct rush_rule *rule,
 	return 0;
 }
 
+static int
+get_bool(char *val, int *res)
+{
+	if (strcmp (val, "yes") == 0
+	    || strcmp (val, "on") == 0
+	    || strcmp (val, "t") == 0
+	    || strcmp (val, "true") == 0
+	    || strcmp (val, "1") == 0)
+		*res = 1;
+	else if (strcmp (val, "no") == 0
+		 || strcmp (val, "off") == 0
+		 || strcmp (val, "nil") == 0
+		 || strcmp (val, "false") == 0
+		 || strcmp (val, "0") == 0)
+		*res = 0;
+	else
+		return 1;
+	return 0;
+}
+
+static int
+_parse_fork(struct input_buf *ibuf, struct rush_rule *rule,
+	    char *kw, char *val)
+{
+	int yes;
+	if (get_bool(val, &yes)) {
+		logmsg(LOG_NOTICE,
+		       "%s:%d: expected boolean value, but found `%s'",
+		       ibuf->file, ibuf->line, val);
+		return 1;
+	}
+	rule->fork = yes ? rush_true : rush_false;
+	return 0;
+}
+
 
 #define TOK_NONE  0x00   /* No flags */
 #define TOK_ARG   0x01   /* Token requires an argument */
@@ -752,6 +788,7 @@ struct token toktab[] = {
 	{ "config-error",  TOK_ARG, _parse_config_error },
 	{ "system-error",  TOK_ARG, _parse_system_error },
 	{ "regexp",        TOK_ARG, _parse_re_flags },
+	{ "fork",          TOK_ARG, _parse_fork },
 	{ NULL }
 };
 
@@ -779,7 +816,8 @@ parse_input_buf(struct input_buf *ibuf)
 	size_t size = 0;
 	int err = 0;
 	struct rush_rule *rule = NULL;
-
+	unsigned rule_num = 0;
+	
 	debug1(3, "Parsing %s", ibuf->file);
 	while (read_line(ibuf, &buf, &size)) {
 		char *kw, *val;
@@ -801,9 +839,17 @@ parse_input_buf(struct input_buf *ibuf)
 			val = NULL;
 		
 		if (strcmp(kw, "rule") == 0) {
+			rule_num++;
 			rule = new_rush_rule();
 			if (val && val[0])
-				rule->tag = xstrdup (val);
+				rule->tag = xstrdup(val);
+			else {
+				char buf[INT_BUFSIZE_BOUND(unsigned)];
+				char *s = uinttostr(rule_num, buf);
+				rule->tag = xmalloc(strlen(s) + 2);
+				rule->tag[0] = '#';
+				strcpy(rule->tag + 1, s);
+			}
 			rule->file = ibuf->file;
 			rule->line = ibuf->line;
 			continue;

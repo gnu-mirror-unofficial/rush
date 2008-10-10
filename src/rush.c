@@ -15,6 +15,9 @@
    along with Rush.  If not, see <http://www.gnu.org/licenses/>. */
 
 #include <rush.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <signal.h>
 #include <getopt.h>
 
 extern char **environ;
@@ -154,6 +157,7 @@ struct rush_request {
         char **argv;
         struct passwd *pw;
         char *home_dir;
+	enum rush_three_state fork;
 };
 
 int
@@ -514,12 +518,47 @@ run_transforms(struct rush_rule *rule, struct rush_request *req)
 }
 
 void
+fork_process(struct rush_rule *rule)
+{
+	int status;
+	pid_t pid;
+
+	signal(SIGCHLD, SIG_DFL);
+	
+	pid = fork();
+
+	if (pid == 0)
+		return;
+	if (pid == -1) 
+		die(system_error, "%s:%d: %s: cannot fork: %s",
+		    rule->file, rule->line, rule->tag,
+		    strerror(errno));
+
+	close(0);
+	close(1);
+	close(2);
+
+	debug1(2, "Forked process %lu", (unsigned long) pid);
+	waitpid(pid, &status, 0);
+	if (WIFEXITED(status)) {
+		status = WEXITSTATUS(status);
+		debug2(2, "%s: subprocess exited with code %d",
+		       rule->tag, status);
+	} else if (WIFSIGNALED(status)) {
+		logmsg(LOG_NOTICE, "%s: subprocess terminated on signal %d",
+		       rule->tag, WTERMSIG(status));
+	} else
+		logmsg(LOG_NOTICE, "%s: subprocess terminated", rule->tag);
+	exit(0);
+}
+
+void
 run_rule(struct rush_rule *rule, struct rush_request *req)
 {
         char **new_env;
         
         debug3(2, "Rule %s at %s:%d matched",
-               rule->tag ? rule->tag : "(untagged)", rule->file, rule->line);
+	       rule->tag, rule->file, rule->line);
 
         if (rule->error_msg) {
                 debug1(2, "Error message: %s", rule->error_msg);
@@ -565,7 +604,10 @@ run_rule(struct rush_rule *rule, struct rush_request *req)
 
         if (req->home_dir) 
                 debug1(2, "Home dir: %s", req->home_dir);
-        
+
+	if (rule->fork != rush_undefined) 
+		req->fork = rule->fork;
+
         default_umask = rule->mask;
         if (rule->fall_through)
                 return;
@@ -583,9 +625,13 @@ run_rule(struct rush_rule *rule, struct rush_request *req)
         debug1(2, "executing %s", req->cmdline);
 	if (lint_option)
 		exit(0);
+
+	if (req->fork == rush_true) 
+		fork_process(rule);
+
         execve(req->argv[0], req->argv, new_env);
         die(system_error, "%s:%d: %s: cannot execute %s: %s",
-            rule->file, rule->line, rule->tag ? rule->tag : "(untagged)",
+            rule->file, rule->line, rule->tag,
             req->cmdline, strerror(errno));
 }
 
@@ -735,6 +781,7 @@ main(int argc, char **argv)
         req.cmdline = xstrdup(command);
         req.pw = pw;
         req.home_dir = NULL;
+	req.fork = rush_undefined;
         rc = argcv_get(req.cmdline, NULL, NULL, &req.argc, &req.argv);
         if (rc)
                 die(system_error,
@@ -747,7 +794,7 @@ main(int argc, char **argv)
                         die(usage_error,
                             "no matching rule for \"%s\", user %s",
                             req.cmdline, pw->pw_name);
-                if (debug_level && rule->tag) 
+                if (debug_level) 
                         logmsg(LOG_NOTICE,
                                "Serving request \"%s\" for %s by rule %s",
                                command, pw->pw_name, rule->tag);

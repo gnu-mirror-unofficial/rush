@@ -4,6 +4,7 @@
 c-ctype
 getopt
 gitlog-to-changelog
+inttostr
 malloc
 readutmp
 realloc
