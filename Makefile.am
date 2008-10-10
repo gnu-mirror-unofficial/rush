@@ -15,7 +15,10 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 ACLOCAL_AMFLAGS = -I m4 
-SUBDIRS=gnu src etc doc
+SUBDIRS=gnu lib src etc doc
+
+EXTRA_DIST=paths
+DISTCLEANFILES = pathdefs.make paths.defs
 
 # We never remove files from the configuration directory
 distuninstallcheck_listfiles = \

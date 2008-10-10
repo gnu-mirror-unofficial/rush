@@ -15,7 +15,7 @@
 # along with Rush.  If not, see <http://www.gnu.org/licenses/>.
 
 AC_PREREQ(2.61)
-AC_INIT([rush], [1.2], [bug-rush@gnu.org.ua])
+AC_INIT([rush], [1.2.90], [bug-rush@gnu.org.ua])
 AC_CONFIG_SRCDIR([src/rush.c])
 AC_CONFIG_HEADER([config.h])
 AC_CONFIG_AUX_DIR([build-aux])
@@ -31,7 +31,9 @@ AC_PROG_RANLIB
 
 # Checks for header files.
 AC_HEADER_STDC
-AC_CHECK_HEADERS([stdlib.h string.h syslog.h unistd.h])
+AC_HEADER_TIME
+AC_CHECK_HEADERS([stdlib.h string.h syslog.h unistd.h sys/time.h \
+                  utmpx.h utmp.h paths.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST
@@ -39,6 +41,20 @@ AC_TYPE_UID_T
 AC_TYPE_MODE_T
 AC_TYPE_SIZE_T
 
+if test "$ac_cv_header_utmp_h" = yes; then
+  AC_CHECK_TYPES(struct lastlog, , , [#include <utmp.h>])
+  IU_CHECK_MEMBERS([struct utmp.ut_type, struct utmp.ut_pid,
+                    struct utmp.ut_id, struct utmp.ut_user,
+                    struct utmp.ut_host, struct utmp.ut_tv,
+	            struct utmp.ut_exit], , ,
+	           [#include <sys/types.h>
+	            #include <utmp.h>])
+fi
+
+if test "$ac_cv_header_utmpx_h" = yes; then
+  IU_CHECK_MEMBERS([struct utmpx.ut_tv], , , [#include <utmpx.h>])
+fi
+								 
 # Checks for library functions.
 AC_FUNC_GETGROUPS
 AC_FUNC_MALLOC
@@ -46,9 +62,19 @@ AC_FUNC_MEMCMP
 AC_FUNC_REALLOC
 AC_FUNC_STAT
 AC_FUNC_ALLOCA
-AC_CHECK_FUNCS([strdup strerror strrchr strtoul sysconf getdtablesize])
+AC_CHECK_FUNCS([strdup strerror strrchr strtoul sysconf getdtablesize \
+                flock ftruncate updwtmp updwtmpx])
 
 gl_INIT
+
+# Configure paths used by Rush.  See the file `paths' for
+# details.
+PATHDEFS_MAKE=pathdefs.make
+PATHS_DEFS=paths.defs
+IU_CONFIG_PATHS($srcdir/paths, PATHDEFS_MAKE, PATHS_DEFS)
+AH_BOTTOM(
+[/* Defaults for PATH_ variables.  */
+#include <confpaths.h>])
 
 # Doc hints.
 # Select a rendition level:
@@ -68,8 +94,10 @@ case `echo $VERSION|sed  's/[[^.]]//g'` in
 esac
 
 
-AC_CONFIG_FILES([Makefile
+AC_CONFIG_FILES([confpaths.h:confpaths.h.in
+		 Makefile
                  gnu/Makefile
+		 lib/Makefile
 		 src/Makefile
 		 etc/Makefile
 		 doc/Makefile])
