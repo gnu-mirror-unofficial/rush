@@ -28,6 +28,7 @@
 
 #include "librush.h"
 
+enum rush_wtmp_dir rush_wtmp_dir = rush_wtmp_forward;
 static int wtmp_fd = -1;
 static size_t wtmp_recsize = 0;
 int rush_wtmp_mode = 0660;
@@ -53,6 +54,29 @@ rush_wtmp_close()
 }
 
 int
+rush_wtmp_rewind(void)
+{
+	int whence;
+	
+	switch (rush_wtmp_dir) {
+	case rush_wtmp_forward:
+		whence = SEEK_SET;
+		break;
+		
+	case rush_wtmp_backward:
+		whence = SEEK_END;
+	}
+	return lseek(wtmp_fd, 0, whence) == -1;
+}
+
+void
+rush_wtmp_set_dir(enum rush_wtmp_dir dir)
+{
+	rush_wtmp_dir = dir;
+	rush_wtmp_rewind();
+}
+
+int
 rush_wtmp_seek(off_t off)
 {
 	off_t rc = lseek(wtmp_fd, off, SEEK_SET);
@@ -73,25 +97,29 @@ alloc_wtmp(size_t reclen)
 	return wtmp;
 }
 
-int
-rush_wtmp_read(struct rush_wtmp **pwtmp)
+enum rushdb_result
+rush_wtmp_read_fwd(struct rush_wtmp **pwtmp)
 {
 	struct rush_wtmp *wtmprec;
 	size_t reclen, left;
+	ssize_t size;
 	char *p, *s;
 	
 	if (wtmp_fd == -1) {
 		errno = EINVAL;
-		return 1;
+		return rushdb_result_fail;
 	}
 
-	if (read(wtmp_fd, &reclen, sizeof(reclen)) != sizeof(reclen))
-		return 1;
+	size = read(wtmp_fd, &reclen, sizeof(reclen));
+	if (size == 0)
+		return rushdb_result_eof; 
+	if (size != sizeof(reclen))
+		return rushdb_result_fail;
 	wtmp_recsize = reclen;
 	
 	wtmprec = alloc_wtmp(reclen);
 	if (!wtmprec)
-		return 1;
+		return rushdb_result_fail;
 	p = RUSH_WTMP_DATA_PTR(wtmprec);
 	reclen -= sizeof(reclen);
 	left = reclen;
@@ -102,7 +130,6 @@ rush_wtmp_read(struct rush_wtmp **pwtmp)
 		p += n;
 		left -= n;
 	}
-	
 	p = (char*) (wtmprec + 1);
 	s = p;
 	wtmprec->user = s;
@@ -116,12 +143,43 @@ rush_wtmp_read(struct rush_wtmp **pwtmp)
 	wtmprec->command = s;
 
 	*pwtmp = wtmprec;
-	return 0;
+	return rushdb_result_ok;
 
   errlab:
 	free(wtmprec);
 	rush_wtmp_close();
-	return 1;
+	return rushdb_result_fail;
+}
+
+enum rushdb_result
+rush_wtmp_read(struct rush_wtmp **pwtmp)
+{
+	size_t reclen;
+	enum rushdb_result res;
+		
+	switch (rush_wtmp_dir) {
+	case rush_wtmp_forward:
+		res = rush_wtmp_read_fwd(pwtmp);
+		if (lseek(wtmp_fd, sizeof(reclen), SEEK_CUR) == -1)
+			res = rushdb_result_fail;
+		break;
+		
+	case rush_wtmp_backward:
+		if (lseek(wtmp_fd, 0, SEEK_CUR) == 0)
+			return rushdb_result_eof;
+		if (lseek(wtmp_fd, -sizeof(reclen), SEEK_CUR) == -1)
+			return rushdb_result_fail;
+		if (read(wtmp_fd, &reclen, sizeof(reclen)) != sizeof(reclen))
+			return rushdb_result_fail;
+		if (lseek(wtmp_fd, -(reclen + sizeof(reclen)), SEEK_CUR) == -1)
+			return rushdb_result_fail;
+		res = rush_wtmp_read_fwd(pwtmp);
+		if (res == rushdb_result_ok) {
+			if (lseek(wtmp_fd, -reclen, SEEK_CUR) == -1)
+				return rushdb_result_fail;
+		}
+	}
+	return res;
 }
 
 size_t
@@ -187,6 +245,9 @@ rush_wtmp_append(struct rush_wtmp *wtmp)
 		p += n;
 		left -= n;
 	}
+	if (write(wtmp_fd, &record->reclen, sizeof(record->reclen)) !=
+	    sizeof(wtmp->reclen))
+		goto errlab;
 	
         wtmp_recsize = record->reclen;
 	free(record);
@@ -201,7 +262,7 @@ int
 rush_wtmp_update(struct timeval *tv)
 {
 	struct rush_wtmp wtmp;
-	if (lseek(wtmp_fd, - wtmp_recsize, SEEK_CUR) == -1)
+	if (lseek(wtmp_fd, - (wtmp_recsize + sizeof(size_t)), SEEK_CUR) == -1)
 		return 1;
 	if (read(wtmp_fd, &wtmp, sizeof wtmp) != sizeof wtmp)
 		return 1;

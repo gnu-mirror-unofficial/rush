@@ -39,36 +39,44 @@ struct rush_utmp {
 	off_t offset;
 };
 
-#define RUSH_UTMP_SUF "ut"
-#define RUSH_WTMP_SUF "wt"
+#define RUSH_UTMP_NAME "utmp"
+#define RUSH_WTMP_NAME "wtmp"
+
+enum rushdb_result {
+	rushdb_result_ok,
+	rushdb_result_eof,
+	rushdb_result_fail
+};
 
 extern int rush_wtmp_mode;
 
+enum rush_wtmp_dir {
+	rush_wtmp_forward,
+	rush_wtmp_backward
+};
+
+void rush_wtmp_set_dir(enum rush_wtmp_dir dir);
+int rush_wtmp_rewind(void);
+
 int rush_wtmp_open(const char *name, int rw);
-int rush_wtmp_read(struct rush_wtmp **pwtmp);
+enum rushdb_result rush_wtmp_read(struct rush_wtmp **pwtmp);
 int rush_wtmp_seek(off_t off);
 off_t rush_wtmp_append(struct rush_wtmp *wtmp);
 int rush_wtmp_close(void);
 int rush_wtmp_update(struct timeval *tv);
 
-enum rush_utmp_result {
-	rush_utmp_ok,
-	rush_utmp_eof,
-	rush_utmp_fail
-};
-
 int rush_utmp_open(const char *name, int rw);
-enum rush_utmp_result rush_utmp_read(int statmap, int *pstatus,
+enum rushdb_result rush_utmp_read(int statmap, int *pstatus,
 				     struct rush_wtmp **pwtmp);
 int rush_utmp_chstatus(int status);
 int rush_utmp_write(struct rush_wtmp *wtmp);
 int rush_utmp_close();
 
-int rushdb_open(const char *base_name, int rw);
+enum rushdb_result rushdb_open(const char *base_name, int rw);
 int rushdb_close(void);
 int rushdb_start(struct rush_wtmp *wtmp);
 int rushdb_stop(void);
-
+void rushdb_backward_direction(void);
 
 
 typedef struct slist *slist_t;

@@ -19,7 +19,9 @@
 #endif
 
 #include <sys/time.h>
+#include <sys/stat.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <string.h>
 #include <errno.h>
 #include <strftime.h>
@@ -30,44 +32,97 @@
 
 #include "librush.h"
 
-static char *
-mkname(const char *base, const char *suf)
+char *rushdb_error_string;
+
+static void
+format_error(const char *fmt, ...)
 {
-	char *s = malloc(strlen(base) + 1 + strlen(suf) + 1);
+	va_list ap;
+	va_start(ap, fmt);
+	free(rushdb_error_string);
+	vasprintf(&rushdb_error_string, fmt, ap);
+	va_end(ap);
+}
+
+static char *
+mkname(const char *dir, const char *file)
+{
+	char *s = malloc(strlen(dir) + 1 + strlen(file) + 1);
 	if (s) {
-		strcpy(s, base);
-		strcat(s, ".");
-		strcat(s, suf);
+		strcpy(s, dir);
+		strcat(s, "/");
+		strcat(s, file);
 	}
 	return s;
 }
 
-int
-rushdb_open(const char *base_name, int rw)
+enum rushdb_result
+rushdb_open(const char *dbdir, int rw)
 {
 	char *fname;
 	int rc;
+	struct stat st;
 	
-	fname = mkname(base_name, RUSH_UTMP_SUF);
-	if (!fname) 
-		return 1;
+	if (stat(dbdir, &st)) {
+		if (errno == ENOENT) {
+			if (!rw)
+				return rushdb_result_eof;
+			if (mkdir(dbdir, 0700)) {
+				format_error("cannot create directory %s: %s",
+					     dbdir, strerror(errno));
+				return rushdb_result_fail;
+			}
+		} else {
+			format_error("cannot stat directory %s: %s",
+				     dbdir, strerror(errno));
+			return rushdb_result_fail;
+		}
+	} else if (!S_ISDIR(st.st_mode)) {
+		format_error("%s is not a directory", dbdir);
+		return rushdb_result_fail;
+	}
+	
+	fname = mkname(dbdir, RUSH_UTMP_NAME);
+	if (!fname) {
+		format_error("%s", ENOMEM);
+		return rushdb_result_fail;
+	}
 	rc = rush_utmp_open(fname, rw);
+	if (rc) {
+		format_error("cannot open file %s: %s",
+			     fname, strerror(errno));
+		free(fname);
+		return rushdb_result_fail;
+	}
 	free(fname);
-	if (rc)
-		return 1;
-	
-	fname = mkname(base_name, RUSH_WTMP_SUF);
-	if (!fname) 
-		return 1;
+
+	fname = mkname(dbdir, RUSH_WTMP_NAME);
+	if (!fname) {
+		format_error("%s", ENOMEM);
+		return rushdb_result_fail;
+	}
 	rc = rush_wtmp_open(fname, rw);
+	if (rc) {
+		format_error("cannot open file %s: %s",
+			     fname, strerror(errno));
+		free(fname);
+		return rushdb_result_fail;
+	}
 	free(fname);
-	return rc;
+	
+	return rushdb_result_ok;
 }
 
 int
 rushdb_close()
 {
 	return rush_wtmp_close() || rush_utmp_close();
+}
+
+void
+rushdb_backward_direction()
+{
+	rush_wtmp_set_dir(rush_wtmp_backward);
 }
 
 
@@ -104,7 +159,6 @@ struct rushdb_format {
 };
 
 char *rushdb_date_format = "%a %H:%M";
-char *rushdb_error_string;
 
 #define ALIGN_LEFT  0
 #define ALIGN_RIGHT 1
@@ -286,7 +340,10 @@ static int
 format_stop(int outbytes, int width, struct format_key *key,
 	    struct rush_wtmp *wtmp)
 {
-	return output_time(&wtmp->stop, width, key);
+	if (wtmp->stop.tv_sec == 0 && wtmp->stop.tv_usec == 0) 
+		return output_string_key("active", width, key);
+	else
+		return output_time(&wtmp->stop, width, key);
 }
 
 struct format_tab {
@@ -389,9 +446,8 @@ parse_quote(char **fmtp, struct rushdb_format *form)
 	char *p;
 	p = parse_string0(*fmtp + 1, form, _is_closing_quote, *fmtp);	
 	if (!*p) {
-		asprintf(&rushdb_error_string,
-		         "missing closing quote in string started near `%s'",
-		         *fmtp);
+		format_error("missing closing quote in string started near `%s'",
+			     *fmtp);
 		return 1;
 	}
 	*fmtp = p + 1;
@@ -436,6 +492,23 @@ get_token(char **fmtp)
 }
 
 static int
+is_time_function(rushdb_format_fp fh)
+{
+	return fh == format_start || fh == format_stop;
+}
+
+static int
+time_width(struct rushdb_format *form)
+{
+	time_t t = 0;
+	struct tm *tm = localtime(&t);
+	char *fmt = format_key_lookup(form->key, "format");
+
+	return nstrftime(NULL, -1, fmt ? fmt : rushdb_date_format, 
+			 tm, 0, 0);
+}
+
+static int
 parse_form(char **fmtp, struct rushdb_format *form)
 {
 	char *formname, *p;
@@ -466,9 +539,8 @@ parse_form(char **fmtp, struct rushdb_format *form)
 		
 		fh = _lookup(formname);
 		if (!fh) {
-			asprintf(&rushdb_error_string,
-			         "error in format spec: unknown format %s",
-			         formname);
+			format_error("error in format spec: unknown format %s",
+				     formname);
 			return 1;
 		}
 		
@@ -488,9 +560,9 @@ parse_form(char **fmtp, struct rushdb_format *form)
 				form->v.fh.header = xstrdup(p);
 				break;
 			default:
-				asprintf(&rushdb_error_string,
-					 "wrong number of arguments to form %s",
-				         formname);
+				format_error("wrong number of arguments "
+					     "to form %s",
+					     formname);
 				return 1;
 			}
 		}
@@ -514,34 +586,19 @@ parse_form(char **fmtp, struct rushdb_format *form)
 			}
 		}
 		form->key = key_head;
+
+		if (is_time_function(form->v.fh.fun))
+			form->v.fh.width = time_width(form);
 	}
 	
 	if (p[0] != ')') {
-		asprintf(&rushdb_error_string,
-			 "form `%s' not closed", formname);
+		format_error("form `%s' not closed", formname);
 		return 1;
 	}
 	return 0;
 }
 
 
-static int
-is_time_function(rushdb_format_fp fh)
-{
-	return fh == format_start || fh == format_stop;
-}
-
-static int
-time_width(struct rushdb_format *form)
-{
-	time_t t = 0;
-	struct tm *tm = localtime(&t);
-	char *fmt = format_key_lookup(form->key, "format");
-
-	return nstrftime(NULL, -1, fmt ? fmt : rushdb_date_format, 
-			 tm, 0, 0);
-}
-
 rushdb_format_t 
 rushdb_compile_format(char *fmt)
 {
@@ -620,7 +677,6 @@ rushdb_print_header(rushdb_format_t form)
 {
 	int i, outbytes = 0;
 	rushdb_format_t p;
-	int width;
 	
 	for (p = form; p; p = p->next) 
 		if (p->type == FDATA_NEWLINE)
@@ -629,16 +685,13 @@ rushdb_print_header(rushdb_format_t form)
 	for (; form; form = form->next) {
 		switch (form->type) {
 		case FDATA_FH:
-			width = form->v.fh.width;
-
-			if (form->v.fh.header) {
-				if (is_time_function(form->v.fh.fun))
-					width = time_width(form);
+			if (form->v.fh.header) 
 				outbytes += output_string(form->v.fh.header,
-							  width,
+							  form->v.fh.width,
 							  ALIGN_LEFT);
-			} else
-				output_string("", width, ALIGN_LEFT);
+			else
+				outbytes += output_string("", form->v.fh.width,
+							  ALIGN_LEFT);
 			break;
 				
 		case FDATA_STRING:
@@ -667,11 +720,11 @@ int
 rushdb_start(struct rush_wtmp *wtmp)
 {
 	int status;
-	enum rush_utmp_result rc;
+	enum rushdb_result rc;
 
 	rc = rush_utmp_read(RUSH_STATUS_MAP_BIT(RUSH_STATUS_AVAIL),
 			    &status, NULL);
-	if (rc == rush_utmp_fail)
+	if (rc == rushdb_result_fail)
 		return rc;
 	gettimeofday(&wtmp->start, NULL);
 	memset(&wtmp->stop, 0, sizeof(wtmp->stop));

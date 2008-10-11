@@ -28,7 +28,7 @@
 #include "librush.h"
 
 static int utmp_fd = -1;
-static enum rush_utmp_result status = rush_utmp_eof;
+static enum rushdb_result status = rushdb_result_eof;
 static struct rush_utmp utmprec = { -1, 0 };
 
 int
@@ -51,34 +51,34 @@ rush_utmp_close()
 	return rc;
 }
 
-static enum rush_utmp_result
+static enum rushdb_result
 rush_utmp_read0(int statmap, int *pstatus, struct rush_wtmp **pwtmp)
 {
 	for (;;) {
 		ssize_t n = read(utmp_fd, &utmprec, sizeof(utmprec));
 
 		if (n == 0) 
-			return rush_utmp_eof;
+			return rushdb_result_eof;
 			
 		if (n != sizeof(utmprec))
-			return rush_utmp_fail;
+			return rushdb_result_fail;
 
 		if (rush_wtmp_seek(utmprec.offset))
-			return rush_utmp_fail;
+			return rushdb_result_fail;
 
 		if (statmap == 0
 		    || RUSH_STATUS_MAP_ISSET(statmap, utmprec.status)) {
 			if (pwtmp && rush_wtmp_read(pwtmp))
-				return rush_utmp_fail;
+				return rushdb_result_fail;
 			break;
 		}
 	}
 		
 	*pstatus = utmprec.status;
-	return rush_utmp_ok;
+	return rushdb_result_ok;
 }
 
-enum rush_utmp_result
+enum rushdb_result
 rush_utmp_read(int statmap, int *pstatus, struct rush_wtmp **pwtmp)
 {
 	return status = rush_utmp_read0(statmap, pstatus, pwtmp);
@@ -114,7 +114,7 @@ rush_utmp_write(struct rush_wtmp *wtmp)
 	off = rush_wtmp_append(wtmp);
 	if (off == -1)
 		return 1;
-	if (status == rush_utmp_ok) {
+	if (status == rushdb_result_ok) {
 		if (lseek(utmp_fd, - sizeof(utmprec), SEEK_CUR) == -1)
 			return 1;
 	}

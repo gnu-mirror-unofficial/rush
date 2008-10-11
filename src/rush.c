@@ -526,8 +526,8 @@ acct_on(struct rush_rule *rule, struct rush_request *req, pid_t pid)
 	wtmp.command = req->cmdline;
 	if (rushdb_start(&wtmp))
 		die(system_error,
-		    "error writing to database file %s: %s",
-		    RUSH_DB_FILE, strerror(errno));
+		    "error writing to database %s: %s",
+		    RUSH_DB, strerror(errno));
 }
 
 void
@@ -535,7 +535,7 @@ acct_off(void)
 {
 	if (rushdb_stop())
 		logmsg(LOG_ERR, "error writing stop to database file %s: %s",
-		       RUSH_DB_FILE, strerror(errno));
+		       RUSH_DB, strerror(errno));
 	rushdb_close();
 }
 
@@ -646,10 +646,10 @@ run_rule(struct rush_rule *rule, struct rush_request *req)
 
 	if (req->acct) {
 		mode_t um = umask(022);
-		if (rushdb_open(RUSH_DB_FILE, 1)) 
+		if (rushdb_open(RUSH_DB, 1) != rushdb_result_ok) 
 			die(system_error,
-			    "cannot open database file %s: %s",
-			    RUSH_DB_FILE, strerror(errno));
+			    "cannot open database %s: %s",
+			    RUSH_DB, rushdb_error_string);
 		umask(um);
 	}
 	

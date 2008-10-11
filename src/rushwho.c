@@ -30,18 +30,35 @@ struct option longopts[] = {
 };
 
 
+const char help_msg[] = "\
+rushlast - show listing of last Rush users.\n\
+Usage: rushlast [OPTIONS] [user [user...]]\n\
+\n\
+OPTIONS are:\n\
+       -F, --format=STRING       Use STRING instead of the default format.\n\
+       -f, --file=DIR            Look for database files in DIR.\n\
+       -H, --no-header           Do not display header line.\n\
+\n\
+       -v, --version             Display program version.\n\
+       -h, --help                Display this help message.\n\
+       --usage                   Display a concise usage summary.\n";
+
 void
 help()
 {
-	/* FIXME */
-	abort();
+        fputs(help_msg, stdout);
+	printf("\nReport bugs to <%s>.\n", PACKAGE_BUGREPORT);
 }
+
+const char user_msg[] = "\
+rushwho [-F FORMAT] [-f DBDIR] [-Hh] [-v]\n\
+        [--file DBDIR] [--format FORMAT] [--help] [--no-header] [--usage]\n\
+        [--version]\n";
 
 void
 usage()
 {
-	/* FIXME */
-	abort();
+	fputs(user_msg, stdout);
 }
 
 void
@@ -64,7 +81,7 @@ int
 main(int argc, char **argv)
 {
 	int rc;
-	char *base_name = RUSH_DB_FILE;
+	char *base_name = RUSH_DB;
 	struct rush_wtmp *wtmp = NULL;
 	int status;
 	rushdb_format_t form;
@@ -101,6 +118,9 @@ main(int argc, char **argv)
 		case USAGE_OPTION:
 			usage();
 			exit(0);
+
+		default:
+			exit(1);
 		}
 	}
 
@@ -118,8 +138,15 @@ main(int argc, char **argv)
 			progname, rushdb_error_string);
 		exit(1);
 	}
-	
-	if (rushdb_open(base_name, 0)) {
+
+	switch (rushdb_open(base_name, 0)) {
+	case rushdb_result_ok:
+		break;
+
+	case rushdb_result_eof:
+		exit(0);
+
+	case rushdb_result_fail:
                 fprintf(stderr, "%s: cannot open database file %s: %s\n",
 			progname, base_name, strerror(errno));
 		exit(1);
@@ -128,7 +155,7 @@ main(int argc, char **argv)
 	if (display_header)
 		rushdb_print_header(form);
 	while (rush_utmp_read(RUSH_STATUS_MAP_BIT(RUSH_STATUS_INUSE),
-			      &status, &wtmp) == rush_utmp_ok) {
+			      &status, &wtmp) == rushdb_result_ok) {
 		
 		rushdb_print(form, wtmp, 1);
 		free(wtmp);

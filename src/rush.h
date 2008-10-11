@@ -51,7 +51,7 @@
 # define CANONICAL_PROGRAM_NAME "/usr/local/sbin/rush"
 #endif
 
-#define RUSH_DB_FILE LOCALSTATEDIR "/rush"
+#define RUSH_DB LOCALSTATEDIR "/rush"
 
 #if defined HAVE_SYSCONF && defined _SC_OPEN_MAX
 # define getmaxfd() sysconf(_SC_OPEN_MAX)

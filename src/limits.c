@@ -88,9 +88,17 @@ check_logins(const char *name, int limit)
         }
 
         debug1(3, "counting logins for %s", name);
-	if (rushdb_open(RUSH_DB_FILE, 0)) {
-                logmsg(LOG_ERR, "Cannot open Rush database file %s: %s",
-                       RUSH_DB_FILE, strerror(errno));
+	switch (rushdb_open(RUSH_DB, 0)) {
+	case rushdb_result_ok:
+		break;
+
+	case rushdb_result_eof:
+		debug(3, "acct database is empty");
+		return 0;
+
+	case rushdb_result_fail:
+                logmsg(LOG_ERR, "Cannot open database %s: %s",
+                       RUSH_DB, rushdb_error_string);
 		return 0;
 	}
 
