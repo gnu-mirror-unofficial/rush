@@ -31,8 +31,8 @@ struct option longopts[] = {
 
 
 const char help_msg[] = "\
-rushlast - show listing of last Rush users.\n\
-Usage: rushlast [OPTIONS] [user [user...]]\n\
+rushlast - show listing of online Rush users.\n\
+Usage: rushwho [OPTIONS] [user [user...]]\n\
 \n\
 OPTIONS are:\n\
        -F, --format=STRING       Use STRING instead of the default format.\n\
