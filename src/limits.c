@@ -15,7 +15,6 @@
    along with Rush.  If not, see <http://www.gnu.org/licenses/>. */
 
 #include <rush.h>
-#include "readutmp.h"
 
 #define SET_LIMIT_AS      0x0001
 #define SET_LIMIT_CPU     0x0002
@@ -79,9 +78,9 @@ static int
 check_logins(const char *name, int limit)
 {
         size_t count = 0;
-        size_t utmp_count;
-        STRUCT_UTMP *utmpbuf, *uptr;
-        
+	struct rush_wtmp *wtmp = 0;
+	int status;
+	
         if (limit == 0) /* maximum 0 logins ? */ {
                 debug1(2, "No logins allowed for `%s'\n", name);
                 logmsg(LOG_ERR, "No logins allowed for `%s'", name);
@@ -89,23 +88,32 @@ check_logins(const char *name, int limit)
         }
 
         debug1(3, "counting logins for %s", name);
-        read_utmp (UTMP_FILE, &utmp_count, &utmpbuf,
-                   READ_UTMP_USER_PROCESS | READ_UTMP_CHECK_PIDS);
-        for (uptr = utmpbuf; uptr < utmpbuf + utmp_count; uptr++) {
-                if (!strncmp (UT_USER (uptr), name, sizeof (UT_USER (uptr)))) {
-                        count++;
-                        if (++count > limit)
-                                break;
-                }
-        }
-        free (utmpbuf);
-        debug2(3, "counted %d logins for %s", count, name);
+	if (rushdb_open(RUSH_DB_FILE, 0)) {
+                logmsg(LOG_ERR, "Cannot open Rush database file %s: %s",
+                       RUSH_DB_FILE, strerror(errno));
+		return 0;
+	}
+
+	while (rush_utmp_read(RUSH_STATUS_MAP_BIT(RUSH_STATUS_INUSE),
+			      &status, &wtmp) == 0) {
+		if (strcmp (wtmp->user, name) == 0) {
+			if (++count >= limit)
+				break;
+		}
+		free(wtmp);
+		wtmp = NULL;
+	}
+	free(wtmp);
+
+	rushdb_close();
+	
+        debug3(3, "counted %d/%d logins for %s", count, limit, name);
 
         /*
          * This is called after setutmp(), so the number of logins counted
          * includes the user who is currently trying to log in.
          */
-        if (count > limit) {
+        if (count >= limit) {
                 debug2(2, "Too many logins (max %d) for %s",
 		       limit, name);
                 logmsg(LOG_ERR, "Too many logins (max %d) for %s",

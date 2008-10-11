@@ -15,6 +15,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 sbin_PROGRAMS=rush
+bin_PROGRAMS=rushlast rushwho
+
 rush_SOURCES=\
  argcv.c\
  argcv.h\
@@ -23,11 +25,13 @@ rush_SOURCES=\
  limits.c\
  rush.c\
  rush.h\
- slist.c\
  transform.c
 
-INCLUDES=-I$(top_srcdir)/gnu -I$(top_builddir)/gnu
-LDADD=../gnu/libgnu.a
+rushlast_SOURCES=rushlast.c
+rushwho_SOURCES=rushwho.c
+
+INCLUDES=-I$(top_srcdir)/gnu -I$(top_builddir)/gnu -I$(top_builddir)/lib
+LDADD=../lib/librush.a ../gnu/libgnu.a
 
 sbinPROGRAMS_INSTALL = $(INSTALL_PROGRAM) -m 4755
 
@@ -38,6 +42,7 @@ defines.h: Makefile
 	p=`echo rush | sed 's/$(EXEEXT)$$//'`; \
 	f=`echo "$$p" | sed 's,^.*/,,;$(transform);s/$$/$(EXEEXT)/'` ; \
 	echo "#define CANONICAL_PROGRAM_NAME \"$(sbindir)/$$f\"" | tr -s / > $@-t
-	echo "#define SYSCONFDIR \"$(sysconfdir)\"" >> $@-t
+	echo "#define SYSCONFDIR \"$(sysconfdir)\"" >> $@-t 
+	echo "#define LOCALSTATEDIR \"$(localstatedir)\"" >> $@-t
 	mv $@-t $@
 

@@ -197,7 +197,9 @@ new_rush_rule()
 {
 	struct rush_rule *p = xzalloc(sizeof(*p));
 	LIST_APPEND(p, rule_head, rule_tail);
+	p->mask = NO_UMASK;
 	p->fork = rush_undefined;
+	p->acct = rush_undefined;
 	return p;
 }
 
@@ -748,6 +750,21 @@ _parse_fork(struct input_buf *ibuf, struct rush_rule *rule,
 	return 0;
 }
 
+static int
+_parse_acct(struct input_buf *ibuf, struct rush_rule *rule,
+	    char *kw, char *val)
+{
+	int yes;
+	if (get_bool(val, &yes)) {
+		logmsg(LOG_NOTICE,
+		       "%s:%d: expected boolean value, but found `%s'",
+		       ibuf->file, ibuf->line, val);
+		return 1;
+	}
+	rule->acct = yes ? rush_true : rush_false;
+	return 0;
+}
+
 
 #define TOK_NONE  0x00   /* No flags */
 #define TOK_ARG   0x01   /* Token requires an argument */
@@ -789,6 +806,7 @@ struct token toktab[] = {
 	{ "system-error",  TOK_ARG, _parse_system_error },
 	{ "regexp",        TOK_ARG, _parse_re_flags },
 	{ "fork",          TOK_ARG, _parse_fork },
+	{ "acct",          TOK_ARG, _parse_acct },
 	{ NULL }
 };
 

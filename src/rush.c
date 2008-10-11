@@ -15,10 +15,6 @@
    along with Rush.  If not, see <http://www.gnu.org/licenses/>. */
 
 #include <rush.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <signal.h>
-#include <getopt.h>
 
 extern char **environ;
 
@@ -27,7 +23,6 @@ int lint_option = 0;
 unsigned sleep_time = 5;
 unsigned debug_level;
 int debug_option;
-unsigned default_umask = 022;
 struct rush_rule *rule_head, *rule_tail;
 
 static char *progname;
@@ -56,8 +51,8 @@ char *error_msg[] = {
 void
 send_msg(const char *msg, size_t len)
 {
-        if (write (STDERR_FILENO, msg, len) < 0)
-                write (STDOUT_FILENO, msg, len);
+        if (write(STDERR_FILENO, msg, len) < 0)
+                write(STDOUT_FILENO, msg, len);
 }
 
 void
@@ -156,8 +151,11 @@ struct rush_request {
         int argc;
         char **argv;
         struct passwd *pw;
+	unsigned umask;
+	char *chroot_dir;
         char *home_dir;
 	enum rush_three_state fork;
+	enum rush_three_state acct;
 };
 
 int
@@ -518,7 +516,31 @@ run_transforms(struct rush_rule *rule, struct rush_request *req)
 }
 
 void
-fork_process(struct rush_rule *rule)
+acct_on(struct rush_rule *rule, struct rush_request *req, pid_t pid)
+{
+	struct rush_wtmp wtmp;
+
+	wtmp.pid = pid;
+	wtmp.user = req->pw->pw_name;
+	wtmp.rule = rule->tag;
+	wtmp.command = req->cmdline;
+	if (rushdb_start(&wtmp))
+		die(system_error,
+		    "error writing to database file %s: %s",
+		    RUSH_DB_FILE, strerror(errno));
+}
+
+void
+acct_off(void)
+{
+	if (rushdb_stop())
+		logmsg(LOG_ERR, "error writing stop to database file %s: %s",
+		       RUSH_DB_FILE, strerror(errno));
+	rushdb_close();
+}
+
+void
+fork_process(struct rush_rule *rule, struct rush_request *req)
 {
 	int status;
 	pid_t pid;
@@ -527,8 +549,10 @@ fork_process(struct rush_rule *rule)
 	
 	pid = fork();
 
-	if (pid == 0)
+	if (pid == 0) {
 		return;
+	}
+	
 	if (pid == -1) 
 		die(system_error, "%s:%d: %s: cannot fork: %s",
 		    rule->file, rule->line, rule->tag,
@@ -538,6 +562,8 @@ fork_process(struct rush_rule *rule)
 	close(1);
 	close(2);
 
+	if (req->acct == rush_true)
+		acct_on(rule, req, pid);
 	debug1(2, "Forked process %lu", (unsigned long) pid);
 	waitpid(pid, &status, 0);
 	if (WIFEXITED(status)) {
@@ -549,6 +575,8 @@ fork_process(struct rush_rule *rule)
 		       rule->tag, WTERMSIG(status));
 	} else
 		logmsg(LOG_NOTICE, "%s: subprocess terminated", rule->tag);
+	if (req->acct == rush_true)
+		acct_off();
 	exit(0);
 }
 
@@ -590,12 +618,11 @@ run_rule(struct rush_rule *rule, struct rush_request *req)
         }
         
         if (rule->chroot_dir) {
-                const char *dir = expand_tilde(rule->chroot_dir,
+                char *dir = expand_tilde(rule->chroot_dir,
                                                req->pw->pw_dir);
                 debug1(2, "Chroot dir: %s", dir);
-                if (chroot(dir)) 
-                        die(system_error, "cannot chroot to %s: %s",
-                            dir, strerror(errno));
+		free(req->chroot_dir);
+		req->chroot_dir = dir;
                 if (req->home_dir && is_prefix(dir, req->home_dir)) {
                         char *new_dir = req->home_dir + strlen(dir);
                         memmove(req->home_dir, new_dir, strlen(new_dir) + 1);
@@ -605,29 +632,47 @@ run_rule(struct rush_rule *rule, struct rush_request *req)
         if (req->home_dir) 
                 debug1(2, "Home dir: %s", req->home_dir);
 
-	if (rule->fork != rush_undefined) 
+	if (rule->acct != rush_undefined)
+		req->acct = rule->acct;
+	if (req->acct == rush_true)
+		req->fork = rush_true;
+	else if (rule->fork != rush_undefined) 
 		req->fork = rule->fork;
 
-        default_umask = rule->mask;
+	if (rule->mask != NO_UMASK) 
+		req->umask = rule->mask;
         if (rule->fall_through)
                 return;
-        
+
+	if (req->acct) {
+		mode_t um = umask(022);
+		if (rushdb_open(RUSH_DB_FILE, 1)) 
+			die(system_error,
+			    "cannot open database file %s: %s",
+			    RUSH_DB_FILE, strerror(errno));
+		umask(um);
+	}
+	
+	if (req->chroot_dir && chroot(req->chroot_dir)) 
+		die(system_error, "cannot chroot to %s: %s",
+		    req->chroot_dir, strerror(errno));
+
         if (req->home_dir && chdir(req->home_dir)) 
                 die(system_error, "cannot change to dir %s: %s",
                     req->home_dir, strerror(errno));
+
+        debug1(2, "Executing %s", req->cmdline);
+	if (lint_option)
+		exit(0);
+
+	if (req->fork == rush_true) 
+		fork_process(rule, req);
 
         if (setuid(req->pw->pw_uid))
                 die(system_error, "cannot enforce uid %lu: %s",
                     req->pw->pw_uid, strerror(errno));
 
-        umask(default_umask);
-
-        debug1(2, "executing %s", req->cmdline);
-	if (lint_option)
-		exit(0);
-
-	if (req->fork == rush_true) 
-		fork_process(rule);
+        umask(req->umask);
 
         execve(req->argv[0], req->argv, new_env);
         die(system_error, "%s:%d: %s: cannot execute %s: %s",
@@ -682,20 +727,6 @@ usage()
 	fputs(user_msg, stdout);
 }
 
-void
-version()
-{
-        printf("%s (%s) %s\n", progname, PACKAGE, PACKAGE_VERSION);
-        fputs("Copyright (C) 2008 Sergey Poznyakoff\n", stdout);
-        fputs("\
-\n\
-License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>\n\
-This is free software: you are free to change and redistribute it.\n\
-There is NO WARRANTY, to the extent permitted by law.\n\
-\n\
-", stdout);
-}
-        
 int
 main(int argc, char **argv)
 {
@@ -705,7 +736,7 @@ main(int argc, char **argv)
         struct rush_rule *rule;
         struct rush_request req;
 	char *command = NULL;
-	
+
         progname = strrchr(argv[0], '/');
         if (progname)
                 progname++;
@@ -732,7 +763,7 @@ main(int argc, char **argv)
 			break;
                                 
 		case 'v':
-			version();
+			version(progname);
 			exit(0);
                                 
 		case 'h':
@@ -780,8 +811,11 @@ main(int argc, char **argv)
 
         req.cmdline = xstrdup(command);
         req.pw = pw;
+	req.umask = 022;
+	req.chroot_dir = NULL;
         req.home_dir = NULL;
 	req.fork = rush_undefined;
+	req.acct = rush_undefined;
         rc = argcv_get(req.cmdline, NULL, NULL, &req.argc, &req.argv);
         if (rc)
                 die(system_error,

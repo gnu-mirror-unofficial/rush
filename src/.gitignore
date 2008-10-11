@@ -3,3 +3,6 @@ defines.h
 *.o
 *~
 rush
+rushlast
+rushwho
+.gdbinit

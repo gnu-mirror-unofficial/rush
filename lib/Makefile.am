@@ -15,7 +15,13 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 noinst_LIBRARIES=librush.a
-EXTRA_DIST=logwtmp.c
+
 librush_a_SOURCES=\
- utmp_init.c\
- utmp_logout.c
+ rushdb.c\
+ slist.c\
+ utmp.c\
+ version.c\
+ wtmp.c
+
+noinst_HEADERS=librush.h
+INCLUDES=-I$(top_srcdir)/gnu -I$(top_builddir)/gnu

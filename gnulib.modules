@@ -2,11 +2,11 @@
 # A module name per line. Empty lines and comments are ignored.
 
 c-ctype
+fprintftime
 getopt
 gitlog-to-changelog
 inttostr
 malloc
-readutmp
 realloc
 regex
 strerror

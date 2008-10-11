@@ -26,10 +26,13 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <sys/resource.h>
 #include <syslog.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <signal.h>
+#include <getopt.h>
 
 #include <xalloc.h>
 #include <regex.h>
@@ -38,6 +41,7 @@
 #include <inttostr.h>
 
 #include <defines.h>
+#include <librush.h>
 
 #ifndef SYSCONFDIR
 # define SYSCONFDIR "/usr/local/etc"
@@ -46,6 +50,8 @@
 #ifndef CANONICAL_PROGRAM_NAME
 # define CANONICAL_PROGRAM_NAME "/usr/local/sbin/rush"
 #endif
+
+#define RUSH_DB_FILE LOCALSTATEDIR "/rush"
 
 #if defined HAVE_SYSCONF && defined _SC_OPEN_MAX
 # define getmaxfd() sysconf(_SC_OPEN_MAX)
@@ -65,17 +71,7 @@ enum error_type {
 };
 
 typedef struct limits_rec *limits_record_t;
-typedef struct slist *slist_t;
 typedef struct transform *transform_t;
-
-#define LIST_APPEND(elt, head, tail)		\
-	do {					\
-		if (tail)			\
-			(tail)->next = elt;	\
-		else				\
-			head = elt;		\
-		tail = elt;			\
-	} while(0)
 
 enum transform_node_type {
 	transform_cmdline,
@@ -162,9 +158,13 @@ struct rush_rule {
 	limits_record_t limits;      /* resource limits */
 
 	enum rush_three_state fork;  /* Fork a subprocess */
+	enum rush_three_state acct;  /* Run accounting */
+	
 	char *prologue;
 	char *epilogue;
 };
+
+#define NO_UMASK ((mode_t)-1)
 
 extern char *rush_config_file;
 extern int lint_option;
@@ -223,10 +223,6 @@ int parse_limits(limits_record_t *plrec, char *str, char **endp);
 int set_user_limits(const char *name, struct limits_rec *lrec);
 
 void parse_config(void);
-void slist_append(slist_t slist, const char *p, size_t len);
-char *slist_reduce(slist_t slist, char **pbuf, size_t *psize);
-slist_t slist_create(void);
-void slist_free(slist_t slist);
 
 transform_t compile_transform_expr (const char *expr);
 char *transform_string (struct transform *tf, const char *input);

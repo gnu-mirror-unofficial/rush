@@ -14,7 +14,13 @@
    You should have received a copy of the GNU General Public License
    along with Rush.  If not, see <http://www.gnu.org/licenses/>. */
 
-#include <rush.h>
+#ifdef HAVE_CONFIG_H
+# include <config.h>
+#endif
+#include <stdlib.h>
+#include <string.h>
+#include <librush.h>
+#include <xalloc.h>
 
 struct line_list {
 	struct line_list *next;
@@ -50,7 +56,15 @@ slist_reduce(slist_t slist, char **pbuf, size_t *psize)
 {
 	struct line_list *lp;
 	size_t total = slist->size + 1;
+	size_t dummy;
 	char *s;
+
+	if (!psize) {
+		dummy = 0;
+		psize = &dummy;
+		*pbuf = NULL;
+	}
+	
 	if (*psize < total) {
 		if (!*pbuf)
 			*pbuf = xmalloc(total);
