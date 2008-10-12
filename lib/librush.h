@@ -115,4 +115,5 @@ rushdb_format_t rushdb_compile_format(char *fmt);
 int rushdb_print(rushdb_format_t form, struct rush_wtmp *wtmp, int newline);
 void rushdb_print_header(rushdb_format_t form);
 
-
+
+char *rush_read_format(const char *name);

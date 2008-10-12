@@ -84,10 +84,12 @@ documents Rush Version @value{VERSION}.
 * Option Summary::
 * Rushwho::              The @code{rushwho} utility.
 * Rushlast::             The @code{rushlast} utility.
+* Accounting Database::
 * Reporting Bugs::       How to Report a Bug.
 
 Appendices
 
+* Time and Date Formats::
 * Copying This Manual::  The GNU Free Documentation License.
 * Concept Index::        Index of Concepts.
 
@@ -115,6 +117,15 @@ Usage Tips
 * cvs::
 * svn::
 * git::
+
+The @code{rushwho} utility.
+
+* Rushwho Options::
+* Formats::
+
+The @code{rushlast} utility.
+
+* Rushlast Options::
 
 @end detailmenu
 @end menu
@@ -195,7 +206,7 @@ rule sftp
 @end smallexample
 
   The first clause, @code{rule}, defines a new rule.  Its argument
-serves as a rule identifier for diagnostic messages.
+serves as a rule tag, used for diagnostic messages and for accounting.
 
   Lines beginning with @samp{#} are comments, they are intended for a
 human reader and are ignored by @code{rush}.
@@ -707,13 +718,14 @@ first argument.
 
 @node Accounting and Forked Mode
 @section Accounting and Forked Mode
-@UNREVISED
+@cindex accounting
   Rush is able to operate in two modes, which we call default and
 forked.  When operating in the default mode, the process image of
 @command{rush} itself is overwritten by the command being executed.
 Thus, when it comes to the launching of the requested command,
 the running instance of @command{rush} ceases to exist.
 
+@cindex forked mode
   There is also another operation mode, which we call @dfn{forked
 mode}.  When running in this mode, @command{rush} executes the
 requested command in a subprocess, and remains in memory supervising
@@ -1353,10 +1365,346 @@ Display a concise usage summary.
 
 @node Rushwho
 @chapter The @code{rushwho} utility.
-@UNREVISED
+@prindex rushwho
+The @command{rushwho} utility displays the list of user who are
+currently being server by @command{rush}.  The utility operates
+on default Rush database, which is maintained if @command{rush}
+runs accounting mode (@pxref{Accounting and Forked Mode}).  Following
+is a sample output from @code{rushwho}:
+
+@smallexample
+Login      Rule     Start     Time       PID      Command
+jeff       sftp     Sun 12:17 00:58:26   10673    bin/sftp-server
+@end smallexample
+
+The information displayed is:
+
+@table @asis
+@item Login
+The login name of the user.
+
+@item Rule
+The tag of the rule he is served under.  If the rule is untagged, its
+ordinal number, prefixed by a pound sign (@samp{#}) is used insead.
+
+@item Start
+Time when the rule began execution.
+
+@item Time
+Duration of the session.
+
+@item PID
+PID of the running command.
+
+@item Command
+Command being executed.
+@end table
+
+This format is a built-in default, it can be changed using
+@option{--format} command line option.
+
+@menu
+* Rushwho Options::
+* Formats::
+@end menu
+
+@node Rushwho Options
+@section Rushwho Options
+@cindex rushwho, command line options
+
+This section summarizes the command line options understood by
+@command{rushwho} utility.
+
+@table @option
+@anchor{format option}
+@item --format=@var{string}
+@itemx -F @var{string}
+Use @var{string} instead of the default format, described in
+@ref{Rushwho}.  @xref{Formats}, for a detailed description of the
+output format syntax.  If @var{string} begins with a @samp{@@}, then
+this character is removed from it, and the resulting string is
+regarded as a name of a file to read.  The contents of this file is
+the format string.  The file is read literally, except that lines
+beginning with @samp{;} are ignored (they can be used to introduce
+comments).  For example, @command{rushwho --format=@@formfile} reads
+in the contents of the file named @file{formfile}.
+
+@item --file=@var{dir}
+@itemx -f @var{dir}
+Use database directory @var{dir}, instead of the default.
+By default, database files are located in @file{/usr/local/var/rush}.
+
+@item --no-header
+@itemx -H
+Do not display header line.
+
+@item --version
+@itemx -v
+Display program version.
+
+@item --help 
+@itemx -h
+Display a short help message.
+
+@item --usage
+Display a concise usage summary.
+@end table
+
+@node Formats
+@section Output Formats
+@cindex output formats
+
+A format string controls the output of every record from Rush
+accounting database.  It may contain following four types of objects:
+
+@table @asis
+@item Ordinary characters
+These are copied to the output verbatim.
+
+@item Escapes
+An escape is a backslash (@samp{\\}), followed by a single character.
+It is interpreted as follows:
+
+@multitable @columnfractions 0.30 .5
+@item Escape @tab Output
+@item \a @tab Audible bell character (@acronym{ASCII} 7)
+@item \b @tab Backspace character (@acronym{ASCII} 8)
+@item \e @tab Escape character (@acronym{ASCII} 27)
+@item \f @tab Form-feed character (@acronym{ASCII} 12)
+@item \n @tab Newline character (@acronym{ASCII} 10)
+@item \r @tab Carriage return character (@acronym{ASCII} 13)
+@item \t @tab Horizontal tabulation character (@acronym{ASCII} 9)
+@item \\ @tab A single backslash (@samp{\})
+@item \" @tab A double-quote.
+@end multitable
+
+Any escape not listed in the table above results in its second
+character being output.
+
+@item Quoted strings
+Strings are delimited by single or double quotes.  Within a string
+any escape sequences are interpreted as described above.
+
+@item Format specifications
+A @dfn{format specification} is a kind of function, which outputs
+a particular piece of information from the database record.
+@end table
+
+Each format specification starts with an opening brace and ends with
+a closing brace.  The first word after the brace is the name of the
+format specification.  The rest of words are @dfn{positional arguments}
+followed by @dfn{keyword arguments}.  Both are optional.  The keyword
+arguments begin with a colon and must follow the positional arguments.
+For example:
+
+@table @code
+@item (time)
+A single format specification.
+
+@item (time 10)
+The same format specification with the output width limited to 10
+characters.
+
+@item (time 10 Duration)
+The @samp{time} format specification, with the output width limited to 10
+characters and @samp{Duration} as a header title.
+
+@item (time 10 "Session Duration" :right :format %H:%M)
+The same with two keyword arguments: @samp{:right} and
+@samp{:format}.  The latter takes the string @samp{%H:%M} as its
+argument.  Notice the use of quoted string to preserve the
+whitespace.
+@end table
+
+The full list of format specifications follows.
+
+@deffn {Format Spec} newline [@var{count}]
+Causes the newline character to be output.  If the optional @var{count}
+is supplied, that many newlines will be printed
+@end deffn
+
+@deffn {Format Spec} tab [@var{num}]
+Advance to the next tabstop in the output stream.  If optional @var{num}
+is present, then skip @var{num} tabstops.  Each tabstop is eight
+characters long.
+@end deffn
+
+The following specifications output particular fields of a database
+record.  They all take two positional arguments: @var{width} and
+@var{title}.
+
+The first argument, @var{width} sets the maximum output
+length for this specification.  If the number of characters actually output
+is less than the width, they will be padded with whitespace either to
+the left or to the right, depending on the presence of the @code{:right}
+keyword argument.  If the number of characters is greater than
+@var{width}, they will be truncated to fit.  If @var{width} is
+not given, the exact data are output as is.
+
+The second argument, @var{title}, gives the title of this column for
+the heading line.  By default no title is output.
+
+Every field specification accepts at least two keyword arguments.
+The keyword @code{:right} may be used to request alignment to the right
+for the data.  This keyword is ignored if @var{width} is not given.
+
+The keyword @code{:empty} followed by a string causes @command{rushwho}
+to output that string if the resulting value for this specification
+would otherwise be empty.
+
+@deffn {Format Spec} user @var{width} @var{title} [:empty @var{repl}][:right]
+Print the user login name.
+@end deffn
+
+@deffn {Format Spec} time @var{width} @var{title} @
+       [:empty @var{repl}][:right][:format @var{date-format}]
+@deffnx {Format Spec} start-time @var{width} @var{title} @
+       [:empty @var{repl}][:right][:format @var{date-format}]
+       
+Date and time when the session started.
+
+The @code{:format} keyword introduces the @code{strftime} format string
+to be used when converting the date for printing.  The default value is
+@samp{%a %H:%M}.  @xref{Time and Date Formats}, for a detailed
+description of @code{strftime} format strings.
+@end deffn
+
+@deffn {Format Spec} stop-time @var{width} @var{title} @
+        [:empty @var{repl}][:right][:format @var{date-format}]
+Time when the command finished.  This specifier has sense only for
+@command{rushlast} (@pxref{Rushlast}).  If the command is still
+running, the word @samp{running} is output.
+@end deffn
+
+@deffn {Format Spec} duration @var{width} @var{title} @
+       [:empty @var{repl}][:right]
+Total time of the session duration.
+@end deffn
+
+@deffn {Format Spec} rule @var{width} @var{title} [:right]
+The tag of the rule used to serve the user.  If the rule is untagged,
+the string @samp{#@var{n}} is used instead, where @var{n} stands for
+the number of the rule in the configuration file.  Rules are numbered
+starting from 1.
+@end deffn
+
+@deffn {Format Spec} command @var{width} @var{title} @
+       [:empty @var{repl}][:right]
+Command line being executed.
+@end deffn
+
+@deffn {Format Spec} pid @var{width} @var{title} [:right]
+PID of the process.
+@end deffn
+
+For example, the following is the default format for the
+@command{rushwho} utility.  It is written in a form, suitable for use
+in a file supplied with the @option{--format=@@@var{file}} command
+line option (@pxref{format option}):
+
+@smallexample
+(user 10 Login)" "
+(rule 8 Rule)" " 
+(start-time 0 Start)" " 
+(duration 9 Time)" "
+(pid 10 PID)" "
+(command 28 Command)
+@end smallexample
 
 @node Rushlast
 @chapter The @code{rushlast} utility.
+@prindex rushlast
+The @command{rushlast} utility searches back through the Rush database
+and displays a list of all user sessions since the database was
+created.  By default, it displays the following information:
+
+@smallexample
+Login      Rule     Start     Stop      Time    Command
+sergiusz   rsync    Sun 20:43 Sun 20:43 05:57   /usr/bin/rsync /upload
+jeff       sftp-sav Sun 20:09 running   07:17   /bin/sftp-server
+@end smallexample
+
+@table @asis
+@item Login
+The login name of the user.
+
+@item Rule
+The tag of the rule he is served under.  If the rule is untagged, its
+ordinal number, prefixed by a pound sign (@samp{#}) is used insead.
+
+@item Start
+Time when the rule began execution.
+
+@item Start
+Time when the command finished, or the word @samp{running} if it is
+still running.
+
+@item Time
+Duration of the session.
+
+@item Command
+Command being executed.
+@end table
+
+This format is a built-in default, and can be changed using
+@option{--format} command line option (@pxref{Rushlast Options}).
+
+@menu
+* Rushlast Options::
+@end menu
+
+@node Rushlast Options
+@section Rushlast Options
+
+This section summarizes the command line options understood by
+@command{rushlast} utility.
+
+@table @option
+@item --format=@var{string}
+@itemx -F @var{string}
+Use @var{string} instead of the default format, described in
+@ref{Rushwho}.  @xref{Formats}, for a detailed description of the
+output format syntax.  If @var{string} begins with a @samp{@@}, then
+this character is removed from it, and the resulting string is
+regarded as a name of a file to read.  The contents of this file is
+the format string.  The file is read literally, except that lines
+beginning with @samp{;} are ignored (they can be used to introduce
+comments).  For example, @command{rushwho --format=@@formfile} reads
+in the contents of the file named @file{formfile}.
+
+@item --file=@var{dir}
+@itemx -f @var{dir}
+Use database directory @var{dir}, instead of the default.
+By default, database files are located in @file{/usr/local/var/rush}.
+
+@item --forward
+Display entries in chronological order, instead of the reverse
+chronological one, which is the default.
+
+@item --count=@var{number}
+@itemx -n @var{number}
+@itemx -@var{number}
+Show at most @var{number} records.  The form @option{-@var{number}} is
+provided for compatibility with the @cite{last(1)} utility.
+
+@item --no-header
+@itemx -H
+Do not display header line.
+
+@item --version
+@itemx -v
+Display program version.
+
+@item --help 
+@itemx -h
+Display a short help message.
+
+@item --usage
+Display a concise usage summary.
+@end table
+
+@node Accounting Database
+@chapter Accounting Database
 @UNREVISED
 
 @node Reporting Bugs
@@ -1376,6 +1724,10 @@ needed in order to find the bug:
 file along with your bug report. This file is created after running
 @command{./configure} in the Rush source root directory.
 @end itemize
+
+@node Time and Date Formats
+@appendix Time and Date Formats
+@include strftime.texi
 
 @node Copying This Manual
 @appendix GNU Free Documentation License

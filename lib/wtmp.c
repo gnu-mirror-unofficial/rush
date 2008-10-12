@@ -201,6 +201,7 @@ rush_wtmp_copy(struct rush_wtmp *src)
 		char *p;
 		
 		dst->reclen = reclen;
+		dst->pid = src->pid;
 		dst->start = src->start;
 		dst->stop = src->stop;
 		p = (char*) (dst + 1);

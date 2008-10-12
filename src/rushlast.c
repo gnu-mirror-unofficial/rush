@@ -15,8 +15,9 @@
    along with Rush.  If not, see <http://www.gnu.org/licenses/>. */
 
 #include <rush.h>
+#include "error.h"
 
-char *progname;
+char *program_name;
 
 #define USAGE_OPTION   256
 #define FORWARD_OPTION 257
@@ -68,7 +69,7 @@ usage()
 void
 xalloc_die()
 {
-	fprintf(stderr, "%s: not enough memory\n", progname);
+	error(1, 0, "not enough memory");
 	abort();
 }
 
@@ -79,7 +80,7 @@ char *format =
 	"(start-time 0 Start) "
 	"(stop-time 0 Stop) "
 	"(duration 7 Time) "
-	"(command 10 Command)"; 
+	"(command 32 Command)"; 
 
 int
 want_record(struct rush_wtmp *wtmp, int argc, char **argv)
@@ -104,11 +105,11 @@ main(int argc, char **argv)
 	int forward = 0;
 	unsigned long count = 0, i;
 	
-	progname = strrchr(argv[0], '/');
-        if (progname)
-                progname++;
+	program_name = strrchr(argv[0], '/');
+        if (program_name)
+                program_name++;
         else
-                progname = argv[0];
+                program_name = argv[0];
 	opterr = 0;
 	while ((rc = getopt_long(argc, argv, "F:f:Hn:hv", longopts, NULL))
 	       != EOF) {
@@ -116,7 +117,10 @@ main(int argc, char **argv)
 		
 		switch (rc) {
 		case 'F':
-			format = optarg;
+			if (optarg[0] == '@')
+				format = rush_read_format(optarg + 1);
+			else
+				format = optarg;
 			break;
 			
 		case 'f':
@@ -133,15 +137,12 @@ main(int argc, char **argv)
 
 		case 'n':
 			count = strtoul(optarg, &p, 10);
-			if (*p) {
-				fprintf(stderr, "%s: invalid number (%s)\n",
-					progname, optarg);
-				exit(1);
-			}
+			if (*p) 
+				error(1, 0, "invalid number (%s)", optarg);
 			break;
 			
 		case 'v':
-			version(progname);
+			version(program_name);
 			exit(0);
                                 
 		case 'h':
@@ -155,20 +156,15 @@ main(int argc, char **argv)
 		default:
 			if (c_isdigit(optopt)) {
 				count = strtoul(argv[optind-1] + 1, &p, 10);
-				if (*p) {
-					fprintf(stderr,
-						"%s: invalid number (%s)\n",
-						progname, argv[optind-1]);
-					exit(1);
-				}
+				if (*p) 
+					error(1, 0, "invalid number (%s)",
+					      argv[optind-1]);
 				if (optind < argc) 
 					continue;
 				else
 					break;
 			}
-			fprintf(stderr, "%s: invalid option -- %c\n",
-				progname, optopt);
-			exit(1);
+			error(1, 0, "invalid option -- %c", optopt);
 		}
 	}
 
@@ -176,11 +172,8 @@ main(int argc, char **argv)
 	argv += optind;
 
 	form = rushdb_compile_format(format);
-	if (!form) {
-		fprintf(stderr, "%s: invalid format: %s\n",
-			progname, rushdb_error_string);
-		exit(1);
-	}
+	if (!form) 
+		error(1, 0, "invalid format: %s", rushdb_error_string);
 	
 	switch (rushdb_open(base_name, 0)) {
 	case rushdb_result_ok:
@@ -190,9 +183,7 @@ main(int argc, char **argv)
 		exit(0);
 
 	case rushdb_result_fail:
-                fprintf(stderr, "%s: cannot open database file %s: %s\n",
-			progname, base_name, strerror(errno));
-		exit(1);
+                error(1, errno, "cannot open database file %s", base_name);
 	}
 
 	if (display_header)

@@ -17,6 +17,7 @@
 info_TEXINFOS=rush.texi
 rush_TEXINFOS=\
  fdl.texi\
+ strftime.texi\
  rendition.texi
 
 EXTRA_DIST = \

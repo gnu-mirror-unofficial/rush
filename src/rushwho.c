@@ -15,14 +15,16 @@
    along with Rush.  If not, see <http://www.gnu.org/licenses/>. */
 
 #include <rush.h>
+#include "error.h"
 
-char *progname;
+char *program_name;
 
 #define USAGE_OPTION 256
+
 struct option longopts[] = {
 	{ "file", required_argument, 0, 'f' },
 	{ "no-header", no_argument, 0, 'H' },
-	{ "format", required_argument, 0, 'F' }, 
+	{ "format", required_argument, 0, 'F' },
         { "version", no_argument, 0, 'v' },
         { "help", no_argument, 0, 'h' },
         { "usage", no_argument, 0, USAGE_OPTION },
@@ -64,7 +66,7 @@ usage()
 void
 xalloc_die()
 {
-	fprintf(stderr, "%s: not enough memory\n", progname);
+	error(1, 0, "not enough memory");
 	abort();
 }
 
@@ -74,7 +76,8 @@ char *format =
 	"(rule 8 Rule) "
 	"(start-time 0 Start) "
 	"(duration 10 Time) "
-	"(command 38 Command)"; 
+	"(pid 10 PID) "
+	"(command 28 Command)"; 
 
 int
 main(int argc, char **argv)
@@ -86,18 +89,21 @@ main(int argc, char **argv)
 	rushdb_format_t form;
 	int  display_header = 1;  /* Display header line */
 	
-	progname = strrchr(argv[0], '/');
-        if (progname)
-                progname++;
+	program_name = strrchr(argv[0], '/');
+        if (program_name)
+                program_name++;
         else
-                progname = argv[0];
+                program_name = argv[0];
 	while ((rc = getopt_long(argc, argv, "F:f:Hhv", longopts, NULL))
 	       != EOF) {
 		switch (rc) {
 		case 'F':
-			format = optarg;
+			if (optarg[0] == '@')
+				format = rush_read_format(optarg + 1);
+			else
+				format = optarg;
 			break;
-			
+
 		case 'f':
 			base_name = optarg;
 			break;
@@ -107,7 +113,7 @@ main(int argc, char **argv)
 			break;
 			
 		case 'v':
-			version(progname);
+			version(program_name);
 			exit(0);
                                 
 		case 'h':
@@ -126,17 +132,12 @@ main(int argc, char **argv)
 	argc -= optind;
 	argv += optind;
 
-	if (argc) {
-		fprintf(stderr, "%s: extra arguments\n", progname);
-		exit(1);
-	}
+	if (argc) 
+		error(1, 0, "extra arguments");
 
 	form = rushdb_compile_format(format);
-	if (!form) {
-		fprintf(stderr, "%s: invalid format: %s\n",
-			progname, rushdb_error_string);
-		exit(1);
-	}
+	if (!form) 
+		error(1, 0, "invalid format: %s", rushdb_error_string);
 
 	switch (rushdb_open(base_name, 0)) {
 	case rushdb_result_ok:
@@ -146,9 +147,7 @@ main(int argc, char **argv)
 		exit(0);
 
 	case rushdb_result_fail:
-                fprintf(stderr, "%s: cannot open database file %s: %s\n",
-			progname, base_name, strerror(errno));
-		exit(1);
+                error(1, errno, "cannot open database file %s", base_name);
 	}
 
 	if (display_header)
