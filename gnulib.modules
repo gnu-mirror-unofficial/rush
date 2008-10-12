@@ -10,4 +10,5 @@ malloc
 realloc
 regex
 strerror
+vasprintf
 xalloc

@@ -24,6 +24,7 @@
 #include <stdarg.h>
 #include <string.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <strftime.h>
 #include <fprintftime.h>
 #include <inttostr.h>
@@ -123,6 +124,43 @@ void
 rushdb_backward_direction()
 {
 	rush_wtmp_set_dir(rush_wtmp_backward);
+}
+
+
+/* Locking */
+
+static int lock_typetab[] = {
+	F_RDLCK,              /* RUSH_LOCK_READ */
+	F_WRLCK               /* RUSH_LOCK_WRITE */
+};
+
+int
+rushdb_lock(int fd, size_t size, off_t offset, int whence, int type)
+{
+	struct flock fl;
+
+	if (type < 0 || type > 1) {
+		errno = EINVAL;
+		return -1;
+	}
+		
+	fl.l_type = lock_typetab[type];
+	fl.l_whence = whence;
+	fl.l_start = offset;
+	fl.l_len = size;
+	return fcntl(fd, F_SETLKW, &fl); /* FIXME: Handle EINTR */
+}
+
+int
+rushdb_unlock(int fd, size_t size, off_t offset, int whence)
+{
+	struct flock fl;
+
+	fl.l_type = F_UNLCK;
+	fl.l_whence = whence;
+	fl.l_start = offset;
+	fl.l_len = size;
+	return fcntl(fd, F_SETLKW, &fl);
 }
 
 
@@ -720,15 +758,21 @@ int
 rushdb_start(struct rush_wtmp *wtmp)
 {
 	int status;
-	enum rushdb_result rc;
+	enum rushdb_result result;
+	int rc;
 
-	rc = rush_utmp_read(RUSH_STATUS_MAP_BIT(RUSH_STATUS_AVAIL),
-			    &status, NULL);
-	if (rc == rushdb_result_fail)
-		return rc;
-	gettimeofday(&wtmp->start, NULL);
-	memset(&wtmp->stop, 0, sizeof(wtmp->stop));
-	return rush_utmp_write(wtmp);
+	rush_utmp_lock_all(RUSH_LOCK_WRITE);
+	result = rush_utmp_read(RUSH_STATUS_MAP_BIT(RUSH_STATUS_AVAIL),
+				&status, NULL);
+	if (result == rushdb_result_fail) 
+		rc = 1;
+	else {
+		gettimeofday(&wtmp->start, NULL);
+		memset(&wtmp->stop, 0, sizeof(wtmp->stop));
+		rc = rush_utmp_write(wtmp);
+	} 
+	rush_utmp_unlock_all();
+	return rc;
 }
 		
 int

@@ -235,7 +235,8 @@ rush_wtmp_append(struct rush_wtmp *wtmp)
 		return -1;
 
 	record = rush_wtmp_copy(wtmp);
-	
+
+	rushdb_lock(wtmp_fd, record->reclen, off, SEEK_SET, RUSH_LOCK_WRITE);
 	left = record->reclen;
 	p = (char*) record;
 	while (left) {
@@ -248,12 +249,14 @@ rush_wtmp_append(struct rush_wtmp *wtmp)
 	if (write(wtmp_fd, &record->reclen, sizeof(record->reclen)) !=
 	    sizeof(wtmp->reclen))
 		goto errlab;
-	
+
+	rushdb_unlock(wtmp_fd, record->reclen, off, SEEK_SET);
         wtmp_recsize = record->reclen;
 	free(record);
 	return off;
 
   errlab:
+	rushdb_unlock(wtmp_fd, record->reclen, off, SEEK_SET);
 	rush_wtmp_close();
 	return -1;
 }

@@ -72,11 +72,20 @@ int rush_utmp_chstatus(int status);
 int rush_utmp_write(struct rush_wtmp *wtmp);
 int rush_utmp_close();
 
+void rush_utmp_lock_all(int type);
+void rush_utmp_unlock_all(void);
+
 enum rushdb_result rushdb_open(const char *base_name, int rw);
 int rushdb_close(void);
 int rushdb_start(struct rush_wtmp *wtmp);
 int rushdb_stop(void);
 void rushdb_backward_direction(void);
+
+#define RUSH_LOCK_READ  0
+#define RUSH_LOCK_WRITE 1
+
+int rushdb_lock(int fd, size_t size, off_t offset, int whence, int type);
+int rushdb_unlock(int fd, size_t size, off_t offset, int whence);
 
 
 typedef struct slist *slist_t;

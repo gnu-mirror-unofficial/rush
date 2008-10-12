@@ -104,6 +104,7 @@ rush_utmp_chstatus(int status)
 int
 rush_utmp_write(struct rush_wtmp *wtmp)
 {
+	int rc;
 	off_t off;
 	
 	if (utmp_fd == -1) {
@@ -120,8 +121,22 @@ rush_utmp_write(struct rush_wtmp *wtmp)
 	}
 	utmprec.status = RUSH_STATUS_INUSE;
 	utmprec.offset = off;
-	if (write(utmp_fd, &utmprec, sizeof(utmprec)) != sizeof(utmprec))
+	rushdb_lock(utmp_fd, sizeof(utmprec), 0, SEEK_CUR, RUSH_LOCK_WRITE);
+	rc = write(utmp_fd, &utmprec, sizeof(utmprec));
+	rushdb_unlock(utmp_fd, - sizeof(utmprec), 0, SEEK_CUR);
+	if (rc != sizeof(utmprec))
 		return 1;	
 	return 0;
 }
 
+void
+rush_utmp_lock_all(int type)
+{
+	rushdb_lock(utmp_fd, 0, 0, SEEK_SET, type);
+}
+
+void
+rush_utmp_unlock_all()
+{
+	rushdb_unlock(utmp_fd, 0, 0, SEEK_SET);
+}
