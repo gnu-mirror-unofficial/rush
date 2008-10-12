@@ -297,443 +297,461 @@ output_tab(int column, int tabstop)
 static int
 output_duration(time_t t, int width, struct format_key *key)
 {
-        int d,h,m,s;
-	
-        d = t / 86400;
-        t %= 86400;
-        
-        s = t % 60;
-        m = t / 60;
-        if (m > 59) {
-                h = m / 60;
-                m -= h*60;
-        } else
-                h = 0;
-	if (d)
-		width = printf("%d+%02d:%02d", d, h, m);
-        else
-                width = printf("%02d:%02d", h, m);
-	return width;
-}
+        unsigned d,h,m,s;
+	 unsigned outbytes;
+	 char dbuf[INT_BUFSIZE_BOUND(unsigned)+1];
 
-static int
-output_time(struct timeval *tv, int width, struct format_key *key)
-{
-	struct tm *tm = localtime(&tv->tv_sec);
-	char *fmt = format_key_lookup(key, "format");
+	 d = t / 86400;
+	 t %= 86400;
 
-	return fprintftime(stdout, fmt ? fmt : rushdb_date_format,
-			   tm, 0, tv->tv_usec * 1000);
-}
+	 s = t % 60;
+	 m = t / 60;
+	 if (m > 59) {
+		 h = m / 60;
+		 m -= h*60;
+	 } else
+		 h = 0;
 
-
+	 outbytes = 0;
+	 if (d) 
+		 outbytes += printf("%*.*s+", width, width,
+				    uinttostr(d, dbuf));
 
-/* Runtime */
-static int
-format_user(int outbytes, int width, struct format_key *key,
-	    struct rush_wtmp *wtmp)
-{
-	return output_string_key(wtmp->user, width, key);
-}
+	 if (outbytes < width) {
+		 unsigned rest = width - outbytes;
+		 if (rest > 2)
+			 outbytes += printf("%02u", d);
+		 rest = width - outbytes;
+		 if (rest > 3)
+			 outbytes += printf(":%02u", m);
+		 rest = width - outbytes;
+		 if (rest > 3)
+			 outbytes += printf(":%02u", s);
+		 rest = width - outbytes;
+		 if (rest)
+			 printf("%*.*s", rest, rest, "");
+	 }
+	 return width;
+ }
 
-static int
-format_rule(int outbytes, int width, struct format_key *key, struct rush_wtmp *wtmp)
-{
-	return output_string_key(wtmp->rule, width, key);
-}
+ static int
+ output_time(struct timeval *tv, int width, struct format_key *key)
+ {
+	 struct tm *tm = localtime(&tv->tv_sec);
+	 char *fmt = format_key_lookup(key, "format");
 
-static int
-format_command(int outbytes, int width, struct format_key *key,
-	       struct rush_wtmp *wtmp)
-{
-	return output_string_key(wtmp->command, width, key);
-}
+	 return fprintftime(stdout, fmt ? fmt : rushdb_date_format,
+			    tm, 0, tv->tv_usec * 1000);
+ }
 
-static int
-format_pid(int outbytes, int width, struct format_key *key,
-	   struct rush_wtmp *wtmp)
-{
-	char buf[INT_BUFSIZE_BOUND(pid_t)];
-	return output_string_key(umaxtostr(wtmp->pid, buf), width, key);
-}
+ 
 
-static int
-format_duration(int outbytes, int width, struct format_key *key,
-		struct rush_wtmp *wtmp)
-{
-	time_t end = wtmp->stop.tv_sec;
-	time_t x = (end ? end : time(NULL)) - wtmp->start.tv_sec;
-	
-	return output_duration(x, width, key);
-}
-
-static int
-format_start(int outbytes, int width, struct format_key *key,
+ /* Runtime */
+ static int
+ format_user(int outbytes, int width, struct format_key *key,
 	     struct rush_wtmp *wtmp)
-{
-	return output_time(&wtmp->start, width, key);
-}
+ {
+	 return output_string_key(wtmp->user, width, key);
+ }
 
-static int
-format_stop(int outbytes, int width, struct format_key *key,
+ static int
+ format_rule(int outbytes, int width, struct format_key *key, struct rush_wtmp *wtmp)
+ {
+	 return output_string_key(wtmp->rule, width, key);
+ }
+
+ static int
+ format_command(int outbytes, int width, struct format_key *key,
+		struct rush_wtmp *wtmp)
+ {
+	 return output_string_key(wtmp->command, width, key);
+ }
+
+ static int
+ format_pid(int outbytes, int width, struct format_key *key,
 	    struct rush_wtmp *wtmp)
-{
-	if (wtmp->stop.tv_sec == 0 && wtmp->stop.tv_usec == 0) 
-		return output_string_key("active", width, key);
-	else
-		return output_time(&wtmp->stop, width, key);
-}
+ {
+	 char buf[INT_BUFSIZE_BOUND(pid_t)];
+	 return output_string_key(umaxtostr(wtmp->pid, buf), width, key);
+ }
 
-struct format_tab {
-	char *name;
-	rushdb_format_fp fun;
-};
+ static int
+ format_duration(int outbytes, int width, struct format_key *key,
+		 struct rush_wtmp *wtmp)
+ {
+	 time_t end = wtmp->stop.tv_sec;
+	 time_t x = (end ? end : time(NULL)) - wtmp->start.tv_sec;
 
-static struct format_tab handlers[] = {
-	{ "user", format_user },
-	{ "rule", format_rule },
-	{ "command", format_command },
-	{ "pid", format_pid },
-	{ "duration", format_duration },
-	{ "time", format_start },
-	{ "start-time", format_start },
-	{ "stop-time", format_stop },
-	{ NULL }
-};
+	 return output_duration(x, width, key);
+ }
 
-static rushdb_format_fp
-_lookup(char *name)
-{
-	int i;
-	for (i = 0; handlers[i].name; i++)
-		if (strcmp(handlers[i].name, name) == 0)
-			return handlers[i].fun;
-	return NULL;
-}
+ static int
+ format_start(int outbytes, int width, struct format_key *key,
+	      struct rush_wtmp *wtmp)
+ {
+	 return output_time(&wtmp->start, width, key);
+ }
+
+ static int
+ format_stop(int outbytes, int width, struct format_key *key,
+	     struct rush_wtmp *wtmp)
+ {
+	 if (wtmp->stop.tv_sec == 0 && wtmp->stop.tv_usec == 0) 
+		 return output_string_key("active", width, key);
+	 else
+		 return output_time(&wtmp->stop, width, key);
+ }
+
+ struct format_tab {
+	 char *name;
+	 rushdb_format_fp fun;
+ };
+
+ static struct format_tab handlers[] = {
+	 { "user", format_user },
+	 { "rule", format_rule },
+	 { "command", format_command },
+	 { "pid", format_pid },
+	 { "duration", format_duration },
+	 { "time", format_start },
+	 { "start-time", format_start },
+	 { "stop-time", format_stop },
+	 { NULL }
+ };
+
+ static rushdb_format_fp
+ _lookup(char *name)
+ {
+	 int i;
+	 for (i = 0; handlers[i].name; i++)
+		 if (strcmp(handlers[i].name, name) == 0)
+			 return handlers[i].fun;
+	 return NULL;
+ }
 
 
-
-static slist_t slist;
+ 
+ static slist_t slist;
 
-static char *
-parse_string0(char *fmt, rushdb_format_t form,
-	      int (*cond)(void *, char *), void *closure)
-{
-	char c;
-	char *p;
-	
-	for (p = fmt; *p && (*cond)(closure, p) == 0; p++) {
-		if (*p == '\\') {
-			switch (*++p) {
-			case 'a':
-				c = '\a';
-				break;
-				
-			case 'b':
-				c = '\b';
-				break;
-				
-			case 'e':
-				c = '\033';
-				break;
-				
-			case 'f':
-				c = '\f';
-				break;
-				
-			case 'n':
-				c = '\n';
-				break;
-				
-			case 't':
-				c = '\t';
-				break;
-				
-			case 'r':
-				c = '\r';
-				break;
-				
-			case 'v':
-				c = '\v';
-				break;
-				
-			default:
-				c = *p;
-			}
-			slist_append(slist, &c, 1);
-		} else
-			slist_append(slist, p, 1);
-	}
+ static char *
+ parse_string0(char *fmt, rushdb_format_t form,
+	       int (*cond)(void *, char *), void *closure)
+ {
+	 char c;
+	 char *p;
 
-	c = 0;
-	slist_append(slist, &c, 1);
-	form->type = FDATA_STRING;
-	slist_reduce(slist, &form->v.string, NULL);
-	return p;
-}
+	 for (p = fmt; *p && (*cond)(closure, p) == 0; p++) {
+		 if (*p == '\\') {
+			 switch (*++p) {
+			 case 'a':
+				 c = '\a';
+				 break;
 
-static int
-_is_closing_quote(void *closure, char *p)
-{
-	return *(char*)closure == *p;
-}
+			 case 'b':
+				 c = '\b';
+				 break;
 
-static int
-parse_quote(char **fmtp, struct rushdb_format *form)
-{
-	char *p;
-	p = parse_string0(*fmtp + 1, form, _is_closing_quote, *fmtp);	
-	if (!*p) {
-		format_error("missing closing quote in string started near `%s'",
-			     *fmtp);
-		return 1;
-	}
-	*fmtp = p + 1;
-	return 0;
-}
+			 case 'e':
+				 c = '\033';
+				 break;
 
-static int
-_is_delim(void *closure, char *p)
-{
-	return *p == '(';
-}
+			 case 'f':
+				 c = '\f';
+				 break;
 
-static int
-parse_string(char **fmtp, struct rushdb_format *form)
-{
-	char *p;
-	p = parse_string0(*fmtp, form, _is_delim, NULL);
-	*fmtp = p;
-	return 0;
-}
+			 case 'n':
+				 c = '\n';
+				 break;
 
-static char *
-get_token(char **fmtp)
-{
-	char *p;
-	char c;
-	
-	while (**fmtp && c_isspace(**fmtp))
-		++*fmtp;
-	p = *fmtp;
-	if (*p == ')') {
-		slist_append(slist, p, 1);
-		++*fmtp;
-	} else {
-		while (**fmtp && !c_isspace(**fmtp) && **fmtp != ')')
-			++*fmtp;
-		slist_append(slist, p, *fmtp - p);
-	}
-	c = 0;
-	slist_append(slist, &c, 1);
-	return slist_reduce(slist, &p, NULL);
-}
+			 case 't':
+				 c = '\t';
+				 break;
 
-static int
-is_time_function(rushdb_format_fp fh)
-{
-	return fh == format_start || fh == format_stop;
-}
+			 case 'r':
+				 c = '\r';
+				 break;
 
-static int
-time_width(struct rushdb_format *form)
-{
-	time_t t = 0;
-	struct tm *tm = localtime(&t);
-	char *fmt = format_key_lookup(form->key, "format");
+			 case 'v':
+				 c = '\v';
+				 break;
 
-	return nstrftime(NULL, -1, fmt ? fmt : rushdb_date_format, 
-			 tm, 0, 0);
-}
+			 default:
+				 c = *p;
+			 }
+			 slist_append(slist, &c, 1);
+		 } else
+			 slist_append(slist, p, 1);
+	 }
 
-static int
-parse_form(char **fmtp, struct rushdb_format *form)
-{
-	char *formname, *p;
-	struct format_key *key_head, *key_tail;
-	
-	++*fmtp;
+	 c = 0;
+	 slist_append(slist, &c, 1);
+	 form->type = FDATA_STRING;
+	 slist_reduce(slist, &form->v.string, NULL);
+	 return p;
+ }
 
-	formname = get_token(fmtp);
-	if (strcmp(formname, "newline") == 0) {
-		form->type = FDATA_NEWLINE;
-		p = get_token(fmtp);
-		if (p[0] != ')') {
-			form->v.nl = strtol(p, NULL, 0);
-			p = get_token(fmtp);
-		} else
-			form->v.nl = 1;
-	} else if (strcmp(formname, "tab") == 0) {
-		form->type = FDATA_TAB;
-		p = get_token(fmtp);
-		if (p[0] != ')') {
-			form->v.tabstop = strtol(p, NULL, 0);
-			p = get_token(fmtp);
-		} else
-			form->v.tabstop = 1;
-	} else {
-		rushdb_format_fp fh;
-		int arg;
-		
-		fh = _lookup(formname);
-		if (!fh) {
-			format_error("error in format spec: unknown format %s",
-				     formname);
-			return 1;
-		}
-		
-		form->type = FDATA_FH;
-		form->v.fh.fun = fh;
+ static int
+ _is_closing_quote(void *closure, char *p)
+ {
+	 return *(char*)closure == *p;
+ }
 
-		/* Collect optional arguments */
-		arg = 0;
-		while ((p = get_token(fmtp)) != NULL &&
-		       !(p[0] == ':' || p[0] == ')')) {
-			arg++;
-			switch (arg) {
-			case 1: /* width */
-				form->v.fh.width = strtol(p, NULL, 0);
-				break;
-			case 2: /* header */
-				form->v.fh.header = xstrdup(p);
-				break;
-			default:
-				format_error("wrong number of arguments "
-					     "to form %s",
-					     formname);
-				return 1;
-			}
-		}
-		
-		/* Collect keyword arguments */
-		key_head = NULL;
-		while (p && p[0] == ':') {
-			struct format_key *key = xzalloc(sizeof(*key));
-			if (!key_head)
-				key_head = key;
-			else
-				key_tail->next = key;
-			key_tail = key;
-			key->name = xstrdup(p + 1);
-			p = get_token(fmtp);
-			if (p[0] == ')' || p[0] == ':')
-				key->value = xstrdup("t");
-			else {
-				key->value = xstrdup(p);
-				p = get_token(fmtp);
-			}
-		}
-		form->key = key_head;
+ static int
+ parse_quote(char **fmtp, struct rushdb_format *form)
+ {
+	 char *p;
+	 p = parse_string0(*fmtp + 1, form, _is_closing_quote, *fmtp);	
+	 if (!*p) {
+		 format_error("missing closing quote in string started near `%s'",
+			      *fmtp);
+		 return 1;
+	 }
+	 *fmtp = p + 1;
+	 return 0;
+ }
 
-		if (is_time_function(form->v.fh.fun))
-			form->v.fh.width = time_width(form);
-	}
-	
-	if (p[0] != ')') {
-		format_error("form `%s' not closed", formname);
-		return 1;
-	}
-	return 0;
-}
+ static int
+ _is_delim(void *closure, char *p)
+ {
+	 return *p == '(';
+ }
 
-
-rushdb_format_t 
-rushdb_compile_format(char *fmt)
-{
-	struct rushdb_format *form_head = NULL, *form_tail;
+ static int
+ parse_string(char **fmtp, struct rushdb_format *form)
+ {
+	 char *p;
+	 p = parse_string0(*fmtp, form, _is_delim, NULL);
+	 *fmtp = p;
+	 return 0;
+ }
 
-	slist = slist_create();
-	
-	while (*fmt) {
-		int rc;
-		struct rushdb_format *form = xmalloc(sizeof(*form));
-		if (!form_head)
-			form_head = form;
-		else
-			form_tail->next = form;
-		form_tail = form;
-		
-		if (*fmt == '(')
-			rc = parse_form(&fmt, form);
-		else if (*fmt == '"' || *fmt == '\'')
-			rc = parse_quote(&fmt, form);
-		else
-			rc = parse_string(&fmt, form);
-		
-		if (rc) {
-			form_free(form_head);
-			form_head = NULL;
-			break;
-		}
-	}
+ static char *
+ get_token(char **fmtp)
+ {
+	 char *p;
+	 char c;
 
-	slist_free(slist);
-	
-	return form_head;
-}
+	 while (**fmtp && c_isspace(**fmtp))
+		 ++*fmtp;
+	 p = *fmtp;
+	 if (*p == ')') {
+		 slist_append(slist, p, 1);
+		 ++*fmtp;
+	 } else {
+		 while (**fmtp && !c_isspace(**fmtp) && **fmtp != ')')
+			 ++*fmtp;
+		 slist_append(slist, p, *fmtp - p);
+	 }
+	 c = 0;
+	 slist_append(slist, &c, 1);
+	 return slist_reduce(slist, &p, NULL);
+ }
 
-int
-rushdb_print(rushdb_format_t form, struct rush_wtmp *wtmp, int newline)
-{
-	int i;
-	int outbytes = 0;
+ static int
+ is_time_function(rushdb_format_fp fh)
+ {
+	 return fh == format_start || fh == format_stop;
+ }
 
-	for (; form; form = form->next) {
-		switch (form->type) {
-		case FDATA_FH:
-			outbytes += form->v.fh.fun(outbytes,
-						   form->v.fh.width,
-						   form->key,
-						   wtmp);
-			break;
-				
-		case FDATA_STRING:
-			outbytes += output_string(form->v.string, 0,
-						  ALIGN_LEFT);
-			break;
-			
-		case FDATA_TAB:
-			outbytes += output_tab(outbytes, form->v.tabstop);
-			break;
+ static int
+ time_width(struct rushdb_format *form)
+ {
+	 time_t t = 0;
+	 struct tm *tm = localtime(&t);
+	 char *fmt = format_key_lookup(form->key, "format");
 
-		case FDATA_NEWLINE:
-			for (i = 0; i < form->v.nl; i++)
-				putchar('\n');
-			break;
-			
-		default:
-			abort();
-		}
-	}
-	if (newline)
-		putchar('\n');
-	return outbytes;
-}
+	 return nstrftime(NULL, -1, fmt ? fmt : rushdb_date_format, 
+			  tm, 0, 0);
+ }
 
-void
-rushdb_print_header(rushdb_format_t form)
-{
-	int i, outbytes = 0;
-	rushdb_format_t p;
-	
-	for (p = form; p; p = p->next) 
-		if (p->type == FDATA_NEWLINE)
-			return;
-	
-	for (; form; form = form->next) {
-		switch (form->type) {
-		case FDATA_FH:
-			if (form->v.fh.header) 
-				outbytes += output_string(form->v.fh.header,
-							  form->v.fh.width,
-							  ALIGN_LEFT);
-			else
-				outbytes += output_string("", form->v.fh.width,
-							  ALIGN_LEFT);
-			break;
-				
-		case FDATA_STRING:
-			outbytes += output_string("",
+ static int
+ parse_form(char **fmtp, struct rushdb_format *form)
+ {
+	 char *formname, *p;
+	 struct format_key *key_head, *key_tail;
+
+	 ++*fmtp;
+
+	 formname = get_token(fmtp);
+	 if (strcmp(formname, "newline") == 0) {
+		 form->type = FDATA_NEWLINE;
+		 p = get_token(fmtp);
+		 if (p[0] != ')') {
+			 form->v.nl = strtol(p, NULL, 0);
+			 p = get_token(fmtp);
+		 } else
+			 form->v.nl = 1;
+	 } else if (strcmp(formname, "tab") == 0) {
+		 form->type = FDATA_TAB;
+		 p = get_token(fmtp);
+		 if (p[0] != ')') {
+			 form->v.tabstop = strtol(p, NULL, 0);
+			 p = get_token(fmtp);
+		 } else
+			 form->v.tabstop = 1;
+	 } else {
+		 rushdb_format_fp fh;
+		 int arg;
+
+		 fh = _lookup(formname);
+		 if (!fh) {
+			 format_error("error in format spec: unknown format %s",
+				      formname);
+			 return 1;
+		 }
+
+		 form->type = FDATA_FH;
+		 form->v.fh.fun = fh;
+
+		 /* Collect optional arguments */
+		 arg = 0;
+		 while ((p = get_token(fmtp)) != NULL &&
+			!(p[0] == ':' || p[0] == ')')) {
+			 arg++;
+			 switch (arg) {
+			 case 1: /* width */
+				 form->v.fh.width = strtol(p, NULL, 0);
+				 break;
+			 case 2: /* header */
+				 form->v.fh.header = xstrdup(p);
+				 break;
+			 default:
+				 format_error("wrong number of arguments "
+					      "to form %s",
+					      formname);
+				 return 1;
+			 }
+		 }
+
+		 /* Collect keyword arguments */
+		 key_head = NULL;
+		 while (p && p[0] == ':') {
+			 struct format_key *key = xzalloc(sizeof(*key));
+			 if (!key_head)
+				 key_head = key;
+			 else
+				 key_tail->next = key;
+			 key_tail = key;
+			 key->name = xstrdup(p + 1);
+			 p = get_token(fmtp);
+			 if (p[0] == ')' || p[0] == ':')
+				 key->value = xstrdup("t");
+			 else {
+				 key->value = xstrdup(p);
+				 p = get_token(fmtp);
+			 }
+		 }
+		 form->key = key_head;
+
+		 if (is_time_function(form->v.fh.fun))
+			 form->v.fh.width = time_width(form);
+	 }
+
+	 if (p[0] != ')') {
+		 format_error("form `%s' not closed", formname);
+		 return 1;
+	 }
+	 return 0;
+ }
+
+ 
+ rushdb_format_t 
+ rushdb_compile_format(char *fmt)
+ {
+	 struct rushdb_format *form_head = NULL, *form_tail;
+
+	 slist = slist_create();
+
+	 while (*fmt) {
+		 int rc;
+		 struct rushdb_format *form = xzalloc(sizeof(*form));
+		 if (!form_head)
+			 form_head = form;
+		 else
+			 form_tail->next = form;
+		 form_tail = form;
+
+		 if (*fmt == '(')
+			 rc = parse_form(&fmt, form);
+		 else if (*fmt == '"' || *fmt == '\'')
+			 rc = parse_quote(&fmt, form);
+		 else
+			 rc = parse_string(&fmt, form);
+
+		 if (rc) {
+			 form_free(form_head);
+			 form_head = NULL;
+			 break;
+		 }
+	 }
+
+	 slist_free(slist);
+
+	 return form_head;
+ }
+
+ int
+ rushdb_print(rushdb_format_t form, struct rush_wtmp *wtmp, int newline)
+ {
+	 int i;
+	 int outbytes = 0;
+
+	 for (; form; form = form->next) {
+		 switch (form->type) {
+		 case FDATA_FH:
+			 outbytes += form->v.fh.fun(outbytes,
+						    form->v.fh.width,
+						    form->key,
+						    wtmp);
+			 break;
+
+		 case FDATA_STRING:
+			 outbytes += output_string(form->v.string, 0,
+						   ALIGN_LEFT);
+			 break;
+
+		 case FDATA_TAB:
+			 outbytes += output_tab(outbytes, form->v.tabstop);
+			 break;
+
+		 case FDATA_NEWLINE:
+			 for (i = 0; i < form->v.nl; i++)
+				 putchar('\n');
+			 break;
+
+		 default:
+			 abort();
+		 }
+	 }
+	 if (newline)
+		 putchar('\n');
+	 return outbytes;
+ }
+
+ void
+ rushdb_print_header(rushdb_format_t form)
+ {
+	 int i, outbytes = 0;
+	 rushdb_format_t p;
+
+	 for (p = form; p; p = p->next) 
+		 if (p->type == FDATA_NEWLINE)
+			 return;
+
+	 for (; form; form = form->next) {
+		 switch (form->type) {
+		 case FDATA_FH:
+			 if (form->v.fh.header) 
+				 outbytes += output_string(form->v.fh.header,
+							   form->v.fh.width,
+							   ALIGN_LEFT);
+			 else
+				 outbytes += output_string("", form->v.fh.width,
+							   ALIGN_LEFT);
+			 break;
+
+		 case FDATA_STRING:
+			 outbytes += output_string("",
 						  strlen(form->v.string),
 						  ALIGN_LEFT);
 			break;

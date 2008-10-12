@@ -82,6 +82,8 @@ documents Rush Version @value{VERSION}.
 * Usage Tips::
 * Test Mode::
 * Option Summary::
+* Rushwho::              The @code{rushwho} utility.
+* Rushlast::             The @code{rushlast} utility.
 * Reporting Bugs::       How to Report a Bug.
 
 Appendices
@@ -101,6 +103,7 @@ Configuration File
 * System Actions::
 * Environment::
 * Fall-through::
+* Accounting and Forked Mode::
 * Exit::
 * Global Actions::
 
@@ -247,6 +250,7 @@ and test your configurations.
 * System Actions::
 * Environment::
 * Fall-through::
+* Accounting and Forked Mode::
 * Exit::
 * Global Actions::
 @end menu
@@ -587,7 +591,7 @@ utility:
 @item     S       @tab  max stack size (KB)
 @item     T       @tab  max CPU time (MIN)
 @item     U       @tab  max number of processes
-@item     L       @tab  max number of logins for this user
+@item     L       @tab  max number of logins for this user (see below)
 @item     P       @tab  process priority -20..20 (negative = high priority)
 @end multitable
 
@@ -597,9 +601,9 @@ For example:
 limits T10 R20 U16 P20
 @end smallexample
 
-Note, that as of Rush version @value{VERSION}, the @code{L} resource
-setting is obeyed only if the executed command updates the system
-accounting database.
+@anchor{L limit}
+The use of @samp{L} resource automatically enables @dfn{forked mode}.
+@xref{Accounting and Forked Mode}, for more information about it.
 @end table
 
 @node Environment
@@ -700,6 +704,73 @@ rule default
 It will remove all path components from the first comman line argument.
 As a result, all subsequent rules may expect a bare binary name as the
 first argument.
+
+@node Accounting and Forked Mode
+@section Accounting and Forked Mode
+@UNREVISED
+  Rush is able to operate in two modes, which we call default and
+forked.  When operating in the default mode, the process image of
+@command{rush} itself is overwritten by the command being executed.
+Thus, when it comes to the launching of the requested command,
+the running instance of @command{rush} ceases to exist.
+
+  There is also another operation mode, which we call @dfn{forked
+mode}.  When running in this mode, @command{rush} executes the
+requested command in a subprocess, and remains in memory supervising
+its execution.  Once the command terminates, @command{rush} exits.
+
+  One advantage of the forked mode is that it allows to run
+@dfn{accounting}, i.e. to note who is doing what and to keep an
+history of invocations.  The acounting, in turn, can be used to limit
+simultaneous executions of commands by the users (@dfn{logins}, in
+Rush terminology), as requested by @samp{L} command to @code{limit}
+statement (@pxref{L limit}).
+
+  The forked mode is enabled on a per-rule basis, for rules that
+contain either @samp{L} command in the @code{limit} statement, or
+@samp{acct on} command:
+
+@table @code
+@kwindex acct
+@item acct @var{bool}
+Turn accounting mode on or off, depending on @var{bool}.  The argument
+can be one of the following: @samp{yes}, @samp{on}, @samp{t}, 
+@samp{true}, or @samp{1}, to enable accounting, and @samp{no},
+@samp{off}, @samp{nil}, @samp{false}, @samp{0}, to disable it.
+
+Notice, that there is no need in explicite @code{acct on} command, if
+you use @command{limit L}.
+@end table
+
+The notion @samp{rule contains}, used above, means that either the
+rule in question contains that statement, or it inherits it from one
+of the above fall-through rules (@pxref{Fall-through}).  In fact, in
+most cases the accounting should affect all rules, therefore we
+suggest to enable it in a fall-through rule at the beginning of the
+configuratin file, e.g.:
+
+@smallexample
+rule default
+  acct on
+@end smallexample
+
+If the need be, you can disable it for some of the subsequent rules by
+placing @code{acct off} in it.  Notice, that this will disable
+accounting only, the forked mode will remain in action.  To disable it
+as well and enforce default mode for a given rule, use @code{fork off}
+statement:
+
+@table @code
+@kwindex fork
+@item fork @var{bool}
+Enable or disable forked mode.  This statement is mainly designed as a
+way of disabling the forked mode for a given rule.
+@end table
+
+  Once the accounting enabled, you can view the list of currently
+logged in users using @code{rushwho} command (@pxref{Rushwho}) and
+view the history of last logins using @code{rushlast} command
+(@pxref{Rushlast}).
 
 @node Exit
 @section Exit rule
@@ -1279,6 +1350,14 @@ Display a short help message.
 @item --usage
 Display a concise usage summary.
 @end table
+
+@node Rushwho
+@chapter The @code{rushwho} utility.
+@UNREVISED
+
+@node Rushlast
+@chapter The @code{rushlast} utility.
+@UNREVISED
 
 @node Reporting Bugs
 @chapter How to Report a Bug

@@ -73,9 +73,8 @@ char *format =
 	"(user 10 Login) "
 	"(rule 8 Rule) "
 	"(start-time 0 Start) "
-	"(stop-time 0 Stop) "
-	"(duration 7 Time) "
-	"(command 10 Command)"; 
+	"(duration 10 Time) "
+	"(command 38 Command)"; 
 
 int
 main(int argc, char **argv)
