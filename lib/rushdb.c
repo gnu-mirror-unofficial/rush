@@ -319,13 +319,13 @@ output_duration(time_t t, int width, struct format_key *key)
 	 
 	 if (outbytes < width) {
 		 unsigned rest = width - outbytes;
-		 if (rest > 2)
+		 if (rest >= 2)
 			 outbytes += printf("%02u", d);
 		 rest = width - outbytes;
-		 if (rest > 3)
+		 if (rest >= 3)
 			 outbytes += printf(":%02u", m);
 		 rest = width - outbytes;
-		 if (rest > 3)
+		 if (rest >= 3)
 			 outbytes += printf(":%02u", s);
 		 rest = width - outbytes;
 		 if (rest)

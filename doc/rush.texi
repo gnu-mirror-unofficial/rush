@@ -127,6 +127,11 @@ The @code{rushlast} utility.
 
 * Rushlast Options::
 
+Accounting Database
+
+* wtmp::        The Structure of @file{wtmp} File.
+* utmp::        The Structure of @file{wtmp} File.
+
 @end detailmenu
 @end menu
 
@@ -337,7 +342,7 @@ Verbosely describe parsing of the configuration file.
 @cindex conditions
   These statements define conditions that are used to match the rule with
 the request.  A rule may contain any number of conditions.  All
-conditions are tested in order of their appearence in the rule and are
+conditions are tested in order of their appearance in the rule and are
 tied together using boolean shortcut @samp{and} evaluation: if any of
 them yields false, the rest is not considered and control is
 transferred to the subsequent rule. 
@@ -712,7 +717,7 @@ rule default
 @end group
 @end smallexample
 
-It will remove all path components from the first comman line argument.
+It will remove all path components from the first command line argument.
 As a result, all subsequent rules may expect a bare binary name as the
 first argument.
 
@@ -733,7 +738,7 @@ its execution.  Once the command terminates, @command{rush} exits.
 
   One advantage of the forked mode is that it allows to run
 @dfn{accounting}, i.e. to note who is doing what and to keep an
-history of invocations.  The acounting, in turn, can be used to limit
+history of invocations.  The accounting, in turn, can be used to limit
 simultaneous executions of commands by the users (@dfn{logins}, in
 Rush terminology), as requested by @samp{L} command to @code{limit}
 statement (@pxref{L limit}).
@@ -750,7 +755,7 @@ can be one of the following: @samp{yes}, @samp{on}, @samp{t},
 @samp{true}, or @samp{1}, to enable accounting, and @samp{no},
 @samp{off}, @samp{nil}, @samp{false}, @samp{0}, to disable it.
 
-Notice, that there is no need in explicite @code{acct on} command, if
+Notice, that there is no need in explicit @code{acct on} command, if
 you use @command{limit L}.
 @end table
 
@@ -759,7 +764,7 @@ rule in question contains that statement, or it inherits it from one
 of the above fall-through rules (@pxref{Fall-through}).  In fact, in
 most cases the accounting should affect all rules, therefore we
 suggest to enable it in a fall-through rule at the beginning of the
-configuratin file, e.g.:
+configuration file, e.g.:
 
 @smallexample
 rule default
@@ -1385,7 +1390,7 @@ The login name of the user.
 
 @item Rule
 The tag of the rule he is served under.  If the rule is untagged, its
-ordinal number, prefixed by a pound sign (@samp{#}) is used insead.
+ordinal number, prefixed by a pound sign (@samp{#}) is used instead.
 
 @item Start
 Time when the rule began execution.
@@ -1524,8 +1529,8 @@ is supplied, that many newlines will be printed
 @end deffn
 
 @deffn {Format Spec} tab [@var{num}]
-Advance to the next tabstop in the output stream.  If optional @var{num}
-is present, then skip @var{num} tabstops.  Each tabstop is eight
+Advance to the next tab stop in the output stream.  If optional @var{num}
+is present, then skip @var{num} tab stops.  Each tab stop is eight
 characters long.
 @end deffn
 
@@ -1630,7 +1635,7 @@ The login name of the user.
 
 @item Rule
 The tag of the rule he is served under.  If the rule is untagged, its
-ordinal number, prefixed by a pound sign (@samp{#}) is used insead.
+ordinal number, prefixed by a pound sign (@samp{#}) is used instead.
 
 @item Start
 Time when the rule began execution.
@@ -1705,7 +1710,118 @@ Display a concise usage summary.
 
 @node Accounting Database
 @chapter Accounting Database
-@UNREVISED
+@cindex accounting database
+  Rush accounting database is stored in the directory
+@file{@var{localstatedir}/rush}, where @var{localstatedir} stands for
+the name of the local state directory, set on compile time.  By
+default, it is @file{@var{prefix}/var}, where @var{prefix} is the
+installation prefix, which defaults to @file{/usr/local}.  Thus, the
+default database directory is @file{/usr/local/var/rush}.  You can
+change this default by using @option{--localstatedir} option to
+@command{configure} before compiling the package.  The
+@option{--prefix} option affects it as well.
+
+@cindex @file{utmp} file, accounting database
+@cindex @file{wtmp} file, accounting database
+  As of version @value{VERSION}, the database consists of two files,
+called @file{utmp} and @file{wtmp}.  The @file{wtmp} file keeps
+information about all user sessions, both finished and still active.
+The @file{utmp} file contains indices to those records in @file{wtmp},
+which represent active sessions.
+
+  The @file{wtmp} grows continuously, while @file{utmp} normally
+grow the first day or two of using @command{rush}, from then on
+its size remains without changes.  If you set up log file rotation,
+e.g. by using @command{logrotate} (@pxref{logrotate,,logrotate,logrotate(8),
+logrotate man page}), or a similar tool, it is safe to rotate
+@file{wtmp} without notifying @command{rush}. @FIXME{This could
+interfere with the functionality of @command{radwho}.  Verify it}.
+It is usually no necessary to rotate @file{utmp}, though.
+
+  The following sections contain a detailed description of the
+structure of these two files.  You may skip it, if you are not
+interested in technical details.
+
+@menu
+* wtmp::        The Structure of @file{wtmp} File.
+* utmp::        The Structure of @file{wtmp} File.
+@end menu
+
+@node wtmp
+@section The @file{wtmp} file
+@cindex @file{wtmp}
+  The @file{wtmp} file consists of variable-size entries. It is
+designed so, that it can easily be read both from the beginning to the
+end and in the opposite direction.
+
+  Each record begins with a fixed-size header, which is followed by
+three zero-terminated strings, and the record size in @code{size_t}
+representation.  The three strings are, in that order: the user login
+name, the rule tag, and the full command line.
+
+  The header has the following structure:
+
+@smallexample
+@group
+struct rush_wtmp @{
+        size_t reclen;
+        pid_t pid;
+        struct timeval start;
+        struct timeval stop;
+        char *unused[3];
+@};
+@end group
+@end smallexample
+
+@noindent
+where:
+
+@table @code
+@item reclen
+is the length of the entire record, including the size of this
+header.  This field is duplicated at the end of the record.
+
+@item pid
+is the PID of the command executed for the user.
+
+@item start
+represents the time of the beginning of the user session.
+
+@item stop
+represents the time when the user session finished.  If the session is
+still running, this field is filled with zeros.
+
+@item unused
+The three pointers at the end of the structure are used internally bu
+@command{rush}.  On disk, these fields are always filled with zeros.
+@end table
+
+@node utmp
+@section The @file{utmp} file
+@cindex @file{utmp}
+  The @file{utmp} file consists of a fixed-size records of the
+following structure:
+
+@smallexample
+@group
+struct rush_utmp @{
+        int status;
+        off_t offset;
+@};
+@end group
+@end smallexample
+
+The fields have the following meaning:
+
+@table @code
+@item status
+Status of the record: @samp{0} if the record is unused, and @samp{1}
+if it represents an active session.
+
+@item offset
+Offset to the corresponding record in @file{wtmp} (see previous
+section).
+@end table
 
 @node Reporting Bugs
 @chapter How to Report a Bug
