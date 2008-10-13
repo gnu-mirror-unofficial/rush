@@ -99,7 +99,14 @@ Appendices
 Configuration File
 
 * Syntax::
+* Rule::
 * Debugging::
+* Regex::
+* Sleep Time::
+* Error Messages::
+
+Rule
+
 * Conditions::
 * Transformations::
 * System Actions::
@@ -107,7 +114,6 @@ Configuration File
 * Fall-through::
 * Accounting and Forked Mode::
 * Exit::
-* Global Actions::
 
 Usage Tips
 
@@ -260,15 +266,11 @@ and test your configurations.
 
 @menu
 * Syntax::
+* Rule::
 * Debugging::
-* Conditions::
-* Transformations::
-* System Actions::
-* Environment::
-* Fall-through::
-* Accounting and Forked Mode::
-* Exit::
-* Global Actions::
+* Regex::
+* Sleep Time::
+* Error Messages::
 @end menu
 
 @node Syntax
@@ -299,46 +301,45 @@ is equivalent to:
 usage-error Contact your system administrator
 @end smallexample
 
-@node Debugging
-@section Debugging
-@cindex debugging
-  The @code{debug} statement sets the @dfn{debugging level} -- an
-integer value that controls the verbosity of @command{rush}:
+@node Rule
+@section Rule
+@cindex @code{rule} statement
+  The @code{rule} statement configures a Rush rule.  This is a
+@dfn{block} statement, which means that all statements located between
+it and the next @code{rule} statement (or end of file, whichever
+occurs first) modify the definition of the rule.
 
-@kwindex debug
-@table @code
-@item debug @var{num}
-Set the debugging level to @var{num}.
-@end table
+@kwindex rule
+  The syntax of the @code{rule} statement is:
 
-  The greater @var{num} is, the more verbose is shell's logging.  The
-debugging information is reported via @code{syslog} at facility
-@samp{authpriv}, priority @samp{debug}.  As of version @value{VERSION},
-the following debugging levels are supported: 
+@deffn {Configuration} rule @var{tag}
+@end deffn
 
-@cindex debugging levels
-@table @asis
-@item 1
-A minimum debugging level, and the only one whose messages are logged
-using the priority @samp{notice}.  At this level, @command{rush} only
-logs requests and rules selected to handle them.  For example:
+@cindex rule tag
+@cindex tag, rule
+The @var{tag} argument is optional.  If it is given, it supplies a
+@dfn{tag} for the rule, i.e. a (presumably unique) identifier, which
+is used to label this rule.  Rush uses this tag in its diagnostic
+messages.  For rules without explicit @var{tag}, Rush supplies a
+default tag, which is constructed by concatenating @samp{#} character
+and the ordinal number of rule in the configuration file, in decimal
+notation.  Rule numbering begins from @samp{1}.
 
-@smallexample
-rush[16821]: Serving request "/usr/libexec/sftp-server"
-for sergiusz by rule sftp-savane
-@end smallexample
+The following sub-sections describe the statements that can be used
+within a @code{rule}.
 
-@item 2
-List all actions executed when serving requests.
-
-@item 3
-Verbosely describe parsing of the configuration file.
-@end table
-
-  More debugging levels may be implemented in future.  
+@menu
+* Conditions::
+* Transformations::
+* System Actions::
+* Environment::
+* Fall-through::
+* Accounting and Forked Mode::
+* Exit::
+@end menu
 
 @node Conditions
-@section Conditions
+@subsection Conditions
 @cindex conditions
   These statements define conditions that are used to match the rule with
 the request.  A rule may contain any number of conditions.  All
@@ -347,9 +348,7 @@ tied together using boolean shortcut @samp{and} evaluation: if any of
 them yields false, the rest is not considered and control is
 transferred to the subsequent rule. 
 
-@table @code
-@kwindex command
-@item command @var{regex}
+@deffn {Rule Config} command @var{regex}
 True, if the current command line matches regular expression
 @var{regex}.  
 
@@ -360,14 +359,15 @@ command ^scp (-v )?-t /incoming/(alpha|ftp)
 @end smallexample
 
 By default, @acronym{POSIX} extended regular expressions are used.
-This, however can be changed using @code{regex} statement (@pxref{regex}).
+This, however can be changed using @code{regex} statement (@pxref{Regex}).
+@end deffn
 
-@kwindex match
-@item match[@var{n}] @var{regexp}
+@deffn {Rule Config} match[@var{n}] @var{regexp}
 True, if @var{n}th @dfn{word} from the command line matches
-regular expression @var{regexp}.  A special value @samp{$} can be used
+regular expression @var{regexp}.  Notice, that the square brackets are
+part of the statement syntax.  A special value @samp{$} can be used
 instead of @var{n} to denote the last word.  Unless changed by
-previous @code{regex} statement (@pxref{regex}), @acronym{POSIX}
+previous @code{regex} statement (@pxref{Regex}), @acronym{POSIX}
 extended regular expressions are used. 
 
 The command line is split into words using the same rules as used in
@@ -379,9 +379,9 @@ an absolute path name:
 @smallexample
 match[$] ^/.*
 @end smallexample
+@end deffn
 
-@kwindex argc
-@item argc @var{op} @var{num}
+@deffn {Rule Config} argc @var{op} @var{num}
 Compare the number of command line arguments to @var{num}.
 The comparison operator is given by @var{op}, which can be one 
 of the following: @samp{=} (or @samp{==}), @samp{!=}, @samp{<},
@@ -393,29 +393,29 @@ arguments is less than 3:
 @smallexample
 argc < 3
 @end smallexample
+@end deffn
 
-@kwindex uid
-@item uid @var{op} @var{num}
+@deffn {Rule Config} uid @var{op} @var{num}
 Compare current @acronym{UID} to @var{num}.
 The comparison operator is given by @var{op}, which can be one 
 of the following: @samp{=} (@samp{==}), @samp{!=}, @samp{<},
 @samp{<=}, @samp{>}, @samp{>=}.
+@end deffn
 
-@kwindex gid
-@item gid @var{op} @var{num}
+@deffn {Rule Config} gid @var{op} @var{num}
 Compare current @acronym{GID} to @var{num}.
 The comparison operator is given by @var{op}, which can be one
 of the following: @samp{=} (@samp{==}), @samp{!=}, @samp{<},
 @samp{<=}, @samp{>}, @samp{>=}.
+@end deffn
 
-@kwindex user
-@item user @var{names}
+@deffn {Rule Config} user @var{names}
 Argument is a whitespace-separated list of user names.  This condition
 yields true, if the user name matches one of the listed names.
 String comparisons are case-sensitive.
+@end deffn
 
-@kwindex group
-@item group @var{names}
+@deffn {Rule Config} group @var{names}
 Argument is a whitespace-separated list of group names.  This condition
 yields true, if the the name of any group the user is a member of
 matches one of listed names. String comparisons are case-sensitive.
@@ -425,7 +425,7 @@ For example, to match users from groups @samp{admin} and @samp{root}:
 @smallexample
 group admin root
 @end smallexample
-@end table
+@end deffn
 
   Each condition allows for a negated form, by placing an exclamation
 sign between the condition keyword and expression.  For example:
@@ -439,21 +439,21 @@ True if command line does not begin with @samp{scp}.
 @end table
 
 @node Transformations
-@section Transformations
+@subsection Transformations
 @cindex transformations
   Special actions that allow to rewrite command line are called
 @dfn{transformations}.
 
-@kwindex transform
-@table @code
-@item transform @var{expr}
+@deffn {Rule Config} transform @var{expr}
 Apply expression @var{expr} to entire command line.
+@end deffn
 
-@item transform[@var{n}] @var{expr}
+@deffn {Rule Config} transform[@var{n}] @var{expr}
 Apply expression @var{expr} to @var{n}th @dfn{word} from the
-command line.  A special value @samp{$} can be used instead
-of @var{n} to denote the last word.
-@end table
+command line.  Notice, that square brackets are part of the statement
+syntax.  A special value @samp{$} can be used instead of @var{n} to
+denote the last word. 
+@end deffn
 
 The transformation expression, @var{expr}, is a @command{sed}-like
 replace expression of the form:
@@ -542,24 +542,23 @@ adds its own @option{-r} option and replaces @samp{svnserve} with a
 full name of the program.
 
 @node System Actions
-@section System Actions
+@subsection System Actions
 @cindex system actions
 @cindex actions, system
 
-System actions provide an interface to the operating system:
+System actions provide an interface to the operating system.
 
-@table @code
-@kwindex umask
-@item umask @var{mask}
+@deffn {Rule Config} umask @var{mask}
 Set the umask.  The @var{mask} must be an octal value not greater than
 @samp{0777}.  The default umask is @samp{022}.
+@end deffn
 
-@kwindex chroot
-@item chroot @var{dir}
+@deffn {Rule Config} chroot @var{dir}
 Change the root directory to that specified in @var{dir}.  This
 directory will be used for file names beginning with @samp{/}.
 A tilde (@samp{~}) in the beginning of @var{dir} is replaced with
 the user's home directory.
+@end deffn
 
 The directory @var{dir} must be properly set up to execute the 
 commands.  For example, the following rule defines execution of
@@ -580,14 +579,13 @@ For this to work, each user's home must contain the directory
 directories and files that are needed for executing it, in particular
 @file{lib}.
 
-@kwindex chdir
-@item chdir @var{dir}
+@deffn {Rule Config} chdir @var{dir}
 Change to the directory @var{dir}.  The argument is subject to
 tilde-expansion (see @code{chroot}, above).  If both @code{chdir} and
 @code{chroot} are specified, then @code{chroot} is executed first.
+@end deffn
 
-@kwindex limits
-@item limits @var{res}
+@deffn {Rule Config} limits @var{res}
 Impose limits on system resources, as defined by @var{res}.  The
 argument consists of @dfn{commands}, optionally separated by any
 amount of whitespace.  A command is a single command letter followed
@@ -620,20 +618,18 @@ limits T10 R20 U16 P20
 @anchor{L limit}
 The use of @samp{L} resource automatically enables @dfn{forked mode}.
 @xref{Accounting and Forked Mode}, for more information about it.
-@end table
+@end deffn
 
 @node Environment
-@section Environment
+@subsection Environment
 @cindex Environment
 
 The @code{env} action allows to modify the environment in which the
 program will be executed.
 
-@table @code
-@kwindex env
-@item env @var{args}
+@deffn {Rule Config} env @var{args}
 Modify the environment.
-@end table
+@end deffn
 
 Its argument is a whitespace-delimited list of specifiers.  The
 following specifiers are understood: 
@@ -680,16 +676,14 @@ before assignment.
 @end table
 
 @node Fall-through
-@section Fall-through
+@subsection Fall-through
 @cindex fall-through rule
 A @dfn{fall-through} rule is a rule that does not execute the
 requested command.  It is declared using the following statement:
 
-@table @code
-@kwindex fall-through
-@item fall-through
-Declare a rule as a fall-through.
-@end table
+@deffn {Rule Config} fall-through
+Declare a fall-through rule.
+@end deffn
 
 Usually it is placed as the last statement in a rule, e.g.:
 
@@ -722,7 +716,7 @@ As a result, all subsequent rules may expect a bare binary name as the
 first argument.
 
 @node Accounting and Forked Mode
-@section Accounting and Forked Mode
+@subsection Accounting and Forked Mode
 @cindex accounting
   Rush is able to operate in two modes, which we call default and
 forked.  When operating in the default mode, the process image of
@@ -747,9 +741,7 @@ statement (@pxref{L limit}).
 contain either @samp{L} command in the @code{limit} statement, or
 @samp{acct on} command:
 
-@table @code
-@kwindex acct
-@item acct @var{bool}
+@deffn {Rule Config} acct @var{bool}
 Turn accounting mode on or off, depending on @var{bool}.  The argument
 can be one of the following: @samp{yes}, @samp{on}, @samp{t}, 
 @samp{true}, or @samp{1}, to enable accounting, and @samp{no},
@@ -757,7 +749,7 @@ can be one of the following: @samp{yes}, @samp{on}, @samp{t},
 
 Notice, that there is no need in explicit @code{acct on} command, if
 you use @command{limit L}.
-@end table
+@end deffn
 
 The notion @samp{rule contains}, used above, means that either the
 rule in question contains that statement, or it inherits it from one
@@ -777,12 +769,10 @@ accounting only, the forked mode will remain in action.  To disable it
 as well and enforce default mode for a given rule, use @code{fork off}
 statement:
 
-@table @code
-@kwindex fork
-@item fork @var{bool}
+@deffn {Rule Config} fork @var{bool}
 Enable or disable forked mode.  This statement is mainly designed as a
 way of disabling the forked mode for a given rule.
-@end table
+@end deffn
 
   Once the accounting enabled, you can view the list of currently
 logged in users using @code{rushwho} command (@pxref{Rushwho}) and
@@ -790,19 +780,17 @@ view the history of last logins using @code{rushlast} command
 (@pxref{Rushlast}).
 
 @node Exit
-@section Exit rule
+@subsection Exit rule
 @cindex exit rule
   An @dfn{exit} rule does not execute the command.  Instead, it writes
 the supplied error message to the specified file descriptor and exits
 immediately.  An exit rule is defined using the following statement:
 
-@kwindex exit
-@table @code
-@item exit [@var{fd}] @var{message}
+@deffn {Rule Config} exit [@var{fd}] @var{message}
 Write textual message @var{message} to a file descriptor, given by
 optional argument @var{fd}.  If @var{fd} is absent, @samp{2} (standard
 error) is used.
-@end table
+@end deffn
 
 The @var{message} argument is subject to backslash interpretation,
 during which the following @dfn{escape sequences} are replaced with
@@ -850,9 +838,10 @@ rule git
 It allows to use only those Git repositories that are located under
 @file{/sources} directory.  If a user tries to access a repository
 outside this root, he will be returned a default error message, saying
-@samp{You are not permitted to execute this command} (@pxref{Global
-Actions}).  You can, however, provide a more convenient message in
-this case.  To do so, place the following after the @samp{git} rule:
+@samp{You are not permitted to execute this command} (@pxref{Error
+Messages, usage-error}).  You can, however, provide a more convenient
+message in this case.  To do so, place the following after the
+@samp{git} rule: 
 
 @smallexample
 @group
@@ -865,18 +854,56 @@ rule git-trap
 This rule will trap all git invocations that do not match the
 @samp{git} rule.
 
-@node Global Actions
-@section Global Actions
+@node Debugging
+@section Debugging
+@cindex debugging
+  The @code{debug} statement sets the @dfn{debugging level} -- an
+integer value that controls the verbosity of @command{rush}:
 
-Global actions affect the behavior of @command{rush} as a whole.
+@deffn {Configuration} debug @var{num}
+Set the debugging level to @var{num}.
+@end deffn
 
-@table @code
-@kwindex regex
+  The greater @var{num} is, the more verbose is shell's logging.  The
+debugging information is reported via @code{syslog} at facility
+@samp{authpriv}, priority @samp{debug}.  As of version @value{VERSION},
+the following debugging levels are supported: 
+
+@cindex debugging levels
+@table @asis
+@item 1
+A minimum debugging level, and the only one whose messages are logged
+using the priority @samp{notice}.  At this level, @command{rush} only
+logs requests and rules selected to handle them.  For example:
+
+@smallexample
+rush[16821]: Serving request "/usr/libexec/sftp-server"
+for sergiusz by rule sftp-savane
+@end smallexample
+
+@item 2
+List all actions executed when serving requests.
+
+@item 3
+Verbosely describe parsing of the configuration file.
+@end table
+
+  More debugging levels may be implemented in future.  
+
+@node Regex
+@section Regex
 @cindex regular expressions
 @cindex extended regular expressions
 @cindex basic regular expressions
-@anchor{regex}
-@item regex @var{regex-flags}
+
+The @code{regex} statement configures the flavor of the regular
+expressions for use by subsequent @code{command}, @code{match} and
+@code{transform} statements.
+
+@deffn {Configuration} regex @var{regex-flags}
+Configure the type of regular expressions.
+@end deffn
+
 @var{Regex-flags} is a whitespace-separated list of flags.
 Each flag is a word specifying some regular expression 
 feature.  It can be preceded by @samp{+} to enable this feature (this
@@ -906,15 +933,27 @@ The @code{regex} settings affect subsequent @code{command} and
 @code{match} statements (@pxref{Conditions}), and remain in effect
 until next @code{regex} statement or the end of configuration file,
 whichever occurs first.
-                       
-@kwindex sleep-time
-@item sleep-time @var{number}
-Set the time in seconds to sleep before exiting on error.  This
-is intended as a measure against brute-force attacks.  Default
-is 5 seconds.
 
-@kwindex usage-error
-@item usage-error @var{text}
+@node Sleep Time
+@section Sleep Time
+
+@deffn {Configuration} sleep-time @var{number}
+Set the time in seconds to sleep before exiting on error.  
+@end deffn
+
+This statement is intended as a measure against brute-force attacks.
+Default sleep time is 5 seconds.
+
+@node Error Messages
+@section Error Messages
+@cindex error messages
+
+A set of statements configures textual messages that @command{rush}
+returns to the user if an error of some class occurs.  All of them
+take a single argument which is subject to backslash interpretation,
+as described in @ref{Exit, backslash interpretation}. 
+
+@deffn {Configuration} usage-error @var{text}
 Define a textual message which is returned to the remote party if a
 usage error occurs.  
 
@@ -923,9 +962,9 @@ Default is:
 @smallexample
 You are not permitted to execute this command.
 @end smallexample
+@end deffn
 
-@kwindex nologin-error
-@item nologin-error @var{text}
+@deffn {Configuration} nologin-error @var{text}
 Define a textual message which is returned to the remote user if
 there is no such user name in the password database.  
 
@@ -934,9 +973,9 @@ Default is:
 @smallexample
 You do not have interactive login access to this machine.
 @end smallexample
+@end deffn
 
-@kwindex config-error
-@item config-error @var{text}
+@deffn {Configuration} config-error @var{text}
 Define a textual message which is returned to the remote party on
 Rush configuration errors.  
 
@@ -945,9 +984,9 @@ Default is:
 @smallexample
 Local configuration error occurred.
 @end smallexample
+@end deffn
 
-@kwindex system-error
-@item system-error @var{text}
+@deffn {Configuration} system-error @var{text}
 Define a textual message which is returned to the remote party if
 a system error occurs. 
 
@@ -956,10 +995,7 @@ Default message is:
 @smallexample
 A system error occurred while attempting to execute command.
 @end smallexample
-@end table
-
-The argument to all @samp{-error} statements is subject to backslash
-interpretation, as described in @ref{Exit, backslash interpretation}.
+@end deffn
 
 @node Usage Tips
 @chapter Usage Tips
@@ -1389,8 +1425,7 @@ The information displayed is:
 The login name of the user.
 
 @item Rule
-The tag of the rule he is served under.  If the rule is untagged, its
-ordinal number, prefixed by a pound sign (@samp{#}) is used instead.
+The tag of the rule he is served under (@pxref{Rule, tag}).  
 
 @item Start
 Time when the rule began execution.
@@ -1587,10 +1622,8 @@ Total time of the session duration.
 @end deffn
 
 @deffn {Format Spec} rule @var{width} @var{title} [:right]
-The tag of the rule used to serve the user.  If the rule is untagged,
-the string @samp{#@var{n}} is used instead, where @var{n} stands for
-the number of the rule in the configuration file.  Rules are numbered
-starting from 1.
+The tag of the rule used to serve the user.  @xref{Rule, tag}, for a
+detailed description of rules and tags.
 @end deffn
 
 @deffn {Format Spec} command @var{width} @var{title} @
@@ -1634,8 +1667,7 @@ jeff       sftp-sav Sun 20:09 running   07:17   /bin/sftp-server
 The login name of the user.
 
 @item Rule
-The tag of the rule he is served under.  If the rule is untagged, its
-ordinal number, prefixed by a pound sign (@samp{#}) is used instead.
+The tag of the rule he is served under (@pxref{Rule, tag}).
 
 @item Start
 Time when the rule began execution.
