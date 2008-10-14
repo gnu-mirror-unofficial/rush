@@ -17,9 +17,6 @@
 ACLOCAL_AMFLAGS = -I m4 
 SUBDIRS=gnu lib src etc doc
 
-EXTRA_DIST=paths
-DISTCLEANFILES = pathdefs.make paths.defs
-
 # We never remove files from the configuration directory
 distuninstallcheck_listfiles = \
  find $(prefix) -type f -not -path '$(sysconfdir)/*'

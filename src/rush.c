@@ -686,7 +686,7 @@ run_rule(struct rush_rule *rule, struct rush_request *req)
 
 
 #define USAGE_OPTION 256
-struct option tty_longopts[] = {
+struct option longopts[] = {
         { "debug", required_argument, 0, 'd' },
         { "lint", no_argument, 0, 't' },
         { "test", no_argument, 0, 't' },
@@ -697,7 +697,7 @@ struct option tty_longopts[] = {
         { NULL }
 };
 
-char *tty_shortopts = "c:d:tu:vh";
+char *shortopts = "c:d:tu:vh";
 
 const char help_msg[] = "\
 Rush - a restricted user shell.\n\
@@ -744,9 +744,6 @@ main(int argc, char **argv)
         struct rush_request req;
 	char *command = NULL;
 	char *test_user = NULL;
-	/* Default options (used when accessed remotely): */
-	char *shortopts = "c:";
-	struct option *longopts = NULL;
 		
         progname = strrchr(argv[0], '/');
         if (progname)
@@ -757,12 +754,6 @@ main(int argc, char **argv)
         
         openlog(progname, LOG_NDELAY|LOG_PID, LOG_AUTHPRIV);
 
-	if (isatty(0)) {
-		/* When running from a tty, provide more options. */
-		shortopts = tty_shortopts;
-		longopts = tty_longopts;
-	}
-	
 	while ((rc = getopt_long(argc, argv, shortopts, longopts, NULL))
 	       != EOF) {
 		switch (rc) {

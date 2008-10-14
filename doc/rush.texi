@@ -27,7 +27,9 @@
 @ifinfo
 @dircategory System Administration Utilities
 @direntry
-* rush (rush).          A restricted user shell.
+* rush: (rush).              A restricted user shell.
+* rushwho: (rush)rushwho.    Show who is using Rush currently.
+* rushlast: (rush)rushlast.  Show listing of recent Rush sessions.
 @end direntry
 @end ifinfo
 
@@ -1360,8 +1362,8 @@ itself is not executed.
 
 An exit status of 0 means no errors, 1 means an error has occurred.
 
-@optindex --user
-@optindex -u
+@opindex --user
+@opindex -u
 You may also emulate access by a particular user, by supplying his
 user name via the @option{--user} (@option{-u}) option.  This option
 implies @option{--test}.
@@ -1420,16 +1422,22 @@ $ rush --test --debug=2 -c "cvs server" sample.rc
 This chapter provides a short summary of Rush command line options.
 
 @table @option
+@opindex -c, @r{rush}
 @item -c @var{command}
 Specify the command to run.
 
-@item --debug=@var{number}
-@itemx -d @var{number}
+@opindex -d, @r{rush}
+@opindex --debug, @r{rush}
+@item -d @var{number}
+@itemx --debug=@var{number}
 Set debugging level.
 
-@item --test
+@opindex -t, @r{rush}
+@opindex --test, @r{rush}
+@opindex --lint, @r{rush}
+@item -t
+@itemx --test
 @itemx --lint
-@itemx -t
 Run in test mode. An optional argument may be used with this option
 to specify alternative configuration file name, e.g.:
 
@@ -1440,20 +1448,27 @@ $ rush --lint ./test.rc
 If the @option{-c} option is also specified, @command{rush} emulates the
 normal processing for the command, but does not execute it.
 
-@item --user=@var{name}
-@itemx -u @var{name}
+@opindex -u, @r{rush}
+@opindex --user, @r{rush}
+@item -u @var{name}
+@itemx --user=@var{name}
 Emulate access by user @var{name}.  This option implies
 @option{--test} and is valid only when used by root and in conjunction
 with the @option{-c} option.
 
-@item --version
-@itemx -v
+@opindex -v, @r{rush}
+@opindex --version, @r{rush}
+@item -v
+@itemx --version
 Display program version.
 
-@item --help
-@itemx -h
+@opindex -h, @r{rush}
+@opindex --help, @r{rush}
+@item -h
+@itemx --help
 Display a short help message.
 
+@opindex --usage, @r{rush}
 @item --usage
 Display a concise usage summary.
 @end table
@@ -1511,8 +1526,10 @@ This section summarizes the command line options understood by
 
 @table @option
 @anchor{format option}
-@item --format=@var{string}
-@itemx -F @var{string}
+@opindex -F, @r{rushwho}
+@opindex --format, @r{rushwho}
+@item -F @var{string}
+@itemx --format=@var{string}
 Use @var{string} instead of the default format, described in
 @ref{Rushwho}.  @xref{Formats}, for a detailed description of the
 output format syntax.  If @var{string} begins with a @samp{@@}, then
@@ -1523,23 +1540,32 @@ beginning with @samp{;} are ignored (they can be used to introduce
 comments).  For example, @command{rushwho --format=@@formfile} reads
 in the contents of the file named @file{formfile}.
 
-@item --file=@var{dir}
-@itemx -f @var{dir}
+@opindex -f, @r{rushwho}
+@opindex --file, @r{rushwho}
+@item -f @var{dir}
+@itemx --file=@var{dir}
 Use database directory @var{dir}, instead of the default.
 By default, database files are located in @file{/usr/local/var/rush}.
 
-@item --no-header
-@itemx -H
+@opindex -H, @r{rushwho}
+@opindex --no-header, @r{rushwho}
+@item -H
+@itemx --no-header
 Do not display header line.
 
-@item --version
-@itemx -v
+@opindex -v, @r{rushwho}
+@opindex --version, @r{rushwho}
+@item -v
+@itemx --version
 Display program version.
 
-@item --help 
-@itemx -h
+@opindex -h, @r{rushwho}
+@opindex --help, @r{rushwho}
+@item -h
+@itemx --help 
 Display a short help message.
 
+@opindex --usage, @r{rushwho}
 @item --usage
 Display a concise usage summary.
 @end table
@@ -1752,8 +1778,10 @@ This section summarizes the command line options understood by
 @command{rushlast} utility.
 
 @table @option
-@item --format=@var{string}
-@itemx -F @var{string}
+@opindex -F, @r{rushlast}
+@opindex --format, @r{rushlast}
+@item -F @var{string}
+@itemx --format=@var{string}
 Use @var{string} instead of the default format, described in
 @ref{Rushwho}.  @xref{Formats}, for a detailed description of the
 output format syntax.  If @var{string} begins with a @samp{@@}, then
@@ -1764,33 +1792,45 @@ beginning with @samp{;} are ignored (they can be used to introduce
 comments).  For example, @command{rushwho --format=@@formfile} reads
 in the contents of the file named @file{formfile}.
 
-@item --file=@var{dir}
-@itemx -f @var{dir}
+@opindex -f, @r{rushlast}
+@opindex --file, @r{rushlast}
+@item -f @var{dir}
+@itemx --file=@var{dir}
 Use database directory @var{dir}, instead of the default.
 By default, database files are located in @file{/usr/local/var/rush}.
 
+@opindex --forward, @r{rushlast}
 @item --forward
 Display entries in chronological order, instead of the reverse
 chronological one, which is the default.
 
-@item --count=@var{number}
-@itemx -n @var{number}
+@opindex -n, @r{rushlast}
+@opindex --count, @r{rushlast}
+@item -n @var{number}
+@itemx --count=@var{number}
 @itemx -@var{number}
 Show at most @var{number} records.  The form @option{-@var{number}} is
 provided for compatibility with the @cite{last(1)} utility.
 
-@item --no-header
-@itemx -H
+@opindex -H, @r{rushlast}
+@opindex --no-header, @r{rushlast}
+@item -H
+@itemx --no-header
 Do not display header line.
 
-@item --version
-@itemx -v
+@opindex -v, @r{rushlast}
+@opindex --version, @r{rushlast}
+@item -v
+@itemx --version
 Display program version.
 
-@item --help 
-@itemx -h
+@opindex -h, @r{rushlast}
+@opindex --help, @r{rushlast}
+@item -h
+@itemx --help 
 Display a short help message.
 
+@opindex --usage, @r{rushlast}
 @item --usage
 Display a concise usage summary.
 @end table

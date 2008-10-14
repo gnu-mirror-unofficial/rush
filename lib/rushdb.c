@@ -298,40 +298,40 @@ static int
 output_duration(time_t t, int width, struct format_key *key)
 {
         unsigned d,h,m,s;
-	 unsigned outbytes;
-	 char dbuf[INT_BUFSIZE_BOUND(unsigned)+1];
+	unsigned outbytes;
+	char dbuf[INT_BUFSIZE_BOUND(unsigned)+1];
 
-	 d = t / 86400;
-	 t %= 86400;
+	d = t / 86400;
+	t %= 86400;
 
-	 s = t % 60;
-	 m = t / 60;
-	 if (m > 59) {
-		 h = m / 60;
-		 m -= h*60;
-	 } else
-		 h = 0;
-	 
-	 outbytes = 0;
-	 if (d) 
-		 outbytes += printf("%*.*s+", width, width,
-				    uinttostr(d, dbuf));
-	 
-	 if (outbytes < width) {
-		 unsigned rest = width - outbytes;
-		 if (rest >= 2)
-			 outbytes += printf("%02u", d);
-		 rest = width - outbytes;
-		 if (rest >= 3)
-			 outbytes += printf(":%02u", m);
-		 rest = width - outbytes;
-		 if (rest >= 3)
-			 outbytes += printf(":%02u", s);
-		 rest = width - outbytes;
-		 if (rest)
-			 printf("%*.*s", rest, rest, "");
-	 }
-	 return width;
+	s = t % 60;
+	m = t / 60;
+	if (m > 59) {
+		h = m / 60;
+		m -= h*60;
+	} else
+		h = 0;
+	
+	outbytes = 0;
+	if (d) 
+		outbytes += printf("%*.*s+", width, width,
+				   uinttostr(d, dbuf));
+	
+	if (outbytes < width) {
+		unsigned rest = width - outbytes;
+		if (rest >= 2)
+			outbytes += printf("%02u", d);
+		rest = width - outbytes;
+		if (rest >= 3)
+			outbytes += printf(":%02u", m);
+		rest = width - outbytes;
+		if (rest >= 3)
+			outbytes += printf(":%02u", s);
+		rest = width - outbytes;
+		if (rest)
+			printf("%*.*s", rest, rest, "");
+	}
+	return width;
 }
 
 static int
@@ -372,7 +372,7 @@ static int
 format_pid(int outbytes, int width, struct format_key *key,
 	   struct rush_wtmp *wtmp)
 {
-	char buf[INT_BUFSIZE_BOUND(pid_t)];
+	char buf[INT_BUFSIZE_BOUND(uintmax_t)];
 	return output_string_key(umaxtostr(wtmp->pid, buf), width, key);
 }
 

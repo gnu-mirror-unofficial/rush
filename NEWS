@@ -1,13 +1,14 @@
-Rush NEWS -- history of user-visible changes. 2008-10-10
+Rush NEWS -- history of user-visible changes. 2008-10-14
 Copyright (C) 2008 Sergey Poznyakoff
 See the end of file for copying conditions.
 
 Please send bug reports to <bug-rush@gnu.org.ua>
 
 
-Version 1.2.90 (Git)
+Version 1.3 (Git)
 
-* Fork mode
+* Implement accounting mode.
+* Support test mode only if run from a tty.
 
 
 Version 1.2, 2008-09-06

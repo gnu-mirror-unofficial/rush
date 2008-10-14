@@ -30,7 +30,7 @@ rush_SOURCES=\
 rushlast_SOURCES=rushlast.c
 rushwho_SOURCES=rushwho.c
 
-INCLUDES=-I$(top_srcdir)/gnu -I$(top_builddir)/gnu -I$(top_builddir)/lib
+INCLUDES=-I$(top_srcdir)/gnu -I$(top_builddir)/gnu -I$(top_srcdir)/lib
 LDADD=../lib/librush.a ../gnu/libgnu.a
 
 sbinPROGRAMS_INSTALL = $(INSTALL_PROGRAM) -m 4755
