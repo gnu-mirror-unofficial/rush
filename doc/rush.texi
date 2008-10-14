@@ -143,19 +143,21 @@ Accounting Database
 
 @node Intro
 @chapter Introduction
-  Rush is a Restricted User Shell, intended for use with ssh,
-rsh and similar remote access programs.  Using a sophisticated
-configuration file, Rush gives you complete control over command
-lines that users execute remotely, and over the usage of system
-resources, such as virtual memory, CPU time, etc. 
+  Rush is a Restricted User Shell, designed for sites that provide
+limited remote access to their resources, such as svn or git  
+repositories, scp, or the like.  Using a sophisticated configuration
+file, Rush gives you complete control over the command lines that
+users execute, as well as over the usage of system resources, such as 
+virtual memory, CPU time, etc.
 
 @node Operation
 @chapter Operation
-  Rush is usually installed as a user shell.  When a user logs in to
-the server using @command{ssh}, the shell binary, @command{rush}, is
-executed.  Rush must be called with exactly two arguments: the
-@option{-c} command line option and a command line to be executed on
-the host machine.  If wrong arguments are supplied, the shell aborts.
+  Rush is usually installed as a user shell.  When a user connects to
+the server (e.g. by using using SSH protocol), the shell binary,
+@command{rush}, is executed.  Rush must be called with exactly two
+arguments: the @option{-c} command line option and a command line to
+be executed on the host machine.  If wrong arguments are supplied, the
+shell aborts.
 
 @cindex request
   The third argument to @command{rush} supplies a command line to be
@@ -167,12 +169,12 @@ for the user who executes @command{rush} are said to form a
 @cindex conditions
 @cindex actions
   After startup, @command{rush} reads a set of @dfn{rules} from its
-configuration file.  Each rule consists of @dfn{conditions}
-and @dfn{actions}.  Conditions are used to match the rule
+configuration file.  Each rule consists of conditions
+and actions.  @dfn{Conditions} are used to match the rule
 with the request.  They can include regular expression matching
 with entire command line or particular fields thereof, user name or
 group comparisons, etc.  If all conditions match the request, 
-actions are executed.  Actions allow to:
+actions are executed.  @dfn{Actions} allow to:
 
 @itemize @bullet
 @item Modify the command line;
@@ -184,18 +186,18 @@ actions are executed.  Actions allow to:
 @end itemize
 
   Finally, after all actions have been executed successfully, @command{rush}
-executes the command.  Notice, that the resulting command line is not
-necessarily the same as was supplied to @command{rush} via the @option{-c}
-option.
+executes the requested command.  Notice, that the resulting command
+line is not necessarily the same as was supplied to @command{rush} via
+the @option{-c} option.
 
 @cindex fall-through rule
 @cindex rule, fall-through
-  A special kind of rules, called @dfn{fall-through} rules, is
+  A special kind of rules, called @dfn{fall-through} ones, is
 provided.  Fall-through rules differ from other rules in that they do
 not execute the command.  After all actions in a fall-through rule
 have been executed, Rush continues to search for another matching rule
 in its configuration and applies it, if found.  Fall-through rules
-allow to set default values for subsequent rules.
+are useful to set default values for subsequent rules.
 
 @node Quick Start
 @chapter Quick Start
@@ -222,10 +224,10 @@ serves as a rule tag, used for diagnostic messages and for accounting.
   Lines beginning with @samp{#} are comments, they are intended for a
 human reader and are ignored by @code{rush}.
  
-  Following two statements, @code{command} and @code{uid}, define
-conditions that must be met for this rule to become active.  The
-@code{command} statement introduces a regular expression to match
-with the command line.  In this example, the command line must
+  The two statements that follow the comment, @code{command} and
+@code{uid}, define conditions that must be met for this rule to become
+active.  The @code{command} statement introduces a regular expression
+to match with the command line.  In this example, the command line must
 begin with @samp{/sftp-server}, optionally preceded by arbitrary
 directory components. 
 
@@ -345,7 +347,7 @@ within a @code{rule}.
 the request.  A rule may contain any number of conditions.  All
 conditions are tested in order of their appearance in the rule and are
 tied together using boolean shortcut @samp{and} evaluation: if any of
-them yields false, the rest is not considered and control is
+them yields false, the rest is not evaluated and control is
 transferred to the subsequent rule. 
 
 @deffn {Rule Config} command @var{regex}
@@ -364,7 +366,7 @@ This, however can be changed using @code{regex} statement (@pxref{Regex}).
 
 @deffn {Rule Config} match[@var{n}] @var{regexp}
 True, if @var{n}th @dfn{word} from the command line matches
-regular expression @var{regexp}.  Notice, that the square brackets are
+regular expression @var{regexp}.  Notice, that square brackets form
 part of the statement syntax.  A special value @samp{$} can be used
 instead of @var{n} to denote the last word.  Unless changed by
 previous @code{regex} statement (@pxref{Regex}), @acronym{POSIX}
@@ -615,7 +617,16 @@ For example:
 limits T10 R20 U16 P20
 @end smallexample
 
+@cindex simultaneous sessions
+@cindex limiting number of simultaneous sessions
 @anchor{L limit}
+If some limit cannot be set, execution of the rule aborts.  In
+particular, @samp{L} limit can be regarded as a condition, rather than
+action.  Setting limit @code{limit L@var{n}} succeeds only if no
+more than @var{n} @code{rush} instances are simultaneously running for
+the same user.  This can be used to limit the number of simultaneously
+open sessions. 
+
 The use of @samp{L} resource automatically enables @dfn{forked mode}.
 @xref{Accounting and Forked Mode}, for more information about it.
 @end deffn
@@ -635,7 +646,7 @@ Its argument is a whitespace-delimited list of specifiers.  The
 following specifiers are understood: 
 
 @table @asis
-@item -
+@item - (a dash)
 Clear the environment.  This is understood only when used as a first
 word in @var{args}.
 
@@ -649,14 +660,14 @@ Unset the environment variable @var{name} only if its value is @var{val}.
 Retain the environment variable @var{name}.
 
 @item @var{name}=@var{value}
-Define environment variable @var{name} to have value @var{value}.
+Define environment variable @var{name} to have given @var{value}.
 
 @item @var{name}+=@var{value}
 Retain variable @var{name} and append @var{value} to its existing
 value.  If no such variable is present in the environment, it is
 created and @var{value} is assigned to it.  However, if @var{value}
 begins with a punctuation character, this character is removed from it
-before assignment.  This is convenient for using this construct with
+before the assignment.  This is convenient for using this construct with
 environment variables like @env{PATH}, e.g.:
 
 @smallexample
@@ -678,14 +689,22 @@ before assignment.
 @node Fall-through
 @subsection Fall-through
 @cindex fall-through rule
-A @dfn{fall-through} rule is a rule that does not execute the
-requested command.  It is declared using the following statement:
+A @dfn{fall-through} rule is a special rule that does not execute the
+requested command.  When a matching fall-through rule is encountered,
+@command{rush} evaluates it and continues scanning its configuration
+for the next matching rule.  Any @code{transform} and @code{env}
+actions found in a fall-through rule take effect immediately, which
+means that subsequent rules will see modified command line and
+environment.  Execution of any other actions from a fall-through rule
+is delayed until a usual rule is found.
+
+A fall-through rule is declared using the following statement:
 
 @deffn {Rule Config} fall-through
 Declare a fall-through rule.
 @end deffn
 
-Usually it is placed as the last statement in a rule, e.g.:
+Usually this statement is placed as the last statement in a rule, e.g.:
 
 @smallexample
 @group
@@ -715,6 +734,17 @@ It will remove all path components from the first command line argument.
 As a result, all subsequent rules may expect a bare binary name as the
 first argument.
 
+Yet another common use for such rules is to enable accounting (see the
+next subsection), or set resource limits for the rest of rules:
+
+@smallexample
+@group
+rule default
+  limit l1
+  fall-through
+@end group
+@end smallexample
+
 @node Accounting and Forked Mode
 @subsection Accounting and Forked Mode
 @cindex accounting
@@ -731,7 +761,7 @@ requested command in a subprocess, and remains in memory supervising
 its execution.  Once the command terminates, @command{rush} exits.
 
   One advantage of the forked mode is that it allows to run
-@dfn{accounting}, i.e. to note who is doing what and to keep an
+@dfn{accounting}, i.e. to note who is doing what and to keep a
 history of invocations.  The accounting, in turn, can be used to limit
 simultaneous executions of commands by the users (@dfn{logins}, in
 Rush terminology), as requested by @samp{L} command to @code{limit}
@@ -761,6 +791,7 @@ configuration file, e.g.:
 @smallexample
 rule default
   acct on
+  fall-through 
 @end smallexample
 
 If the need be, you can disable it for some of the subsequent rules by
@@ -782,11 +813,12 @@ view the history of last logins using @code{rushlast} command
 @node Exit
 @subsection Exit rule
 @cindex exit rule
-  An @dfn{exit} rule does not execute the command.  Instead, it writes
+  An @dfn{exit} rule does not execute any commands.  Instead, it writes
 the supplied error message to the specified file descriptor and exits
 immediately.  An exit rule is defined using the following statement:
 
-@deffn {Rule Config} exit [@var{fd}] @var{message}
+@deffn {Rule Config} exit @var{fd} @var{message}
+@deffnx {Rule Config} exit @var{message}
 Write textual message @var{message} to a file descriptor, given by
 optional argument @var{fd}.  If @var{fd} is absent, @samp{2} (standard
 error) is used.
@@ -810,7 +842,8 @@ the corresponding single characters, as described in the table below:
 @end multitable
 @end float
 
-Any escape sequence not listed in this table is copied verbatim.
+Any escape sequence not listed in this table is replaced with its
+second character.
 
 For example (note the use of line continuation character):
 
@@ -896,7 +929,7 @@ Verbosely describe parsing of the configuration file.
 @cindex extended regular expressions
 @cindex basic regular expressions
 
-The @code{regex} statement configures the flavor of the regular
+The @code{regex} statement configures the flavor of regular
 expressions for use by subsequent @code{command}, @code{match} and
 @code{transform} statements.
 
@@ -1407,10 +1440,10 @@ Display a concise usage summary.
 @node Rushwho
 @chapter The @code{rushwho} utility.
 @prindex rushwho
-The @command{rushwho} utility displays the list of user who are
-currently being server by @command{rush}.  The utility operates
+The @command{rushwho} utility displays the list of users who are
+currently using @command{rush}.  The utility operates
 on default Rush database, which is maintained if @command{rush}
-runs accounting mode (@pxref{Accounting and Forked Mode}).  Following
+runs in accounting mode (@pxref{Accounting and Forked Mode}).  The following
 is a sample output from @code{rushwho}:
 
 @smallexample
@@ -1533,8 +1566,9 @@ a particular piece of information from the database record.
 Each format specification starts with an opening brace and ends with
 a closing brace.  The first word after the brace is the name of the
 format specification.  The rest of words are @dfn{positional arguments}
-followed by @dfn{keyword arguments}.  Both are optional.  The keyword
-arguments begin with a colon and must follow the positional arguments.
+followed by @dfn{keyword arguments}.  Both are optional.  Keyword
+arguments must follow the positional arguments.  A keyword argument
+begins with a colon.
 For example:
 
 @table @code
@@ -1762,16 +1796,16 @@ The @file{utmp} file contains indices to those records in @file{wtmp},
 which represent active sessions.
 
   The @file{wtmp} grows continuously, while @file{utmp} normally
-grow the first day or two of using @command{rush}, from then on
+grows the first day or two after enabling accounting mode, and from then on
 its size remains without changes.  If you set up log file rotation,
 e.g. by using @command{logrotate} (@pxref{logrotate,,logrotate,logrotate(8),
 logrotate man page}), or a similar tool, it is safe to rotate
 @file{wtmp} without notifying @command{rush}. @FIXME{This could
 interfere with the functionality of @command{radwho}.  Verify it}.
-It is usually no necessary to rotate @file{utmp}, though.
+It is usually not necessary to rotate @file{utmp}, though.
 
   The following sections contain a detailed description of the
-structure of these two files.  You may skip it, if you are not
+structure of these two files.  You may skip them, if you are not
 interested in technical details.
 
 @menu
@@ -1783,8 +1817,7 @@ interested in technical details.
 @section The @file{wtmp} file
 @cindex @file{wtmp}
   The @file{wtmp} file consists of variable-size entries. It is
-designed so, that it can easily be read both from the beginning to the
-end and in the opposite direction.
+designed so that it can easily be read in both directions.
 
   Each record begins with a fixed-size header, which is followed by
 three zero-terminated strings, and the record size in @code{size_t}

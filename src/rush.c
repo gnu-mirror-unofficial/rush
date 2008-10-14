@@ -672,6 +672,9 @@ run_rule(struct rush_rule *rule, struct rush_request *req)
                 die(system_error, "cannot enforce uid %lu: %s",
                     req->pw->pw_uid, strerror(errno));
 
+	if (req->pw->pw_uid && setuid(0) == 0) 
+		die(system_error, "seteuid(0) succeeded when it should not");
+	
         umask(req->umask);
 
         execve(req->argv[0], req->argv, new_env);
@@ -687,6 +690,7 @@ struct option longopts[] = {
         { "debug", required_argument, 0, 'd' },
         { "lint", no_argument, 0, 't' },
         { "test", no_argument, 0, 't' },
+	{ "user", required_argument, 0, 'u' },
         { "version", no_argument, 0, 'v' },
         { "help", no_argument, 0, 'h' },
         { "usage", no_argument, 0, USAGE_OPTION },
@@ -701,6 +705,7 @@ Usage: rush -c command\n\
 OPTIONS are:\n\
        -d, --debug=NUMBER        Set debugging level.\n\
        -t, --test, --lint        Run in test mode.\n\
+       -u, --user=NAME           Supply user name for test mode.\n\
        -c COMMAND                Emulate execution of COMMAND.\n\
 \n\
        -v, --version             Display program version.\n\
@@ -718,8 +723,8 @@ help()
 }
 
 const char user_msg[] = "\
-rush [-htv] [-d N] [-c COMMAND] [--debug=NUMBER] [--help] [--lint]\n\
-     [--version] [--usage] [FILE]\n";
+rush [-htv] [-d N] [-c COMMAND] [--debug=NUMBER] [-u USER] [--help] [--lint]\n\
+     [--user=USER] [--version] [--usage] [FILE]\n";
 
 void
 usage()
@@ -736,7 +741,8 @@ main(int argc, char **argv)
         struct rush_rule *rule;
         struct rush_request req;
 	char *command = NULL;
-
+	char *test_user = NULL;
+	
         progname = strrchr(argv[0], '/');
         if (progname)
                 progname++;
@@ -746,7 +752,7 @@ main(int argc, char **argv)
         
         openlog(progname, LOG_NDELAY|LOG_PID, LOG_AUTHPRIV);
 
-	while ((rc = getopt_long(argc, argv, "c:d:tvh", longopts, NULL))
+	while ((rc = getopt_long(argc, argv, "c:d:tu:vh", longopts, NULL))
 	       != EOF) {
 		switch (rc) {
 		case 'c':
@@ -757,7 +763,16 @@ main(int argc, char **argv)
 			debug_level = atoi(optarg);
 			debug_option = 1;
 			break;
-                                
+
+		case 'u':
+			if (getuid())
+				die(usage_error,
+				    "the --user option is allowed "
+				    "for superuser only");
+			test_user = optarg;
+			lint_option = 1;
+			break;
+			
 		case 't':
 			lint_option = 1;
 			break;
@@ -776,6 +791,7 @@ main(int argc, char **argv)
 		}
 	}
 	
+
 	if (argc == optind + 1) {
 		if (lint_option)
 			rush_config_file = argv[optind];
@@ -801,7 +817,14 @@ main(int argc, char **argv)
                 for (i = 0; environ[i]; i++)
                         logmsg(LOG_DEBUG, "% 4d %s", i, environ[i]);
         }
-        
+
+	if (test_user) {
+		pw = getpwnam(test_user);
+		if (!pw)
+			die(usage_error, "invalid user name");
+		setreuid(pw->pw_uid, 0);
+	}
+
         uid = getuid();
         if ((pw = getpwuid(uid)) == NULL)
                 die(nologin_error, "invalid uid %lu", (unsigned long) uid);
