@@ -159,9 +159,6 @@ struct rush_rule {
 
 	enum rush_three_state fork;  /* Fork a subprocess */
 	enum rush_three_state acct;  /* Run accounting */
-	
-	char *prologue;
-	char *epilogue;
 };
 
 #define NO_UMASK ((mode_t)-1)

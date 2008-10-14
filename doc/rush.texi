@@ -1360,6 +1360,12 @@ itself is not executed.
 
 An exit status of 0 means no errors, 1 means an error has occurred.
 
+@optindex --user
+@optindex -u
+You may also emulate access by a particular user, by supplying his
+user name via the @option{--user} (@option{-u}) option.  This option
+implies @option{--test}.
+
 @opindex --debug
 @opindex -d
 In test mode, you may set debugging level (@pxref{Debugging}) from the
@@ -1390,6 +1396,15 @@ $ rush --test sample.rc
 @smallexample
 $ rush --test --debug=2 -c "cvs server"
 @end smallexample
+
+@item Same, but for user @samp{jeff}:
+
+@smallexample
+$ rush --user=jeff --debug=2 -c "cvs server"
+@end smallexample
+
+Note, that you don't need to specify @option{--test} along with
+@option{--user}.
 
 @item Same, but use @file{sample.rc} instead of the default
 configuration file:
@@ -1424,6 +1439,12 @@ $ rush --lint ./test.rc
 
 If the @option{-c} option is also specified, @command{rush} emulates the
 normal processing for the command, but does not execute it.
+
+@item --user=@var{name}
+@itemx -u @var{name}
+Emulate access by user @var{name}.  This option implies
+@option{--test} and is valid only when used by root and in conjunction
+with the @option{-c} option.
 
 @item --version
 @itemx -v

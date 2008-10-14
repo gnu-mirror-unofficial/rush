@@ -686,7 +686,7 @@ run_rule(struct rush_rule *rule, struct rush_request *req)
 
 
 #define USAGE_OPTION 256
-struct option longopts[] = {
+struct option tty_longopts[] = {
         { "debug", required_argument, 0, 'd' },
         { "lint", no_argument, 0, 't' },
         { "test", no_argument, 0, 't' },
@@ -696,6 +696,8 @@ struct option longopts[] = {
         { "usage", no_argument, 0, USAGE_OPTION },
         { NULL }
 };
+
+char *tty_shortopts = "c:d:tu:vh";
 
 const char help_msg[] = "\
 Rush - a restricted user shell.\n\
@@ -742,7 +744,10 @@ main(int argc, char **argv)
         struct rush_request req;
 	char *command = NULL;
 	char *test_user = NULL;
-	
+	/* Default options (used when accessed remotely): */
+	char *shortopts = "c:";
+	struct option *longopts = NULL;
+		
         progname = strrchr(argv[0], '/');
         if (progname)
                 progname++;
@@ -752,7 +757,13 @@ main(int argc, char **argv)
         
         openlog(progname, LOG_NDELAY|LOG_PID, LOG_AUTHPRIV);
 
-	while ((rc = getopt_long(argc, argv, "c:d:tu:vh", longopts, NULL))
+	if (isatty(0)) {
+		/* When running from a tty, provide more options. */
+		shortopts = tty_shortopts;
+		longopts = tty_longopts;
+	}
+	
+	while ((rc = getopt_long(argc, argv, shortopts, longopts, NULL))
 	       != EOF) {
 		switch (rc) {
 		case 'c':
@@ -765,12 +776,12 @@ main(int argc, char **argv)
 			break;
 
 		case 'u':
+			lint_option = 1;
 			if (getuid())
 				die(usage_error,
 				    "the --user option is allowed "
 				    "for superuser only");
 			test_user = optarg;
-			lint_option = 1;
 			break;
 			
 		case 't':
@@ -803,8 +814,11 @@ main(int argc, char **argv)
         parse_config();
 
 	if (!command) {
-		if (lint_option)
+		if (lint_option) {
+			if (!command)
+			    die(usage_error, "--user is only valid with -c");
 			exit(0);
+		}
 		die(usage_error, "invalid command line");
 	}
 
