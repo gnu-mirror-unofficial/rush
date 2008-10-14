@@ -8,7 +8,11 @@ Please send bug reports to <bug-rush@gnu.org.ua>
 Version 1.3 (Git)
 
 * Implement accounting mode.
-* Support test mode only if run from a tty.
+
+* New programs: rushwho and rushlast
+
+These utilities display information from the Rush accounting database.
+
 
 
 Version 1.2, 2008-09-06
