@@ -71,7 +71,7 @@ xalloc_die()
 }
 
 
-char *format =
+char *default_format =
 	"(user 10 Login) "
 	"(rule 8 Rule) "
 	"(start-time 0 Start) "
@@ -88,20 +88,21 @@ main(int argc, char **argv)
 	int status;
 	rushdb_format_t form;
 	int  display_header = 1;  /* Display header line */
+	char *format;
 	
 	program_name = strrchr(argv[0], '/');
         if (program_name)
                 program_name++;
         else
                 program_name = argv[0];
+	format = getenv("RUSHWHO_FORMAT");
+	if (!format)
+		format = default_format;
 	while ((rc = getopt_long(argc, argv, "F:f:Hhv", longopts, NULL))
 	       != EOF) {
 		switch (rc) {
 		case 'F':
-			if (optarg[0] == '@')
-				format = rush_read_format(optarg + 1);
-			else
-				format = optarg;
+			format = optarg;
 			break;
 
 		case 'f':
@@ -135,6 +136,8 @@ main(int argc, char **argv)
 	if (argc) 
 		error(1, 0, "extra arguments");
 
+	if (format[0] == '@')
+		format = rush_read_format(format + 1);
 	form = rushdb_compile_format(format);
 	if (!form) 
 		error(1, 0, "invalid format: %s", rushdb_error_string);

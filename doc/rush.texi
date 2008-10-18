@@ -1509,8 +1509,10 @@ PID of the running command.
 Command being executed.
 @end table
 
-This format is a built-in default, it can be changed using
-@option{--format} command line option.
+@vrindex RUSHWHO_FORMAT
+This format is a built-in default, it can be changed either by
+setting the @env{RUSHWHO_FORMAT} environment variable to the desired
+format string, or by using @option{--format} command line option.
 
 @menu
 * Rushwho Options::
@@ -1764,8 +1766,11 @@ Duration of the session.
 Command being executed.
 @end table
 
-This format is a built-in default, and can be changed using
-@option{--format} command line option (@pxref{Rushlast Options}).
+@vrindex RUSHLAST_FORMAT
+This format is a built-in default, it can be changed either by
+setting the @env{RUSHLAST_FORMAT} environment variable to the desired
+format string, or by using @option{--format} command line option
+(@pxref{Rushlast Options}).
 
 @menu
 * Rushlast Options::
