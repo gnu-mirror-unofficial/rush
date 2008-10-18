@@ -46,7 +46,7 @@ rush_read_format(const char *name)
 
 	size = st.st_size;
 	p = buf;
-	while (fgets(p, size, fp)) {
+	while (size && fgets(p, size + 1, fp)) {
 		size_t len;
 		
 		if (*p == ';')
