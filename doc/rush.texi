@@ -28,8 +28,8 @@
 @dircategory System Administration Utilities
 @direntry
 * rush: (rush).              A restricted user shell.
-* rushwho: (rush)rushwho.    Show who is using Rush currently.
-* rushlast: (rush)rushlast.  Show listing of recent Rush sessions.
+* rushwho: (rush)Rushwho.    Show who is using Rush currently.
+* rushlast: (rush)Rushlast.  Show listing of recent Rush sessions.
 @end direntry
 @end ifinfo
 
