@@ -15,6 +15,11 @@
    along with Rush.  If not, see <http://www.gnu.org/licenses/>. */
 
 #include <rush.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <sys/un.h>
+#include <netdb.h>
+#include <arpa/inet.h>
 
 static int re_flags = REG_EXTENDED;
 
@@ -766,6 +771,221 @@ _parse_acct(struct input_buf *ibuf, struct rush_rule *rule,
 }
 
 
+static int
+copy_part(const char *cstr, const char *p, char **pbuf)
+{
+	size_t len = p - cstr;
+	char *buf = malloc(len + 1);
+	if (!buf) {
+		free(buf);
+		return 1;
+	}
+	memcpy(buf, cstr, len);
+	buf[len] = 0;
+	*pbuf = buf;
+	return 0;
+}
+
+static int
+parse_conn(const char *cstr, char **pport, char **ppath)
+{
+	const char *p = strchr (cstr, ':');
+
+	if (!p) {
+		*pport = NULL;
+		*ppath = strdup(cstr);
+		return *ppath == NULL;
+	} else if (copy_part(cstr, p, ppath))
+		return 1;
+	else
+		cstr = p + 1;
+	*pport = strdup(cstr);
+	return *pport == NULL;
+}
+
+struct socket_family {
+	char *name;
+	size_t len;
+	int family;
+};
+
+static struct socket_family socket_family[] = {
+#define DEF(s, f) { #s, sizeof(#s)-1, f }
+	DEF(inet, AF_INET),
+	DEF(unix, AF_UNIX),
+	DEF(local, AF_UNIX),
+	{ NULL }
+#undef DEF
+};
+
+static struct socket_family *
+find_family(const char *s, size_t len)
+{
+	struct socket_family *fp;
+	for (fp = socket_family; fp->name; fp++)
+		if (len == fp->len)
+			return fp;
+	return NULL;
+}
+
+static int
+parse_url(struct input_buf *ibuf, const char *cstr, 
+	  int *pfamily, char **pport, char **ppath)
+{
+	const char *p;
+	
+	p = strchr(cstr, ':');
+	if (p) {
+		struct socket_family *fp = find_family(cstr, p - cstr);
+
+		if (!fp) {
+			logmsg(LOG_NOTICE,
+			       "%s:%d: unknown socket family",
+			       ibuf->file, ibuf->line);
+			return 1;
+		}
+
+		*pfamily = fp->family;
+		
+		cstr = p + 1;
+		if (cstr[0] == '/') {
+			if (cstr[1] == '/') {
+				return parse_conn(cstr + 2, pport, ppath);
+			} else if (*pfamily == AF_UNIX) {
+				*pport = NULL;
+				*ppath = strdup(cstr);
+				return *ppath == NULL;
+			}
+		} else {
+			logmsg(LOG_NOTICE,
+			       "%s:%d: malformed URL",
+			       ibuf->file, ibuf->line);
+			return 1;
+		}
+	} else {
+		*pfamily = AF_UNIX;
+		*pport = NULL;
+		*ppath = strdup(cstr);
+		return *ppath == NULL;
+	}
+}
+
+static int
+make_socket(struct input_buf *ibuf, int family,
+	    char *port, char *path, struct rush_sockaddr *pa)
+{
+	union {
+		struct sockaddr sa;
+		struct sockaddr_un s_un;
+		struct sockaddr_in s_in;
+	} addr;
+	socklen_t socklen;
+	short pnum;
+	long num;
+	char *p;
+	
+	switch (family) {
+	case AF_UNIX:
+		if (port) {
+			logmsg(LOG_NOTICE,
+			       "%s:%d: port is meaningless for UNIX sockets",
+			       ibuf->file, ibuf->line);
+			return 1;
+		}
+		if (strlen(path) > sizeof addr.s_un.sun_path) {
+			errno = EINVAL;
+			logmsg(LOG_NOTICE,
+			       "%s:%d: UNIX socket name too long",
+				ibuf->file, ibuf->line);
+			return 1;
+		}
+		
+		addr.sa.sa_family = PF_UNIX;
+		socklen = sizeof(addr.s_un);
+		strcpy(addr.s_un.sun_path, path);
+		break;
+
+	case AF_INET:
+		addr.sa.sa_family = PF_INET;
+		socklen = sizeof(addr.s_in);
+
+		num = pnum = strtol(port, &p, 0);
+		if (*p == 0) {
+			if (num != pnum) {
+				logmsg(LOG_NOTICE,
+				       "%s:%d: bad port number",
+					ibuf->file, ibuf->line);
+				return -1;
+			}
+			pnum = htons(pnum);
+		} else {
+			struct servent *sp = getservbyname(port, "tcp");
+			if (!sp) {
+				logmsg(LOG_NOTICE,
+				       "%s:%d: unknown service name",
+				       ibuf->file, ibuf->line);
+				return -1;
+			}
+			pnum = sp->s_port;
+		}
+
+		if (!path)
+			addr.s_in.sin_addr.s_addr = INADDR_ANY;
+		else {
+			struct hostent *hp = gethostbyname(path);
+			if (!hp) {
+				logmsg(LOG_NOTICE,
+				       "%s:%d: unknown host name %s",
+				       ibuf->file, ibuf->line, path);
+				return 1;
+			}
+			addr.sa.sa_family = hp->h_addrtype;
+			switch (hp->h_addrtype) {
+			case AF_INET:
+				memmove(&addr.s_in.sin_addr, hp->h_addr, 4);
+				addr.s_in.sin_port = pnum;
+				break;
+
+			default:
+				logmsg(LOG_NOTICE,
+				       "%s:%d: unsupported address family",
+				       ibuf->file, ibuf->line);
+				return 1;
+			}
+		}
+		break;
+
+	default:
+		logmsg(LOG_NOTICE,
+		       "%s:%d: unsupported address family",
+		       ibuf->file, ibuf->line);
+		return 1;
+	}
+	pa->len = socklen;
+	pa->sa = xmalloc(socklen);
+	memcpy(pa->sa, &addr.sa, socklen);
+	return 0;
+}
+		
+static int
+_parse_post_socket(struct input_buf *ibuf, struct rush_rule *rule,
+		   char *kw, char *val)
+{
+	int family;
+	char *path;
+	char *port;
+	int rc;
+	
+	if (parse_url(ibuf, val,  &family, &port, &path))
+		return 1;
+	rc = make_socket(ibuf, family, port ? port : "rush", path,
+			 &rule->post_sockaddr);
+	free(port);
+	free(path);
+	return rc;
+}
+
+
 #define TOK_NONE  0x00   /* No flags */
 #define TOK_ARG   0x01   /* Token requires an argument */
 #define TOK_IND   0x02   /* Token must be followed by an index */
@@ -807,6 +1027,7 @@ struct token toktab[] = {
 	{ "regexp",        TOK_ARG, _parse_re_flags },
 	{ "fork",          TOK_ARG, _parse_fork },
 	{ "acct",          TOK_ARG, _parse_acct },
+	{ "post-socket",   TOK_ARG, _parse_post_socket },
 	{ NULL }
 };
 

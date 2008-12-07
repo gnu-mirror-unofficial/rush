@@ -127,6 +127,11 @@ struct test_node {
 	} v;
 };
 
+struct rush_sockaddr {
+	socklen_t len;
+	struct sockaddr *sa;
+};
+
 enum rush_three_state { rush_undefined = -1, rush_false, rush_true };
 
 struct rush_rule {
@@ -159,6 +164,21 @@ struct rush_rule {
 
 	enum rush_three_state fork;  /* Fork a subprocess */
 	enum rush_three_state acct;  /* Run accounting */
+
+	struct rush_sockaddr post_sockaddr;
+};
+
+struct rush_request {
+        char *cmdline;
+        int argc;
+        char **argv;
+        struct passwd *pw;
+	unsigned umask;
+	char *chroot_dir;
+        char *home_dir;
+	enum rush_three_state fork;
+	enum rush_three_state acct;
+	const struct rush_sockaddr *post_sockaddr;
 };
 
 #define NO_UMASK ((mode_t)-1)
@@ -223,3 +243,7 @@ void parse_config(void);
 
 transform_t compile_transform_expr (const char *expr);
 char *transform_string (struct transform *tf, const char *input);
+
+int post_socket_send(const struct rush_sockaddr *sockaddr,
+		     const struct rush_rule *rule,
+		     const struct rush_request *req);

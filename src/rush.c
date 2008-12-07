@@ -146,18 +146,6 @@ is_suffix(const char *suf, const char *str)
 }
 
 
-struct rush_request {
-        char *cmdline;
-        int argc;
-        char **argv;
-        struct passwd *pw;
-	unsigned umask;
-	char *chroot_dir;
-        char *home_dir;
-	enum rush_three_state fork;
-	enum rush_three_state acct;
-};
-
 int
 test_request_cmdline(struct test_node *node, struct rush_request *req)
 {
@@ -575,8 +563,10 @@ fork_process(struct rush_rule *rule, struct rush_request *req)
 		       rule->tag, WTERMSIG(status));
 	} else
 		logmsg(LOG_NOTICE, "%s: subprocess terminated", rule->tag);
-	if (req->acct == rush_true)
+	if (req->acct == rush_true) 
 		acct_off();
+	if (req->post_sockaddr)
+		post_socket_send(req->post_sockaddr, rule, req);
 	exit(0);
 }
 
@@ -641,6 +631,10 @@ run_rule(struct rush_rule *rule, struct rush_request *req)
 
 	if (rule->mask != NO_UMASK) 
 		req->umask = rule->mask;
+
+	if (rule->post_sockaddr.len)
+		req->post_sockaddr = &rule->post_sockaddr;
+	
         if (rule->fall_through)
                 return;
 
@@ -805,11 +799,10 @@ main(int argc, char **argv)
         parse_config();
 
 	if (!command) {
-		if (lint_option) {
-			if (!command)
-			    die(usage_error, "--user is only valid with -c");
+		if (test_user)
+			die(usage_error, "--user is only valid with -c");
+		if (lint_option) 
 			exit(0);
-		}
 		die(usage_error, "invalid command line");
 	}
 

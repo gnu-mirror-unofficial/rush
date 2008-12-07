@@ -25,6 +25,7 @@ rush_SOURCES=\
  limits.c\
  rush.c\
  rush.h\
+ socket.c\
  transform.c
 
 rushlast_SOURCES=rushlast.c
