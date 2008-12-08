@@ -978,7 +978,7 @@ _parse_post_socket(struct input_buf *ibuf, struct rush_rule *rule,
 	
 	if (parse_url(ibuf, val,  &family, &port, &path))
 		return 1;
-	rc = make_socket(ibuf, family, port ? port : "rush", path,
+	rc = make_socket(ibuf, family, port ? port : "tcpmux", path,
 			 &rule->post_sockaddr);
 	free(port);
 	free(path);

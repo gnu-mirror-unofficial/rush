@@ -29,6 +29,8 @@ post_socket_send(const struct rush_sockaddr *sockaddr,
 	int domain;
 	int fd;
 	FILE *fp;
+	char buf[128];
+	char *p;
 	
 	switch (sockaddr->sa->sa_family) {
 	case AF_UNIX:
@@ -54,11 +56,19 @@ post_socket_send(const struct rush_sockaddr *sockaddr,
 		return 1;
 	}
 
-	fp = fdopen(fd, "w");
-	fprintf(fp, "%s %s %s\r\n", rule->tag, req->pw->pw_name,
-		req->cmdline);
+	fp = fdopen(fd, "r+");
+	/* Communication takes place in accordance with TCPMUX
+	   protocol (RFC 1078).  The rule tag is used as service
+	   name. */
+	fprintf(fp, "%s\r\n", rule->tag);
+	p = fgets(buf, sizeof(buf), fp);
+	if (!p)
+		logmsg(LOG_ERR, "%s: TCPMUX did not respond", rule->tag);
+	else if (*p == '+') 
+		fprintf(fp, "%s %s\r\n", req->pw->pw_name, req->cmdline);
+	else
+		logmsg(LOG_ERR, "%s: TCPMUX returned %s", rule->tag, p);
 	fflush(fp);
-	shutdown(fd, SHUT_WR);
 	fclose(fp);
 	return 0;
 }
