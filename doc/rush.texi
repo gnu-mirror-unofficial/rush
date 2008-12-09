@@ -115,6 +115,7 @@ Rule
 * Environment::
 * Fall-through::
 * Accounting and Forked Mode::
+* Notification::
 * Exit::
 
 Usage Tips
@@ -333,13 +334,14 @@ The following sub-sections describe the statements that can be used
 within a @code{rule}.
 
 @menu
-* Conditions::
-* Transformations::
-* System Actions::
-* Environment::
-* Fall-through::
-* Accounting and Forked Mode::
-* Exit::
+* Conditions::                  
+* Transformations::             
+* System Actions::              
+* Environment::                 
+* Fall-through::                
+* Accounting and Forked Mode::  
+* Notification::                
+* Exit::                        
 @end menu
 
 @node Conditions
@@ -812,6 +814,67 @@ logged in users using @code{rushwho} command (@pxref{Rushwho}) and
 view the history of last logins using @code{rushlast} command
 (@pxref{Rushlast}).
 
+@node Notification
+@subsection Post-process Notification
+
+  @command{Rush} can be configured to send a @dfn{notification} over
+@acronym{INET} or @acronym{UNIX} socket, after completing user
+request.  It is done using the @code{post-socket} statement:
+
+@deffn {Rule Config} post-socket @var{url}
+Notify @acronym{URL} about completing user request.  This statement
+implies forked mode (@pxref{Accounting and Forked Mode}). 
+
+Allowed formats for @var{url} are:
+
+@table @asis
+@item inet://@var{hostname}[:@var{port}]
+@cindex tcpmux
+
+Connect to remote host @var{hostname} using TCP/IP.  @var{Hostname} is the
+host name or IP address of the remote machine.  Optional @var{port}
+specifies the port number to connect to.  It can be either a decimal
+port number or a service name from @file{/etc/services}.  If
+@var{port} is absent, @samp{tcpmux} (port 1) is assumed.
+
+@item unix://@var{filename}
+@itemx local://@var{filename}
+
+Connect to a @acronym{UNIX} socket @var{filename}.
+@end table
+
+For example:
+
+@smallexample
+@group
+rule default
+  post-socket inet://localhost
+@end group
+@end smallexample
+@end deffn
+
+  The Rush notification protocol is based on @acronym{TCPMUX}
+(@uref{http://www.rfc-editor.org/rfc/rfc1078.txt, RFC 1078}).
+
+  After establishing connection, @command{rush} sends the rule tag
+followed by a CRLF pair.  The rule tag acts as a service name.  The
+remote party replies with a single character indicating positive
+(@samp{+}) or negative (@samp{-}) acknowledgment, immediately followed
+by an optional message of explanation, terminated with a CRLF. 
+
+  If positive acknowledgment is received, @command{rush} sends a
+single line, consisting of the user name and the executed command
+line, separated by a single space character.  The line is terminated
+with a CRLF.
+
+  After sending this line, @command{rush} closes the connection.
+
+  The post-process notification feature can be used to schedule
+execution of some actions after certain rules.  
+
+  @xref{notification example}, for an example of how to use this
+feature.  
+
 @node Exit
 @subsection Exit rule
 @cindex exit rule
@@ -1070,6 +1133,7 @@ corresponding repositories are located in the following directories:
 * cvs::
 * svn::
 * git::
+* notification example::
 @end menu
 
 @node scp
@@ -1329,6 +1393,53 @@ rule git-trap
   command ^git-.+
   exit fatal: access to this repository is denied.
 @end group
+@end smallexample
+
+@node notification example
+@section Notification
+  In this section we will show how to set up a mail notification for
+Rush rules.  Let's suppose we wish to receive emails for each upload
+by @code{scp-to} rule (@pxref{scp}).  To do so, we add the following
+fall through rule to the beginning of @file{rush.rc}:
+  
+@smallexample
+rule default
+  post-socket inet://localhost
+  fall-trough
+@end smallexample
+
+This will enable notifications for each rule located below this one.
+Missing port in @code{post-socket} statement means @command{rush} will
+be using the default @samp{tcpmux} port.
+
+To receive and process these requests, you will need an
+@command{inetd} capable to handle @acronym{TCPMUX}.  We recomment the
+one from GNU Inetutils package
+(@uref{http://www.gnu.org/software/inetutils, GNU Inetutils}).  In
+@file{/etc/inetd.conf} file, we add:
+
+@smallexample
+# @r{Enable @acronym{TCPMUX} handling}.
+tcpmux	        stream  tcp  nowait root  internal
+# @r{Handle @samp{scp-to} service}.
+tcpmux/+scp-to  stream  tcp  nowait root  /usr/sbin/tcpd  /bin/rushmail
+@end smallexample
+
+The program @command{/bin/rushmail} does the actual notification.
+Following is its simplest implementation:
+
+@smallexample
+#! /bin/sh
+
+read user command
+
+/usr/sbin/sendmail -oi -t <<EOT
+From: Rush Notification <devnull@@localhost>
+To: <root@@localhost>
+Subject: Rush notification
+
+Be informed that $user executed $command.
+EOT
 @end smallexample
 
 @node Test Mode

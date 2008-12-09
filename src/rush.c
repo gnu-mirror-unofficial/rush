@@ -622,9 +622,15 @@ run_rule(struct rush_rule *rule, struct rush_request *req)
         if (req->home_dir) 
                 debug1(2, "Home dir: %s", req->home_dir);
 
+	if (rule->post_sockaddr.len)
+		req->post_sockaddr = &rule->post_sockaddr;
+	
 	if (rule->acct != rush_undefined)
 		req->acct = rule->acct;
+	
 	if (req->acct == rush_true)
+		req->fork = rush_true;
+	else if (rule->post_sockaddr.len)
 		req->fork = rush_true;
 	else if (rule->fork != rush_undefined) 
 		req->fork = rule->fork;
@@ -632,9 +638,6 @@ run_rule(struct rush_rule *rule, struct rush_request *req)
 	if (rule->mask != NO_UMASK) 
 		req->umask = rule->mask;
 
-	if (rule->post_sockaddr.len)
-		req->post_sockaddr = &rule->post_sockaddr;
-	
         if (rule->fall_through)
                 return;
 
