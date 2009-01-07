@@ -33,7 +33,7 @@ struct option longopts[] = {
         { NULL }
 };
 
-const char help_msg[] = "\
+const char help_msg[] = N_("\
 rushlast - show listing of last Rush users.\n\
 Usage: rushlast [OPTIONS] [user [user...]]\n\
 \n\
@@ -46,30 +46,30 @@ OPTIONS are:\n\
 \n\
        -v, --version             Display program version.\n\
        -h, --help                Display this help message.\n\
-       --usage                   Display a concise usage summary.\n";
+       --usage                   Display a concise usage summary.\n");
 
 void
 help()
 {
-        fputs(help_msg, stdout);
-	printf("\nReport bugs to <%s>.\n", PACKAGE_BUGREPORT);
+        fputs(gettext(help_msg), stdout);
+	printf(_("\nReport bugs to <%s>.\n"), PACKAGE_BUGREPORT);
 }
 
-const char user_msg[] = "\
+const char user_msg[] = N_("\
 rushlast [-F FORMAT] [-f DBDIR] [-Hh] [-n NUM] [-v]\n\
  	 [--count NUM] [--file DBDIR] [--format FORMAT] [--forward]\n\
-         [--help] [--no-header] [--usage] [--version]\n";
+         [--help] [--no-header] [--usage] [--version]\n");
 
 void
 usage()
 {
-	fputs(user_msg, stdout);
+	fputs(gettext(user_msg), stdout);
 }
 
 void
 xalloc_die()
 {
-	error(1, 0, "not enough memory");
+	error(1, 0, _("not enough memory"));
 	abort();
 }
 
@@ -106,6 +106,7 @@ main(int argc, char **argv)
 	unsigned long count = 0, i;
 	char *format;
 	
+	rush_i18n_init();
 	program_name = strrchr(argv[0], '/');
         if (program_name)
                 program_name++;
@@ -140,7 +141,7 @@ main(int argc, char **argv)
 		case 'n':
 			count = strtoul(optarg, &p, 10);
 			if (*p) 
-				error(1, 0, "invalid number (%s)", optarg);
+				error(1, 0, _("invalid number (%s)"), optarg);
 			break;
 			
 		case 'v':
@@ -159,14 +160,14 @@ main(int argc, char **argv)
 			if (c_isdigit(optopt)) {
 				count = strtoul(argv[optind-1] + 1, &p, 10);
 				if (*p) 
-					error(1, 0, "invalid number (%s)",
+					error(1, 0, _("invalid number (%s)"),
 					      argv[optind-1]);
 				if (optind < argc) 
 					continue;
 				else
 					break;
 			}
-			error(1, 0, "invalid option -- %c", optopt);
+			error(1, 0, _("invalid option -- %c"), optopt);
 		}
 	}
 
@@ -177,7 +178,7 @@ main(int argc, char **argv)
 		format = rush_read_format(format + 1);
 	form = rushdb_compile_format(format);
 	if (!form) 
-		error(1, 0, "invalid format: %s", rushdb_error_string);
+		error(1, 0, _("invalid format: %s"), rushdb_error_string);
 	
 	switch (rushdb_open(base_name, 0)) {
 	case rushdb_result_ok:
@@ -187,7 +188,7 @@ main(int argc, char **argv)
 		exit(0);
 
 	case rushdb_result_fail:
-                error(1, errno, "cannot open database file %s", base_name);
+                error(1, errno, _("cannot open database file %s"), base_name);
 	}
 
 	if (display_header)

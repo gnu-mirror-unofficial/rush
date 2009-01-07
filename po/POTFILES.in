@@ -1,0 +1,15 @@
+src/config.c
+src/limits.c
+src/rush.c
+src/rushlast.c
+src/rushwho.c
+src/socket.c
+src/transform.c
+
+lib/readfmt.c
+lib/rushdb.c
+lib/version.c
+
+gnu/error.c
+gnu/getopt.c
+gnu/strftime.c

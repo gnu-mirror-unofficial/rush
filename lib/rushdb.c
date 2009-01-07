@@ -35,6 +35,8 @@
 
 char *rushdb_error_string;
 
+static void format_error(const char *fmt, ...) RUSH_PRINTFLIKE(1,2);
+	
 static void
 format_error(const char *fmt, ...)
 {
@@ -69,28 +71,28 @@ rushdb_open(const char *dbdir, int rw)
 			if (!rw)
 				return rushdb_result_eof;
 			if (mkdir(dbdir, 0700)) {
-				format_error("cannot create directory %s: %s",
+				format_error(_("cannot create directory %s: %s"),
 					     dbdir, strerror(errno));
 				return rushdb_result_fail;
 			}
 		} else {
-			format_error("cannot stat directory %s: %s",
+			format_error(_("cannot stat directory %s: %s"),
 				     dbdir, strerror(errno));
 			return rushdb_result_fail;
 		}
 	} else if (!S_ISDIR(st.st_mode)) {
-		format_error("%s is not a directory", dbdir);
+		format_error(_("%s is not a directory"), dbdir);
 		return rushdb_result_fail;
 	}
 	
 	fname = mkname(dbdir, RUSH_UTMP_NAME);
 	if (!fname) {
-		format_error("%s", ENOMEM);
+		format_error("%s", gettext(strerror(ENOMEM)));
 		return rushdb_result_fail;
 	}
 	rc = rush_utmp_open(fname, rw);
 	if (rc) {
-		format_error("cannot open file %s: %s",
+		format_error(_("cannot open file %s: %s"),
 			     fname, strerror(errno));
 		free(fname);
 		return rushdb_result_fail;
@@ -99,12 +101,12 @@ rushdb_open(const char *dbdir, int rw)
 
 	fname = mkname(dbdir, RUSH_WTMP_NAME);
 	if (!fname) {
-		format_error("%s", ENOMEM);
+		format_error("%s", gettext(strerror(ENOMEM)));
 		return rushdb_result_fail;
 	}
 	rc = rush_wtmp_open(fname, rw);
 	if (rc) {
-		format_error("cannot open file %s: %s",
+		format_error(_("cannot open file %s: %s"),
 			     fname, strerror(errno));
 		free(fname);
 		return rushdb_result_fail;
@@ -516,8 +518,8 @@ parse_quote(char **fmtp, struct rushdb_format *form)
 	char *p;
 	p = parse_string_fmt(*fmtp + 1, form, _is_closing_quote, *fmtp);
 	if (!*p) {
-		format_error("missing closing quote in string started "
-			     "near `%s'",
+		format_error(_("missing closing quote in string started "
+			       "near `%s'"),
 			     *fmtp);
 		return 1;
 	}

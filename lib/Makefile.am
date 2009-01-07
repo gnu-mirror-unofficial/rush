@@ -17,6 +17,7 @@
 noinst_LIBRARIES=librush.a
 
 librush_a_SOURCES=\
+ i18n.c\
  readfmt.c\
  rushdb.c\
  slist.c\

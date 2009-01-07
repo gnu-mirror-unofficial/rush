@@ -50,12 +50,13 @@ do_set_limit(int rlimit, rlim_t limit)
 {
         struct rlimit rlim;
 
-        debug2(2, "Setting limit %d to %lu", rlimit, (unsigned long) limit);
+        debug2(2, _("Setting limit %d to %lu"), rlimit, (unsigned long) limit);
         rlim.rlim_cur = limit;
         rlim.rlim_max = limit;
 
         if (setrlimit(rlimit, &rlim)) {
-                logmsg(LOG_NOTICE, "error setting limit: %s", strerror(errno));
+                logmsg(LOG_NOTICE, _("error setting limit: %s"), 
+                       strerror(errno));
                 return 1;
         }
         return 0;
@@ -64,9 +65,9 @@ do_set_limit(int rlimit, rlim_t limit)
 static int
 set_prio(int prio)
 {
-        debug1(2, "Setting priority to %d", prio);
+        debug1(2, _("Setting priority to %d"), prio);
         if (setpriority(PRIO_PROCESS, 0, prio)) {
-                logmsg(LOG_NOTICE, "error setting priority: %s",
+                logmsg(LOG_NOTICE, _("error setting priority: %s"),
                        strerror(errno));
                 return 1;
         }
@@ -82,22 +83,22 @@ check_logins(const char *name, int limit)
 	int status;
 	
         if (limit == 0) /* maximum 0 logins ? */ {
-                debug1(2, "No logins allowed for `%s'\n", name);
-                logmsg(LOG_ERR, "No logins allowed for `%s'", name);
+                debug1(2, _("No logins allowed for `%s'"), name);
+                logmsg(LOG_ERR, _("No logins allowed for `%s'"), name);
                 return 1;
         }
 
-        debug1(3, "counting logins for %s", name);
+        debug1(3, _("counting logins for %s"), name);
 	switch (rushdb_open(RUSH_DB, 0)) {
 	case rushdb_result_ok:
 		break;
 
 	case rushdb_result_eof:
-		debug(3, "acct database is empty");
+		debug(3, _("acct database is empty"));
 		return 0;
 
 	case rushdb_result_fail:
-                logmsg(LOG_ERR, "Cannot open database %s: %s",
+                logmsg(LOG_ERR, _("Cannot open database %s: %s"),
                        RUSH_DB, rushdb_error_string);
 		return 0;
 	}
@@ -115,16 +116,16 @@ check_logins(const char *name, int limit)
 
 	rushdb_close();
 	
-        debug3(3, "counted %d/%d logins for %s", count, limit, name);
+        debug3(3, _("counted %d/%d logins for %s"), count, limit, name);
 
         /*
          * This is called after setutmp(), so the number of logins counted
          * includes the user who is currently trying to log in.
          */
         if (count >= limit) {
-                debug2(2, "Too many logins (max %d) for %s",
+                debug2(2, _("Too many logins (max %d) for %s"),
 		       limit, name);
-                logmsg(LOG_ERR, "Too many logins (max %d) for %s",
+                logmsg(LOG_ERR, _("Too many logins (max %d) for %s"),
                        limit, name);
                 return 1;
         }
@@ -139,7 +140,7 @@ set_user_limits(const char *name, struct limits_rec *lrec)
         if (!lrec)
                 return 0;
 
-	debug1(2, "Setting limits for %s", name);
+	debug1(2, _("Setting limits for %s"), name);
 
 #if defined(RLIMIT_AS)
         if (lrec->set & SET_LIMIT_AS)

@@ -63,11 +63,11 @@ post_socket_send(const struct rush_sockaddr *sockaddr,
 	fprintf(fp, "%s\r\n", rule->tag);
 	p = fgets(buf, sizeof(buf), fp);
 	if (!p)
-		logmsg(LOG_ERR, "%s: TCPMUX did not respond", rule->tag);
+		logmsg(LOG_ERR, _("%s: TCPMUX did not respond"), rule->tag);
 	else if (*p == '+') 
 		fprintf(fp, "%s %s\r\n", req->pw->pw_name, req->cmdline);
 	else
-		logmsg(LOG_ERR, "%s: TCPMUX returned %s", rule->tag, p);
+		logmsg(LOG_ERR, _("%s: TCPMUX returned %s"), rule->tag, p);
 	fflush(fp);
 	fclose(fp);
 	return 0;

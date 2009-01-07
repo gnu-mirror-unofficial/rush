@@ -26,6 +26,7 @@
 #include <xalloc.h>
 #include <error.h>
 #include <errno.h>
+#include <librush.h>
 
 char *
 rush_read_format(const char *name)
@@ -36,13 +37,13 @@ rush_read_format(const char *name)
 	FILE *fp;
 	      
 	if (stat(name, &st)) 
-		error(1, errno, "cannot stat format file %s", name);
+		error(1, errno, _("cannot stat format file %s"), name);
 	else if (!S_ISREG(st.st_mode))
-		error(1, 0, "%s is not a regular file", name);
+		error(1, 0, _("%s is not a regular file"), name);
 	buf = xmalloc(st.st_size + 1);
 	fp = fopen(name, "r");
 	if (!fp)
-		error(1, errno, "cannot open format file %s", name);
+		error(1, errno, _("cannot open format file %s"), name);
 
 	size = st.st_size;
 	p = buf;

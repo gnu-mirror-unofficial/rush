@@ -1,5 +1,5 @@
 /* This file is part of Rush.                  
-   Copyright (C) 2008 Sergey Poznyakoff
+   Copyright (C) 2009 Sergey Poznyakoff
 
    Rush is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -17,20 +17,37 @@
 #ifdef HAVE_CONFIG_H
 # include <config.h>
 #endif
+#include <gettext.h>
+#include <configmake.h>
+#include <locale.h>
 #include <librush.h>
-#include <stdio.h>
+#include <xalloc.h>
 
 void
-version(const char *progname)
+rush_i18n_init()
 {
-        printf("%s (%s) %s\n", progname, PACKAGE, PACKAGE_VERSION);
-        fputs("Copyright (C) 2008 Sergey Poznyakoff\n", stdout);
-        fputs(_("\
-\n\
-License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>\n\
-This is free software: you are free to change and redistribute it.\n\
-There is NO WARRANTY, to the extent permitted by law.\n\
-\n\
-"), stdout);
+	setlocale(LC_ALL, "");
+	bindtextdomain(PACKAGE, LOCALEDIR);
+	textdomain(PACKAGE);
 }
-        
+
+const char *
+user_gettext(const char *locale, const char *domain, const char *dir,
+	     const char *msg)
+{
+	if (locale) {
+		char *save_locale = setlocale(LC_ALL, NULL);
+		if (save_locale && (save_locale = strdup(save_locale))) {
+			if (domain && dir)
+				bindtextdomain(domain, dir);
+			setlocale(LC_ALL, locale);
+			msg = dgettext(domain, msg);
+			setlocale(LC_ALL, save_locale);
+			bindtextdomain(PACKAGE, LOCALEDIR);
+			free(save_locale);
+		}
+	}
+	return msg;
+}
+
+

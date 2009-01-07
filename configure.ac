@@ -1,5 +1,5 @@
 # This file is part of Rush.                  -*- Autoconf -*-
-# Copyright (C) 2008 Sergey Poznyakoff
+# Copyright (C) 2008, 2009 Sergey Poznyakoff
 #
 # Rush is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -52,6 +52,11 @@ AC_CHECK_FUNCS([strdup strerror strrchr strtoul sysconf getdtablesize \
 
 gl_INIT
 
+# Gettext.
+AM_ICONV
+AM_GNU_GETTEXT([external], [need-formatstring-macros])
+AM_GNU_GETTEXT_VERSION([0.17])
+
 # Doc hints.
 # Select a rendition level:
 #  DISTRIB for stable releases (at most one dot in the version number)
@@ -76,5 +81,6 @@ AC_CONFIG_FILES([confpaths.h:confpaths.h.in
 		 lib/Makefile
 		 src/Makefile
 		 etc/Makefile
-		 doc/Makefile])
+		 doc/Makefile
+		 po/Makefile.in])
 AC_OUTPUT

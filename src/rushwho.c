@@ -32,7 +32,7 @@ struct option longopts[] = {
 };
 
 
-const char help_msg[] = "\
+const char help_msg[] = N_("\
 rushlast - show listing of online Rush users.\n\
 Usage: rushwho [OPTIONS] [user [user...]]\n\
 \n\
@@ -43,30 +43,30 @@ OPTIONS are:\n\
 \n\
        -v, --version             Display program version.\n\
        -h, --help                Display this help message.\n\
-       --usage                   Display a concise usage summary.\n";
+       --usage                   Display a concise usage summary.\n");
 
 void
 help()
 {
-        fputs(help_msg, stdout);
-	printf("\nReport bugs to <%s>.\n", PACKAGE_BUGREPORT);
+        fputs(gettext(help_msg), stdout);
+	printf(_("\nReport bugs to <%s>.\n"), PACKAGE_BUGREPORT);
 }
 
-const char user_msg[] = "\
+const char user_msg[] = N_("\
 rushwho [-F FORMAT] [-f DBDIR] [-Hh] [-v]\n\
         [--file DBDIR] [--format FORMAT] [--help] [--no-header] [--usage]\n\
-        [--version]\n";
+        [--version]\n");
 
 void
 usage()
 {
-	fputs(user_msg, stdout);
+	fputs(gettext(user_msg), stdout);
 }
 
 void
 xalloc_die()
 {
-	error(1, 0, "not enough memory");
+	error(1, 0, _("not enough memory"));
 	abort();
 }
 
@@ -90,6 +90,7 @@ main(int argc, char **argv)
 	int  display_header = 1;  /* Display header line */
 	char *format;
 	
+	rush_i18n_init();
 	program_name = strrchr(argv[0], '/');
         if (program_name)
                 program_name++;
@@ -134,13 +135,13 @@ main(int argc, char **argv)
 	argv += optind;
 
 	if (argc) 
-		error(1, 0, "extra arguments");
+		error(1, 0, _("extra arguments"));
 
 	if (format[0] == '@')
 		format = rush_read_format(format + 1);
 	form = rushdb_compile_format(format);
 	if (!form) 
-		error(1, 0, "invalid format: %s", rushdb_error_string);
+		error(1, 0, _("invalid format: %s"), rushdb_error_string);
 
 	switch (rushdb_open(base_name, 0)) {
 	case rushdb_result_ok:
@@ -150,7 +151,7 @@ main(int argc, char **argv)
 		exit(0);
 
 	case rushdb_result_fail:
-                error(1, errno, "cannot open database file %s", base_name);
+                error(1, errno, _("cannot open database file %s"), base_name);
 	}
 
 	if (display_header)

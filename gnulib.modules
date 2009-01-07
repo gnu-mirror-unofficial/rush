@@ -5,6 +5,7 @@ c-ctype
 error
 fprintftime
 getopt
+gettext-h
 gitlog-to-changelog
 inttostr
 malloc

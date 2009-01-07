@@ -151,7 +151,7 @@ parse_transform_expr (struct transform_list *tlist, const char *expr)
   struct transform *tf = new_transform (tlist);
 
   if (expr[0] != 's')
-    die(usage_error, "Invalid transform expression: %s", expr);
+    die(usage_error, NULL, _("Invalid transform expression: %s"), expr);
 
   delim = expr[1];
 
@@ -161,8 +161,8 @@ parse_transform_expr (struct transform_list *tlist, const char *expr)
       i++;
 
   if (expr[i] != delim)
-    die(usage_error,
-	"Missing 2nd delimiter in position %d of expression %s", i, expr);
+    die(usage_error, NULL,
+	_("Missing 2nd delimiter in position %d of expression %s"), i, expr);
 
   /* Scan replacement expression */
   for (j = i + 1; expr[j] && expr[j] != delim; j++)
@@ -170,8 +170,9 @@ parse_transform_expr (struct transform_list *tlist, const char *expr)
       j++;
 
   if (expr[j] != delim)
-    die(usage_error,
-	"Missing trailing delimiter in position %d of expression %s", j, expr);
+    die(usage_error, NULL,
+	_("Missing trailing delimiter in position %d of expression %s"), 
+	j, expr);
 
   /* Check flags */
   tf->transform_type = transform_first;
@@ -197,7 +198,8 @@ parse_transform_expr (struct transform_list *tlist, const char *expr)
 	break;
 
       default:
-	die(usage_error, "Unknown flag in transform expression: %c", *p);
+	die(usage_error, NULL,
+	    _("Unknown flag in transform expression: %c"), *p);
       }
 
   if (*p == ';')
@@ -214,7 +216,7 @@ parse_transform_expr (struct transform_list *tlist, const char *expr)
     {
       char errbuf[512];
       regerror (rc, &tf->regex, errbuf, sizeof (errbuf));
-      die(usage_error, "Invalid transform expression: %s", errbuf);
+      die(usage_error, NULL, _("Invalid transform expression: %s"), errbuf);
     }
 
   if (str[0] == '^' || str[strlen (str) - 1] == '$')
@@ -241,9 +243,9 @@ parse_transform_expr (struct transform_list *tlist, const char *expr)
 	    case '5': case '6': case '7': case '8': case '9':
 	      n = strtoul (cur, &cur, 10);
 	      if (n > tf->regex.re_nsub)
-		die(usage_error,
-		    "Invalid transform replacement: "
-		    "back reference out of range");
+		die(usage_error, NULL,
+		    _("Invalid transform replacement: "
+		      "back reference out of range"));
 	      add_backref_segment (tf, n);
 	      break;
 

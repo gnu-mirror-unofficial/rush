@@ -2,6 +2,7 @@
 *~
 .bootstrap
 .emacs.desktop
+ABOUT-NLS
 ChangeLog
 INSTALL
 Makefile

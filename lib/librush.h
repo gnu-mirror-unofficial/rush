@@ -15,6 +15,18 @@
    along with Rush.  If not, see <http://www.gnu.org/licenses/>. */
 
 #include <stdlib.h>
+#include <gettext.h>
+
+#define N_(s) s
+#define _(s) gettext(s)
+
+#ifndef RUSH_ARG_UNUSED
+# define RUSH_ARG_UNUSED __attribute__ ((__unused__))
+#endif
+
+#ifndef RUSH_PRINTFLIKE
+# define RUSH_PRINTFLIKE(fmt,narg) __attribute__ ((__format__ (__printf__, fmt, narg)))
+#endif
 
 struct rush_wtmp {
 	size_t reclen;
@@ -117,3 +129,9 @@ void rushdb_print_header(rushdb_format_t form);
 
 
 char *rush_read_format(const char *name);
+
+
+void rush_i18n_init(void);
+const char *user_gettext(const char *locale, const char *domain,
+			 const char *dir,
+			 const char *msg);

@@ -24,6 +24,7 @@ unsigned sleep_time = 5;
 unsigned debug_level;
 int debug_option;
 struct rush_rule *rule_head, *rule_tail;
+struct passwd *rush_pw;
 
 static char *progname;
 
@@ -32,20 +33,20 @@ static char *progname;
 
 char *error_msg[] = {
         /* usage_error */
-        "You are not permitted to execute this command.\n"             
-        "Contact the systems administrator for further assistance.\n",
+        N_("You are not permitted to execute this command.\n"             
+           "Contact the systems administrator for further assistance.\n"),
         
         /* nologin_error */
-        "You do not have interactive login access to this machine." 
-        "Contact the systems administrator for further assistance.\n",
+        N_("You do not have interactive login access to this machine." 
+           "Contact the systems administrator for further assistance.\n"),
         
         /* config_error */
-        "Local configuration error occurred.\n" 
-        "Contact the systems administrator for further assistance.\n",
+        N_("Local configuration error occurred.\n" 
+           "Contact the systems administrator for further assistance.\n"),
         
         /* system_error */
-        "A system error occurred while attempting to execute command.\n" 
-        "Contact the systems administrator for further assistance.\n"
+        N_("A system error occurred while attempting to execute command.\n" 
+           "Contact the systems administrator for further assistance.\n")
 };
 
 void
@@ -62,23 +63,23 @@ vlogmsg(int prio, const char *fmt, va_list ap)
 		fprintf(stderr, "%s: ", progname);
 		switch (prio) {
 		case LOG_DEBUG:
-			fprintf(stderr, "Debug: ");
+			fprintf(stderr, _("Debug: "));
 			break;
 			
 		case LOG_INFO:      
 		case LOG_NOTICE:
-			fprintf(stderr, "Info: ");
+			fprintf(stderr, _("Info: "));
 			break;
 			
 		case LOG_WARNING:
-			fprintf(stderr, "Warning: ");
+			fprintf(stderr, _("Warning: "));
 			break;
 			
 		case LOG_ERR:       
 		case LOG_CRIT:      
 		case LOG_ALERT:     
 		case LOG_EMERG:
-			fprintf(stderr, "Error: ");
+			fprintf(stderr, _("Error: "));
 		}
 		vfprintf(stderr, fmt, ap);
 		fputs("\n", stderr);
@@ -96,14 +97,22 @@ logmsg(int prio, const char *fmt, ...)
 }
 
 void
-die(enum error_type type, const char *fmt, ...)
+die(enum error_type type, struct rush_i18n *i18n, const char *fmt, ...)
 {
         va_list ap;
         va_start(ap, fmt);
         vlogmsg(LOG_ERR, fmt, ap);
         va_end(ap);
 	if (!lint_option) {
-		send_msg(error_msg[type], strlen(error_msg[type]));
+		const char *msg;
+		if (i18n) 
+			msg = user_gettext(i18n->locale,
+					   i18n->text_domain,
+					   i18n->localedir,
+					   error_msg[type]);
+		else
+			msg = error_msg[type];
+		send_msg(msg, strlen(msg));
 		sleep(sleep_time);
 	}
         exit(1);
@@ -112,7 +121,7 @@ die(enum error_type type, const char *fmt, ...)
 void
 xalloc_die()
 {
-        die(system_error, "Not enough memory");
+        die(system_error, NULL, _("Not enough memory"));
 }
 
 int
@@ -259,7 +268,8 @@ run_tests(struct rush_rule *rule, struct rush_request *req)
                 
                 if (node->type >= sizeof(test_request)/sizeof(test_request[0]))
                         die(system_error,
-                            "%s:%d: INTERNAL ERROR: node type out of range",
+			    &req->i18n,
+                            _("%s:%d: INTERNAL ERROR: node type out of range"),
                             __FILE__, __LINE__);
                 res = test_request[node->type](node, req);
                 if (node->negate)
@@ -282,6 +292,19 @@ match_rule(struct rush_rule *rule, struct rush_request *req)
         return rule;
 }
 
+char *
+make_file_name(const char *dir, const char *name)
+{
+	size_t dlen = strlen(dir);
+	size_t len = dlen + strlen(name + 1);
+	char *res = xmalloc(len + 1);
+	strcpy(res, dir);
+	if (dlen > 0 && res[dlen-1] != '/')
+		res[dlen++] = '/';
+	strcpy(res + dlen, name);
+	return res;
+}
+ 
 char *
 expand_tilde(const char *dir, const char *home)
 {
@@ -440,7 +463,7 @@ reparse_cmdline(struct rush_request *req)
         
         argcv_free(req->argc, req->argv);
         if ((rc = argcv_get(req->cmdline, NULL, NULL, &req->argc, &req->argv)))
-                die(system_error, "argcv_get(%s) failed: %s",
+                die(system_error, &req->i18n, _("argcv_get(%s) failed: %s"),
                     req->cmdline, strerror(rc));
 }
 
@@ -451,7 +474,8 @@ rebuild_cmdline(struct rush_request *req)
         free(req->cmdline);
         rc = argcv_string(req->argc, req->argv, &req->cmdline);
         if (rc)
-                die(system_error, "argcv_string failed: %s", strerror(rc));
+                die(system_error, &req->i18n,
+		    _("argcv_string failed: %s"), strerror(rc));
 }
 
 void
@@ -469,11 +493,11 @@ run_transforms(struct rush_rule *rule, struct rush_request *req)
                                 rebuild_cmdline(req);
                                 args_transformed = 0;
                         }
-                        debug(2, "Transforming command line");
+                        debug(2, _("Transforming command line"));
                         p = transform_string(node->trans, req->cmdline);
                         free(req->cmdline);
                         req->cmdline = p;
-                        debug1(2, "Command line: %s", req->cmdline);
+                        debug1(2, _("Command line: %s"), req->cmdline);
                         reparse_cmdline(req);
                         break;
 
@@ -483,7 +507,8 @@ run_transforms(struct rush_rule *rule, struct rush_request *req)
                                 arg_no = req->argc - 1;
                         if (arg_no >= req->argc) 
                                 die(usage_error,
-                                    "not enough arguments in command: %s",
+				    &req->i18n, 
+                                    _("not enough arguments in command: %s"),
                                     req->cmdline);
                         p = transform_string(node->trans, req->argv[arg_no]);
                         free(req->argv[arg_no]);
@@ -497,7 +522,7 @@ run_transforms(struct rush_rule *rule, struct rush_request *req)
 
         if (__debug_p(2)) {
                 int i;
-                logmsg(LOG_DEBUG, "Final arguments:");
+                logmsg(LOG_DEBUG, _("Final arguments:"));
                 for (i = 0; i < req->argc; i++)
                         logmsg(LOG_DEBUG, "% 4d: %s", i, req->argv[i]);
         }
@@ -514,7 +539,8 @@ acct_on(struct rush_rule *rule, struct rush_request *req, pid_t pid)
 	wtmp.command = req->cmdline;
 	if (rushdb_start(&wtmp))
 		die(system_error,
-		    "error writing to database %s: %s",
+		    &req->i18n, 
+		    _("error writing to database %s: %s"),
 		    RUSH_DB, strerror(errno));
 }
 
@@ -522,7 +548,8 @@ void
 acct_off(void)
 {
 	if (rushdb_stop())
-		logmsg(LOG_ERR, "error writing stop to database file %s: %s",
+		logmsg(LOG_ERR, 
+		       _("error writing stop to database file %s: %s"),
 		       RUSH_DB, strerror(errno));
 	rushdb_close();
 }
@@ -542,7 +569,8 @@ fork_process(struct rush_rule *rule, struct rush_request *req)
 	}
 	
 	if (pid == -1) 
-		die(system_error, "%s:%d: %s: cannot fork: %s",
+		die(system_error, &req->i18n, 
+		    _("%s:%d: %s: cannot fork: %s"),
 		    rule->file, rule->line, rule->tag,
 		    strerror(errno));
 
@@ -552,17 +580,17 @@ fork_process(struct rush_rule *rule, struct rush_request *req)
 
 	if (req->acct == rush_true)
 		acct_on(rule, req, pid);
-	debug1(2, "Forked process %lu", (unsigned long) pid);
+	debug1(2, _("Forked process %lu"), (unsigned long) pid);
 	waitpid(pid, &status, 0);
 	if (WIFEXITED(status)) {
 		status = WEXITSTATUS(status);
-		debug2(2, "%s: subprocess exited with code %d",
+		debug2(2, _("%s: subprocess exited with code %d"),
 		       rule->tag, status);
 	} else if (WIFSIGNALED(status)) {
-		logmsg(LOG_NOTICE, "%s: subprocess terminated on signal %d",
+		logmsg(LOG_NOTICE, _("%s: subprocess terminated on signal %d"),
 		       rule->tag, WTERMSIG(status));
 	} else
-		logmsg(LOG_NOTICE, "%s: subprocess terminated", rule->tag);
+		logmsg(LOG_NOTICE, _("%s: subprocess terminated"), rule->tag);
 	if (req->acct == rush_true) 
 		acct_off();
 	if (req->post_sockaddr)
@@ -575,28 +603,34 @@ run_rule(struct rush_rule *rule, struct rush_request *req)
 {
         char **new_env;
         
-        debug3(2, "Rule %s at %s:%d matched",
+        debug3(2, _("Rule %s at %s:%d matched"),
 	       rule->tag, rule->file, rule->line);
 
         if (rule->error_msg) {
-                debug1(2, "Error message: %s", rule->error_msg);
-                if (write(rule->error_fd, rule->error_msg,
-                          strlen(rule->error_msg)) < 0)
-                        die(system_error,
-                            "Error sending error message to descriptor %d: %s",
+		const char *msg;
+
+                debug1(2, _("Error message: %s"), rule->error_msg);
+		msg = user_gettext(rule->i18n.locale,
+				   rule->i18n.text_domain,
+				   rule->i18n.localedir,
+				   rule->error_msg);
+                if (write(rule->error_fd, msg, strlen(msg)) < 0)
+                        die(system_error, &req->i18n, 
+                            _("Error sending error message to descriptor %d: %s"),
                             rule->error_fd, strerror(errno));
                 exit(1);
         }
                         
         if (set_user_limits (req->pw->pw_name, rule->limits))
-                die(usage_error, "cannot set limits for %s", req->pw->pw_name);
+                die(usage_error, &req->i18n, _("cannot set limits for %s"), 
+                    req->pw->pw_name);
 
         run_transforms(rule, req);
 
         new_env = env_setup(rule->env);
         if (__debug_p(2)) {
                 int i;
-                logmsg(LOG_DEBUG, "Final environment:");
+                logmsg(LOG_DEBUG, _("Final environment:"));
                 for (i = 0; new_env[i]; i++)
                         logmsg(LOG_DEBUG, "% 4d: %s", i, new_env[i]);
         }
@@ -610,7 +644,7 @@ run_rule(struct rush_rule *rule, struct rush_request *req)
         if (rule->chroot_dir) {
                 char *dir = expand_tilde(rule->chroot_dir,
                                                req->pw->pw_dir);
-                debug1(2, "Chroot dir: %s", dir);
+                debug1(2, _("Chroot dir: %s"), dir);
 		free(req->chroot_dir);
 		req->chroot_dir = dir;
                 if (req->home_dir && is_prefix(dir, req->home_dir)) {
@@ -620,7 +654,7 @@ run_rule(struct rush_rule *rule, struct rush_request *req)
         }
 
         if (req->home_dir) 
-                debug1(2, "Home dir: %s", req->home_dir);
+                debug1(2, _("Home dir: %s"), req->home_dir);
 
 	if (rule->post_sockaddr.len)
 		req->post_sockaddr = &rule->post_sockaddr;
@@ -638,27 +672,28 @@ run_rule(struct rush_rule *rule, struct rush_request *req)
 	if (rule->mask != NO_UMASK) 
 		req->umask = rule->mask;
 
+	req->i18n = rule->i18n;
         if (rule->fall_through)
                 return;
 
 	if (req->acct) {
 		mode_t um = umask(022);
 		if (rushdb_open(RUSH_DB, 1) != rushdb_result_ok) 
-			die(system_error,
-			    "cannot open database %s: %s",
+			die(system_error, &req->i18n, 
+			    _("cannot open database %s: %s"),
 			    RUSH_DB, rushdb_error_string);
 		umask(um);
 	}
 	
 	if (req->chroot_dir && chroot(req->chroot_dir)) 
-		die(system_error, "cannot chroot to %s: %s",
+		die(system_error, &req->i18n, _("cannot chroot to %s: %s"),
 		    req->chroot_dir, strerror(errno));
 
         if (req->home_dir && chdir(req->home_dir)) 
-                die(system_error, "cannot change to dir %s: %s",
+                die(system_error, &req->i18n, _("cannot change to dir %s: %s"),
                     req->home_dir, strerror(errno));
 
-        debug1(2, "Executing %s", req->cmdline);
+        debug1(2, _("Executing %s"), req->cmdline);
 	if (lint_option)
 		exit(0);
 
@@ -666,16 +701,17 @@ run_rule(struct rush_rule *rule, struct rush_request *req)
 		fork_process(rule, req);
 
         if (setuid(req->pw->pw_uid))
-                die(system_error, "cannot enforce uid %lu: %s",
+                die(system_error, &req->i18n, _("cannot enforce uid %lu: %s"),
                     req->pw->pw_uid, strerror(errno));
 
 	if (req->pw->pw_uid && setuid(0) == 0) 
-		die(system_error, "seteuid(0) succeeded when it should not");
+		die(system_error, &req->i18n,
+		    _("seteuid(0) succeeded when it should not"));
 	
         umask(req->umask);
 
         execve(req->argv[0], req->argv, new_env);
-        die(system_error, "%s:%d: %s: cannot execute %s: %s",
+        die(system_error, &req->i18n, _("%s:%d: %s: cannot execute %s: %s"),
             rule->file, rule->line, rule->tag,
             req->cmdline, strerror(errno));
 }
@@ -696,7 +732,7 @@ struct option longopts[] = {
 
 char *shortopts = "c:d:tu:vh";
 
-const char help_msg[] = "\
+const char help_msg[] = N_("\
 Rush - a restricted user shell.\n\
 Usage: rush -c command\n\
        rush OPTIONS [FILE]\n\
@@ -712,23 +748,23 @@ OPTIONS are:\n\
        --usage                   Display a concise usage summary.\n\
 \n\
 Optional FILE specifies alternative configuration file to use instead of the\n\
-default.  It is valid only in conjunction with --lint argument.\n";
+default.  It is valid only in conjunction with --lint argument.\n");
 	       
 void
 help()
 {
-        fputs(help_msg, stdout);
-	printf("\nReport bugs to <%s>.\n", PACKAGE_BUGREPORT);
+        fputs(gettext (help_msg), stdout);
+	printf(_("\nReport bugs to <%s>.\n"), PACKAGE_BUGREPORT);
 }
 
-const char user_msg[] = "\
+const char user_msg[] = N_("\
 rush [-htv] [-d N] [-c COMMAND] [--debug=NUMBER] [-u USER] [--help] [--lint]\n\
-     [--user=USER] [--version] [--usage] [FILE]\n";
+     [--user=USER] [--version] [--usage] [FILE]\n");
 
 void
 usage()
 {
-	fputs(user_msg, stdout);
+	fputs(gettext (user_msg), stdout);
 }
 
 int
@@ -736,12 +772,12 @@ main(int argc, char **argv)
 {
         int rc;
         uid_t uid;
-        struct passwd *pw;
         struct rush_rule *rule;
         struct rush_request req;
 	char *command = NULL;
 	char *test_user = NULL;
-		
+
+	rush_i18n_init();
         progname = strrchr(argv[0], '/');
         if (progname)
                 progname++;
@@ -767,8 +803,9 @@ main(int argc, char **argv)
 			lint_option = 1;
 			if (getuid())
 				die(usage_error,
-				    "the --user option is allowed "
-				    "for superuser only");
+				    NULL,
+				    _("the --user option is allowed "
+				      "for the superuser only"));
 			test_user = optarg;
 			break;
 			
@@ -795,46 +832,46 @@ main(int argc, char **argv)
 		if (lint_option)
 			rush_config_file = argv[optind];
 		else
-			die(usage_error, "invalid command line");
+			die(usage_error, NULL, _("invalid command line"));
 	} else if (argc > optind)
-		die(usage_error, "invalid command line");
+		die(usage_error, NULL, _("invalid command line"));
 	
-        parse_config();
-
-	if (!command) {
-		if (test_user)
-			die(usage_error, "--user is only valid with -c");
-		if (lint_option) 
-			exit(0);
-		die(usage_error, "invalid command line");
-	}
-
-        if (__debug_p(2)) {
-                int i;
-                logmsg(LOG_DEBUG, "Command line:");
-                for (i = 0; i < argc; i++)
-                        logmsg(LOG_DEBUG, "% 4d: %s", i, argv[i]);
-                logmsg(LOG_DEBUG, "Environment:");
-                for (i = 0; environ[i]; i++)
-                        logmsg(LOG_DEBUG, "% 4d %s", i, environ[i]);
-        }
-
 	if (test_user) {
-		pw = getpwnam(test_user);
+		struct passwd *pw = getpwnam(test_user);
 		if (!pw)
-			die(usage_error, "invalid user name");
+			die(usage_error, NULL, _("invalid user name"));
 		setreuid(pw->pw_uid, 0);
 	}
 
         uid = getuid();
-        if ((pw = getpwuid(uid)) == NULL)
-                die(nologin_error, "invalid uid %lu", (unsigned long) uid);
+        if ((rush_pw = getpwuid(uid)) == NULL)
+                die(nologin_error, NULL,
+		    _("invalid uid %lu"), (unsigned long) uid);
 
-        debug2(2, "user %s, uid %lu", pw->pw_name,
-               (unsigned long) pw->pw_uid);
+        debug2(2, _("user %s, uid %lu"), rush_pw->pw_name,
+               (unsigned long) rush_pw->pw_uid);
 
+        parse_config();
+
+	if (!command) {
+		if (lint_option) 
+			exit(0);
+		die(usage_error, NULL, _("invalid command line"));
+	}
+
+        if (__debug_p(2)) {
+                int i;
+                logmsg(LOG_DEBUG, _("Command line:"));
+                for (i = 0; i < argc; i++)
+                        logmsg(LOG_DEBUG, "% 4d: %s", i, argv[i]);
+                logmsg(LOG_DEBUG, _("Environment:"));
+                for (i = 0; environ[i]; i++)
+                        logmsg(LOG_DEBUG, "% 4d %s", i, environ[i]);
+        }
+
+	memset(&req, 0, sizeof(req));
         req.cmdline = xstrdup(command);
-        req.pw = pw;
+        req.pw = rush_pw;
 	req.umask = 022;
 	req.chroot_dir = NULL;
         req.home_dir = NULL;
@@ -842,20 +879,20 @@ main(int argc, char **argv)
 	req.acct = rush_undefined;
         rc = argcv_get(req.cmdline, NULL, NULL, &req.argc, &req.argv);
         if (rc)
-                die(system_error,
-                    "argcv_get(%s) failed: %s",
+                die(system_error, NULL,
+                    _("argcv_get(%s) failed: %s"),
                     req.cmdline, strerror(rc));
         
         for (rule = NULL; ; rule = rule->next) {
                 rule = match_rule(rule, &req);
                 if (!rule)
-                        die(usage_error,
-                            "no matching rule for \"%s\", user %s",
-                            req.cmdline, pw->pw_name);
+                        die(usage_error, &req.i18n, 
+                            _("no matching rule for \"%s\", user %s"),
+                            req.cmdline, req.pw->pw_name);
                 if (debug_level) 
                         logmsg(LOG_NOTICE,
-                               "Serving request \"%s\" for %s by rule %s",
-                               command, pw->pw_name, rule->tag);
+                               _("Serving request \"%s\" for %s by rule %s"),
+                               command, req.pw->pw_name, rule->tag);
                 run_rule(rule, &req);
         } 
         

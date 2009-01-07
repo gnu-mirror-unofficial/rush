@@ -134,6 +134,12 @@ struct rush_sockaddr {
 
 enum rush_three_state { rush_undefined = -1, rush_false, rush_true };
 
+struct rush_i18n {
+	char *text_domain;           /* Gettext domain, if any */
+	char *localedir;             /* Locale directory, if any */
+	char *locale;
+};	
+
 struct rush_rule {
 	struct rush_rule *next;      /* Next config in the list */
 
@@ -156,6 +162,8 @@ struct rush_rule {
 	/* If not NULL, print this message on ERROR_FD and exit */
 	char *error_msg;
 	int error_fd;
+
+	struct rush_i18n i18n;
 	
 	mode_t mask;                 /* umask */
 	char *chroot_dir;            /* chroot directory */ 
@@ -179,6 +187,7 @@ struct rush_request {
 	enum rush_three_state fork;
 	enum rush_three_state acct;
 	const struct rush_sockaddr *post_sockaddr;
+	struct rush_i18n i18n;
 };
 
 #define NO_UMASK ((mode_t)-1)
@@ -190,6 +199,7 @@ extern char *error_msg[];
 extern struct rush_rule *rule_head, *rule_tail;
 extern unsigned debug_level;
 extern int debug_option;
+extern struct passwd *rush_pw;
 
 #define __debug_p(x) ((x) <= debug_level)
 
@@ -233,8 +243,9 @@ extern int debug_option;
 			       x3, x4, x5, x6);		\
 	} while(0)
 
-void die(enum error_type type, const char *fmt, ...) ATTRIBUTE_NORETURN;
-void logmsg(int prio, const char *fmt, ...);
+void die(enum error_type type, struct rush_i18n *i18n, const char *fmt, ...)
+	 ATTRIBUTE_NORETURN RUSH_PRINTFLIKE(3,4);
+void logmsg(int prio, const char *fmt, ...)  RUSH_PRINTFLIKE(2,3);
 
 int parse_limits(limits_record_t *plrec, char *str, char **endp);
 int set_user_limits(const char *name, struct limits_rec *lrec);
@@ -247,3 +258,7 @@ char *transform_string (struct transform *tf, const char *input);
 int post_socket_send(const struct rush_sockaddr *sockaddr,
 		     const struct rush_rule *rule,
 		     const struct rush_request *req);
+
+char *make_file_name(const char *dir, const char *name);
+char *expand_tilde(const char *dir, const char *home);
+
