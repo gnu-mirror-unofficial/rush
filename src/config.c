@@ -60,17 +60,21 @@ struct input_buf {
 	char *buf;
 	size_t off;
 	size_t size;
-	const char *file;
+	char *file;
 	unsigned line;
+	struct input_buf *next;
 };
 
+typedef struct input_buf *input_buf_ptr;
+
 int
-init_input_buf(struct input_buf *ibuf, const char *file)
+init_input_buf(input_buf_ptr *ibufptr, const char *file)
 {
 	struct stat st;
 	char *p;
 	size_t rest;
 	int fd;
+	input_buf_ptr ibuf;
 	
 	if (stat(file, &st)) {
 		if (errno == ENOENT && !lint_option) {
@@ -80,7 +84,8 @@ init_input_buf(struct input_buf *ibuf, const char *file)
 		die(system_error, NULL, _("cannot stat file %s: %s"),
 		    file, strerror(errno));
 	}
-	
+
+	ibuf = xzalloc(sizeof(*ibuf));
 	ibuf->size = st.st_size;
 	ibuf->buf = xmalloc(ibuf->size + 1);
 	fd = open(file, O_RDONLY);
@@ -105,30 +110,37 @@ init_input_buf(struct input_buf *ibuf, const char *file)
 	
 	ibuf->off = 0;
 	ibuf->line = 0;
-	ibuf->file = file;
+	ibuf->file = xstrdup(file);
+	*ibufptr = ibuf;
 	return 0;
 }
 
 void
-init_input_string(struct input_buf *ibuf, const char *string)
+init_input_string(input_buf_ptr *ibufptr, const char *string)
 {
+	input_buf_ptr ibuf = xzalloc(sizeof(*ibuf));
 	ibuf->buf = xstrdup(string);
 	ibuf->size = strlen(string);
 	ibuf->off = 0;
 	ibuf->line = 0;
-	ibuf->file = "<string>";
+	ibuf->file = xstrdup("<string>");
+	*ibufptr = ibuf;
 }
 
 void
-free_input_buf(struct input_buf *ibuf)
+free_input_buf(input_buf_ptr *ibufptr)
 {
-	free(ibuf->buf);
+	if (ibufptr && *ibufptr) {
+		input_buf_ptr ibuf = *ibufptr;
+		free(ibuf->file);
+		free(ibuf->buf);
+		free(ibuf);
+		*ibufptr = NULL;
+	}
 }
 
-void parse_input_buf(struct input_buf *ibuf);
-
 static char *
-read_line(struct input_buf *ibuf, char **pbuf, size_t *psize)
+read_line_plain(input_buf_ptr ibuf, char **pbuf, size_t *psize)
 {
 	slist_t slist = NULL;
 	int cont;
@@ -164,6 +176,27 @@ read_line(struct input_buf *ibuf, char **pbuf, size_t *psize)
 	slist_reduce(slist, pbuf, psize);
 	slist_free(slist);
 	return *pbuf;
+}
+
+static char *
+read_line(input_buf_ptr *ibufptr, char **pbuf, size_t *psize)
+{
+	do {
+		char *p = read_line_plain(*ibufptr, pbuf, psize);
+		if (p)
+			return p;
+		else {
+			input_buf_ptr next = (*ibufptr)->next;
+			debug1(3, _("Finished parsing %s"), (*ibufptr)->file);
+			free_input_buf(ibufptr);
+			*ibufptr = next;
+			if (next)
+				debug2(3,
+				       _("Resuming parsing %s from line %d"),
+				       next->file, next->line);
+		}
+	} while (*ibufptr);
+	return NULL;
 }
 
 int
@@ -246,7 +279,7 @@ absolute_dir_p(const char *dir)
 }
 	
 int
-check_dir(const char *dir, struct input_buf *ibuf)
+check_dir(const char *dir, input_buf_ptr ibuf)
 {
 	struct stat st;
 
@@ -340,7 +373,7 @@ _parse_negation(struct test_node *node, char *val)
 }
 
 int
-parse_numtest(struct input_buf *ibuf, struct test_numeric_node *numtest,
+parse_numtest(input_buf_ptr ibuf, struct test_numeric_node *numtest,
 	      char *val)
 {
 	char *q;
@@ -362,7 +395,7 @@ parse_numtest(struct input_buf *ibuf, struct test_numeric_node *numtest,
 }
 
 int
-parse_strv(struct input_buf *ibuf, struct test_node *node, char *val)
+parse_strv(input_buf_ptr ibuf, struct test_node *node, char *val)
 {
 	int n, rc = argcv_get(val, NULL, "#", &n, &node->v.strv);
 	if (rc)
@@ -373,7 +406,7 @@ parse_strv(struct input_buf *ibuf, struct test_node *node, char *val)
 }
 
 void
-regexp_error(struct input_buf *ibuf, regex_t *regex, int rc)
+regexp_error(input_buf_ptr ibuf, regex_t *regex, int rc)
 {
 	char errbuf[512];
 	regerror(rc, regex, errbuf, sizeof(errbuf));
@@ -382,8 +415,8 @@ regexp_error(struct input_buf *ibuf, regex_t *regex, int rc)
 }
 
 static int
-_parse_re_flags(struct input_buf *ibuf, struct rush_rule *rule,
-		char *kw, char *val)
+_parse_re_flags(input_buf_ptr ibuf, struct rush_rule *rule,
+		char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
 {
 	int fc, i;
 	char **fv;
@@ -438,8 +471,8 @@ _parse_re_flags(struct input_buf *ibuf, struct rush_rule *rule,
 }
 
 static int
-_parse_command(struct input_buf *ibuf, struct rush_rule *rule,
-	       char *kw, char *val)
+_parse_command(input_buf_ptr ibuf, struct rush_rule *rule,
+	       char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
 {
 	int rc;
 	struct test_node *node;
@@ -453,8 +486,8 @@ _parse_command(struct input_buf *ibuf, struct rush_rule *rule,
 }
 	
 static int
-_parse_match(struct input_buf *ibuf, struct rush_rule *rule,
-	     char *kw, char *val)
+_parse_match(input_buf_ptr ibuf, struct rush_rule *rule,
+	     char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
 {
 	char *q;
 	struct test_node *node;
@@ -481,8 +514,8 @@ _parse_match(struct input_buf *ibuf, struct rush_rule *rule,
 }
 	
 static int
-_parse_argc(struct input_buf *ibuf, struct rush_rule *rule,
-	    char *kw, char *val)
+_parse_argc(input_buf_ptr ibuf, struct rush_rule *rule,
+	    char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
 {
 	struct test_node *node = new_test_node(rule, test_argc);
 	val = _parse_negation(node, val);
@@ -490,8 +523,8 @@ _parse_argc(struct input_buf *ibuf, struct rush_rule *rule,
 }
 
 static int
-_parse_uid(struct input_buf *ibuf, struct rush_rule *rule,
-	   char *kw, char *val)
+_parse_uid(input_buf_ptr ibuf, struct rush_rule *rule,
+	   char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
 {
 	struct test_node *node = new_test_node(rule, test_uid);
 	val = _parse_negation(node, val);
@@ -499,8 +532,8 @@ _parse_uid(struct input_buf *ibuf, struct rush_rule *rule,
 }
 
 static int
-_parse_gid(struct input_buf *ibuf, struct rush_rule *rule,
-	   char *kw, char *val)
+_parse_gid(input_buf_ptr ibuf, struct rush_rule *rule,
+	   char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
 {
 	struct test_node *node = new_test_node(rule, test_gid);
 	val = _parse_negation(node, val);
@@ -508,8 +541,8 @@ _parse_gid(struct input_buf *ibuf, struct rush_rule *rule,
 }
 
 static int
-_parse_user(struct input_buf *ibuf, struct rush_rule *rule,
-	    char *kw, char *val)
+_parse_user(input_buf_ptr ibuf, struct rush_rule *rule,
+	    char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
 {
 	struct test_node *node = new_test_node(rule, test_user);
 	val = _parse_negation(node, val);
@@ -517,8 +550,8 @@ _parse_user(struct input_buf *ibuf, struct rush_rule *rule,
 }
 
 static int
-_parse_group(struct input_buf *ibuf, struct rush_rule *rule,
-	     char *kw, char *val)
+_parse_group(input_buf_ptr ibuf, struct rush_rule *rule,
+	     char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
 {
 	struct test_node *node = new_test_node(rule, test_group);
 	val = _parse_negation(node, val);
@@ -526,8 +559,8 @@ _parse_group(struct input_buf *ibuf, struct rush_rule *rule,
 }
 
 static int
-_parse_umask(struct input_buf *ibuf, struct rush_rule *rule,
-	     char *kw, char *val)
+_parse_umask(input_buf_ptr ibuf, struct rush_rule *rule,
+	     char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
 {
 	char *q;
 	unsigned int n = strtoul(val, &q, 8);
@@ -542,8 +575,8 @@ _parse_umask(struct input_buf *ibuf, struct rush_rule *rule,
 }
 
 static int
-_parse_chroot(struct input_buf *ibuf, struct rush_rule *rule,
-	      char *kw, char *val)
+_parse_chroot(input_buf_ptr ibuf, struct rush_rule *rule,
+	      char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
 {
 	char *chroot_dir = xstrdup(val);
 	if (trimslash(chroot_dir) == 0) {
@@ -558,8 +591,8 @@ _parse_chroot(struct input_buf *ibuf, struct rush_rule *rule,
 }
 
 static int
-_parse_limits(struct input_buf *ibuf, struct rush_rule *rule,
-	      char *kw, char *val)
+_parse_limits(input_buf_ptr ibuf, struct rush_rule *rule,
+	      char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
 {
 	char *q;
 			
@@ -573,8 +606,8 @@ _parse_limits(struct input_buf *ibuf, struct rush_rule *rule,
 }
 
 static int
-_parse_transform(struct input_buf *ibuf, struct rush_rule *rule,
-		 char *kw, char *val)
+_parse_transform(input_buf_ptr ibuf, struct rush_rule *rule,
+		 char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
 {
 	struct transform_node *node;
 	node = new_transform_node(rule, transform_cmdline);
@@ -583,8 +616,8 @@ _parse_transform(struct input_buf *ibuf, struct rush_rule *rule,
 }
 
 static int
-_parse_transform_ar(struct input_buf *ibuf, struct rush_rule *rule,
-		    char *kw, char *val)
+_parse_transform_ar(input_buf_ptr ibuf, struct rush_rule *rule,
+		    char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
 {
 	char *q;
 	struct transform_node *node;
@@ -608,8 +641,8 @@ _parse_transform_ar(struct input_buf *ibuf, struct rush_rule *rule,
 }
 
 static int
-_parse_chdir(struct input_buf *ibuf, struct rush_rule *rule,
-	     char *kw, char *val)
+_parse_chdir(input_buf_ptr ibuf, struct rush_rule *rule,
+	     char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
 {
 	char *home_dir = rule->home_dir = xstrdup(val);
 	if (trimslash(home_dir) == 0) {
@@ -625,8 +658,8 @@ _parse_chdir(struct input_buf *ibuf, struct rush_rule *rule,
 }
 
 static int
-_parse_env(struct input_buf *ibuf, struct rush_rule *rule,
-	   char *kw, char *val)
+_parse_env(input_buf_ptr ibuf, struct rush_rule *rule,
+	   char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
 {
 	int rc, n;
 	rc = argcv_get(val, NULL, "#", &n, &rule->env);
@@ -639,8 +672,8 @@ _parse_env(struct input_buf *ibuf, struct rush_rule *rule,
 
 /* Global statements */
 static int
-_parse_debug(struct input_buf *ibuf, struct rush_rule *rule,
-	     char *kw, char *val)
+_parse_debug(input_buf_ptr ibuf, struct rush_rule *rule,
+	     char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
 {
 	if (!debug_option) {
 		debug_level = strtoul(val, NULL, 0);
@@ -650,8 +683,8 @@ _parse_debug(struct input_buf *ibuf, struct rush_rule *rule,
 }
 
 static int
-_parse_sleep_time(struct input_buf *ibuf, struct rush_rule *rule,
-		  char *kw, char *val)
+_parse_sleep_time(input_buf_ptr ibuf, struct rush_rule *rule,
+		  char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
 {
 	char *q;
 	sleep_time = strtoul(val, &q, 10);
@@ -665,48 +698,48 @@ _parse_sleep_time(struct input_buf *ibuf, struct rush_rule *rule,
 }
 
 static int
-_parse_usage_error(struct input_buf *ibuf, struct rush_rule *rule,
-		   char *kw, char *val)
+_parse_usage_error(input_buf_ptr ibuf, struct rush_rule *rule,
+		   char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
 {
 	error_msg[usage_error] = copy_string(val);
 	return 0;
 }
 
 static int
-_parse_nologin_error(struct input_buf *ibuf, struct rush_rule *rule,
-		     char *kw, char *val)
+_parse_nologin_error(input_buf_ptr ibuf, struct rush_rule *rule,
+		     char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
 {
 	error_msg[nologin_error] = copy_string(val);
 	return 0;
 }
 
 static int
-_parse_config_error(struct input_buf *ibuf, struct rush_rule *rule,
-		    char *kw, char *val)
+_parse_config_error(input_buf_ptr ibuf, struct rush_rule *rule,
+		    char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
 {
 	error_msg[config_error] = copy_string(val);
 	return 0;
 }
 
 static int
-_parse_system_error(struct input_buf *ibuf, struct rush_rule *rule,
-		    char *kw, char *val)
+_parse_system_error(input_buf_ptr ibuf, struct rush_rule *rule,
+		    char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
 {
 	error_msg[system_error] = copy_string(val);
 	return 0;
 }
 
 static int
-_parse_fall_through(struct input_buf *ibuf, struct rush_rule *rule,
-		    char *kw, char *val)
+_parse_fall_through(input_buf_ptr ibuf, struct rush_rule *rule,
+		    char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
 {
 	rule->fall_through = 1;
 	return 0;
 }
 
 static int
-_parse_exit(struct input_buf *ibuf, struct rush_rule *rule,
-	    char *kw, char *val)
+_parse_exit(input_buf_ptr ibuf, struct rush_rule *rule,
+	    char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
 {
 	if (c_isdigit(val[0])) {
 		unsigned long n = strtoul(val, &val, 10);
@@ -745,8 +778,8 @@ get_bool(char *val, int *res)
 }
 
 static int
-_parse_fork(struct input_buf *ibuf, struct rush_rule *rule,
-	    char *kw, char *val)
+_parse_fork(input_buf_ptr ibuf, struct rush_rule *rule,
+	    char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
 {
 	int yes;
 	if (get_bool(val, &yes)) {
@@ -760,8 +793,8 @@ _parse_fork(struct input_buf *ibuf, struct rush_rule *rule,
 }
 
 static int
-_parse_acct(struct input_buf *ibuf, struct rush_rule *rule,
-	    char *kw, char *val)
+_parse_acct(input_buf_ptr ibuf, struct rush_rule *rule,
+	    char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
 {
 	int yes;
 	if (get_bool(val, &yes)) {
@@ -833,7 +866,7 @@ find_family(const char *s, size_t len)
 }
 
 static int
-parse_url(struct input_buf *ibuf, const char *cstr, 
+parse_url(input_buf_ptr ibuf, const char *cstr, 
 	  int *pfamily, char **pport, char **ppath)
 {
 	const char *p;
@@ -875,7 +908,7 @@ parse_url(struct input_buf *ibuf, const char *cstr,
 }
 
 static int
-make_socket(struct input_buf *ibuf, int family,
+make_socket(input_buf_ptr ibuf, int family,
 	    char *port, char *path, struct rush_sockaddr *pa)
 {
 	union {
@@ -972,8 +1005,8 @@ make_socket(struct input_buf *ibuf, int family,
 }
 		
 static int
-_parse_post_socket(struct input_buf *ibuf, struct rush_rule *rule,
-		   char *kw, char *val)
+_parse_post_socket(input_buf_ptr ibuf, struct rush_rule *rule,
+		   char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
 {
 	int family;
 	char *path;
@@ -991,36 +1024,36 @@ _parse_post_socket(struct input_buf *ibuf, struct rush_rule *rule,
 
 
 static int
-_parse_text_domain(struct input_buf *ibuf, struct rush_rule *rule,
-		   char *kw, char *val)
+_parse_text_domain(input_buf_ptr ibuf, struct rush_rule *rule,
+		   char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
 {
 	rule->i18n.text_domain = xstrdup(val);
 	return 0;
 }
 
 static int
-_parse_locale_dir(struct input_buf *ibuf, struct rush_rule *rule,
-		  char *kw, char *val)
+_parse_locale_dir(input_buf_ptr ibuf, struct rush_rule *rule,
+		  char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
 {
 	rule->i18n.localedir = xstrdup(val);
 	return 0;
 }
 
 static int
-_parse_locale(struct input_buf *ibuf, struct rush_rule *rule,
-	      char *kw, char *val)
+_parse_locale(input_buf_ptr ibuf, struct rush_rule *rule,
+	      char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
 {
 	rule->i18n.locale = xstrdup(val);
 	return 0;
 }
 
 static int
-_parse_include(struct input_buf *ibuf, struct rush_rule *rule,
-	       char *kw, char *val)
+_parse_include(input_buf_ptr ibuf, struct rush_rule *rule,
+	       char *kw, char *val, input_buf_ptr *ret_buf)
 {
+	int rc;
 	char *name;
 	struct stat st;
-	struct input_buf buf;
 	
 	name = expand_tilde(val, rush_pw->pw_dir);
 	if (trimslash(name) == 0) {
@@ -1051,28 +1084,25 @@ _parse_include(struct input_buf *ibuf, struct rush_rule *rule,
 		name = file;
 	} 
 
-	if (init_input_buf(&buf, name) == 0) {
-		parse_input_buf(&buf);
-		free_input_buf(&buf);
-	}
+	rc = init_input_buf(ret_buf, name);
 	free(name);
-	return 0;
+	return rc;
 }
 
 
-#define TOK_NONE  0x00   /* No flags */
-#define TOK_ARG   0x01   /* Token requires an argument */
-#define TOK_IND   0x02   /* Token must be followed by an index */
-#define TOK_RUL   0x04   /* Token is valid only within a rule */
-
+#define TOK_NONE   0x00   /* No flags */
+#define TOK_ARG    0x01   /* Token requires an argument */
+#define TOK_IND    0x02   /* Token must be followed by an index */
+#define TOK_RUL    0x04   /* Token is valid only within a rule */
+#define TOK_NEWBUF 0x08
 #define TOK_DFL   TOK_ARG|TOK_RUL
 
 struct token {
 	char *name;
 	size_t namelen;
 	int flags;
-	int (*parser) (struct input_buf *, struct rush_rule *,
-		       char *, char *);
+	int (*parser) (input_buf_ptr, struct rush_rule *,
+		       char *, char *, input_buf_ptr *);
 };
 
 
@@ -1107,7 +1137,7 @@ struct token toktab[] = {
 	{ KW("text-domain"),   TOK_ARG, _parse_text_domain },
 	{ KW("locale-dir"),    TOK_ARG, _parse_locale_dir },
 	{ KW("locale"),        TOK_ARG, _parse_locale },
-	{ KW("include"),       TOK_ARG, _parse_include },
+	{ KW("include"),       TOK_ARG|TOK_NEWBUF, _parse_include },
 	{ NULL }
 };
 
@@ -1129,20 +1159,22 @@ find_token(const char *name, int *plen)
 }
 
 void
-parse_input_buf(struct input_buf *ibuf)
+parse_input_buf(input_buf_ptr ibuf)
 {
 	char *buf = NULL;
 	size_t size = 0;
 	int err = 0;
 	struct rush_rule *rule = NULL;
 	unsigned rule_num = 0;
-	
+
 	debug1(3, _("Parsing %s"), ibuf->file);
-	while (read_line(ibuf, &buf, &size)) {
+	while (read_line(&ibuf, &buf, &size)) {
 		char *kw, *val;
 		char *p;
 		struct token *tok;
 		int len;
+		int rc;
+		input_buf_ptr ret_buf;
 		
 		p = skipws(buf);
 		debug3(3, "%s:%d: %s", ibuf->file, ibuf->line, p);
@@ -1200,11 +1232,16 @@ parse_input_buf(struct input_buf *ibuf)
 				continue;
 			}
 		} 
-		
-		err |= tok->parser(ibuf, rule, kw + len, val);
+
+		rc = tok->parser(ibuf, rule, kw + len, val, &ret_buf);
+		err |= rc;
+		if (rc == 0 && tok->flags & TOK_NEWBUF) {
+			ret_buf->next = ibuf;
+			ibuf = ret_buf;
+			debug1(3, _("Parsing %s"), ibuf->file);
+		}
 	}
 	free(buf);
-	debug1(3, _("Finished parsing %s"), ibuf->file);
 	if (err)
 		die(config_error, NULL, _("error parsing config file"));
 }
@@ -1218,16 +1255,14 @@ const char default_entry[] =
 void
 parse_config()
 {
-	struct input_buf buf;
+	input_buf_ptr buf;
 
 	if (init_input_buf(&buf, rush_config_file) == 0) {
-		parse_input_buf(&buf);
-		free_input_buf(&buf);
+		parse_input_buf(buf);
 #ifdef RUSH_DEFAULT_CONFIG
 	} else {
 		init_input_string(&buf, default_entry);
-		parse_input_buf(&buf);
-		free_input_buf(&buf);
+		parse_input_buf(buf);
 #endif
 	}
 }
