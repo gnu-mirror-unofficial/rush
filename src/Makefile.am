@@ -1,5 +1,5 @@
 # This file is part of Rush.
-# Copyright (C) 2008 Sergey Poznyakoff
+# Copyright (C) 2008, 2009 Sergey Poznyakoff
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,6 +16,8 @@
 
 sbin_PROGRAMS=rush
 bin_PROGRAMS=rushlast rushwho
+pkgdata_DATA = rush-po.awk
+EXTRA_DIST = rush-po.awk
 
 rush_SOURCES=\
  argcv.c\

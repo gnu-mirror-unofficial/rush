@@ -1135,13 +1135,13 @@ struct token toktab[] = {
 	{ KW("config-error"),  TOK_ARG, _parse_config_error },
 	{ KW("system-error"),  TOK_ARG, _parse_system_error },
 	{ KW("regexp"),        TOK_ARG, _parse_re_flags },
-	{ KW("fork"),          TOK_ARG, _parse_fork },
-	{ KW("acct"),          TOK_ARG, _parse_acct },
-	{ KW("post-socket"),   TOK_ARG, _parse_post_socket },
-	{ KW("text-domain"),   TOK_ARG, _parse_text_domain },
-	{ KW("locale-dir"),    TOK_ARG, _parse_locale_dir },
-	{ KW("locale"),        TOK_ARG, _parse_locale },
-	{ KW("include"),       TOK_ARG|TOK_NEWBUF, _parse_include },
+	{ KW("fork"),          TOK_DFL, _parse_fork },
+	{ KW("acct"),          TOK_DFL, _parse_acct },
+	{ KW("post-socket"),   TOK_DFL, _parse_post_socket },
+	{ KW("text-domain"),   TOK_DFL, _parse_text_domain },
+	{ KW("locale-dir"),    TOK_DFL, _parse_locale_dir },
+	{ KW("locale"),        TOK_DFL, _parse_locale },
+	{ KW("include"),       TOK_DFL|TOK_NEWBUF, _parse_include },
 	{ NULL }
 };
 

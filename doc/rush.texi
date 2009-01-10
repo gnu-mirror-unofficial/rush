@@ -38,7 +38,7 @@ Published by the Free Software Foundation,
 51 Franklin Street, Fifth Floor,
 Boston, MA 02110-1301 USA 
 
-Copyright @copyright{} 2008 Sergey Poznyakoff
+Copyright @copyright{} 2008, 2009 Sergey Poznyakoff
 
 Permission is granted to copy, distribute and/or modify this document
 under the terms of the GNU Free Documentation License, Version 1.2 or
@@ -270,12 +270,13 @@ output. @xref{Test Mode}, for a detailed description of ways to debug
 and test your configurations.
 
 @menu
-* Syntax::
-* Rule::
-* Debugging::
-* Regex::
-* Sleep Time::
-* Error Messages::
+* Syntax::                      
+* Rule::                        
+* Include::                     
+* Debugging::                   
+* Regex::                       
+* Sleep Time::                  
+* Error Messages::              
 @end menu
 
 @node Syntax
@@ -341,7 +342,8 @@ within a @code{rule}.
 * Fall-through::                
 * Accounting and Forked Mode::  
 * Notification::                
-* Exit::                        
+* Exit::
+* Localization::
 @end menu
 
 @node Conditions
@@ -560,6 +562,7 @@ Set the umask.  The @var{mask} must be an octal value not greater than
 @end deffn
 
 @deffn {Rule Config} chroot @var{dir}
+@cindex tilde expansion
 Change the root directory to that specified in @var{dir}.  This
 directory will be used for file names beginning with @samp{/}.
 A tilde (@samp{~}) in the beginning of @var{dir} is replaced with
@@ -951,6 +954,194 @@ rule git-trap
 
 This rule will trap all git invocations that do not match the
 @samp{git} rule.
+
+@node Localization
+@subsection Localization
+@cindex i18n
+@cindex internationalization
+@cindex l10n
+@cindex localization
+  Rush is completely internationalized, which means that it is able to
+produce log and diagnostic messages in any language, if a
+corresponding translation file is provided.  This file is called a
+@dfn{localization} or @dfn{domain} file.  To find an appropriate
+localization file, @command{rush} uses the following parameters:
+
+@table @var
+@cindex locale name
+@item locale
+@dfn{Locale name} is a string that describes the language, territory
+and optionally, the character set, to use. It consists of the language
+(ISO 639) and country (ISO 3166) codes, separated by an underscore
+character, e.g. @samp{en_US} or @samp{pl_PL}.  If a character set is
+specified, its name follows the country code and is separated from it
+by a @samp{@@} character.
+
+There are two special locale names: @samp{C} or @samp{POSIX} mean to
+use the default @acronym{POSIX} locale, and @samp{""} (an empty
+string), means to use the value of the environment variable
+@env{LC_ALL} as the locale name.
+
+@cindex locale directory
+@item locale_dir
+Directory where localization files are located.  If not specified, a
+predefined set of directories is searched for the matching file.
+
+@cindex domain, localization
+@cindex textual domain
+@item domain
+@dfn{Text domain} defines the base name of the localization file.
+@end table
+
+Given these parameters, the name of the full pathname of the
+localization file is defined as:
+
+@smallexample
+@var{locale_dir}/@var{locale}/LC_MESSAGES/@var{domain}.mo
+@end smallexample
+
+Rush produces three kinds of messages:
+
+@table @asis
+@item diagnostics
+These are diagnostics messages that Rush produces to its log output
+(syslog, unless in test mode).
+
+@item error messages
+Messages sent to the remote party when @command{rush} is not able to
+execute the request (@pxref{Error Messages}).
+
+@item exit messages
+These are messages sent to the remote party by @code{exit} rules
+(@pxref{Exit}). 
+@end table
+
+These messages use different domain names (and may use different
+locale directories). The diagnostics and error messages use textual
+domain @samp{rush}. The corresponding locale directory is defined at
+compile time and defaults to @file{@var{prefix}/share/locale}, where
+@var{prefix} stands for the installation prefix, which is
+@file{/usr/local}, by default.
+
+Rush is shipped with several localization files, which are installed
+by default. These files cover the following locales:
+
+@table @asis
+@item C
+@itemx POSIX
+This is default domain, it is always supported and does not require
+any special handling.  It is roughly equivalent to @samp{en_US}
+(English). 
+
+@item pl
+Polish messages. 
+
+@item uk
+Ukrainian messages.
+@end table
+
+If the localization you need is not in this list, visit
+@uref{http://translationproject.org/domain/rush.html}.  If it is not
+there either, consider writing it (see @ref{Translators,,,gettext, GNU
+gettext utilities}, for a detailed instructions on how to do that).
+
+Exit messages use custom domain files.  It is responsibility of
+the system administrator to provide and install such files.
+
+@menu
+* Localization Directives::
+* Writing Your Localization::
+@end menu
+
+@node Localization Directives
+@subsubsection Localization Directives
+@cindex localization directives
+
+The fillowing configuration directives control localization. They
+are available for use in @code{rule} statement:
+
+@deffn {Configuration} locale @var{name}
+Sets the locale name.  To specify empty locale, use @samp{""} as
+@var{name} (recall that empty locale name means use the value of the
+environment variable @env{LC_ALL} as locale name).
+@end deffn
+
+@deffn {Configuration} locale-dir @var{name}
+Sets the name of the locale directory.
+@end deffn
+
+@deffn {Configuration} text-domain @var{name}
+Sets the textual domain name.
+@end deffn
+
+The following configuration fragment illustrates their use:
+
+@smallexample
+@group
+rule l10n
+  locale pl_PL
+  text-domain rush-config
+  fall-through
+@end group
+@end smallexample
+
+Different users may have different localization
+preferences. @xref{per-user l10n}, for a description of how to
+implement this.
+  
+@node Writing Your Localization
+@subsubsection Writing Your Localization
+@UNREVISED
+
+@node Include
+@section Include
+@cindex include
+  The @code{include} statements forces inclusion of the named file in
+that file location:
+
+@deffn {Configuration} include @var{file}
+  Include file @var{file}
+@end deffn
+
+@cindex tilde expansion
+If @var{file} begins with the tilde character, followed by
+a slash (@samp{~/}), these two characters are replaced with the
+full path name of current user home directory.
+
+If @var{file} is a directory, that directory is searched for a file
+whose name coincides with the current user name.  If such a file is
+found, it is inluded.
+
+In any case, if the file named by @var{file} (after tilde expansion)
+does not exist, no error is reported, and parsing of the configuration
+file continues.
+
+The @code{include} statement can appear in any place of the
+configuration file, both within or outside a rule.
+
+This statement provides a convenient way for user-dependent
+@command{rush} configuration.  For example, the following fall-through
+rule (@pxref{Fall-through}) allows to keep each user's configuration
+in a file named @file{.rush}, located in the user's home directory:
+
+@smallexample
+@group
+rule user
+  inlcude ~/.rush
+  fall-through
+@end group
+@end smallexample
+
+Of course, it is supposed that such a per-user file, if it exists, is
+writable only for super-user and does not contain any @code{rule}
+statements.
+
+@anchor{per-user l10n}
+The use of include files may be especially useful for per-user
+localization (@pxref{Localization}).  It suffices to provide a
+fall-through rule, similar to the one above, and to place a
+@code{locale} directive in @file{~/.rush} files, according to the
+users' preferences.
 
 @node Debugging
 @section Debugging
@@ -1420,7 +1611,7 @@ one from GNU Inetutils package
 
 @smallexample
 # @r{Enable @acronym{TCPMUX} handling}.
-tcpmux	        stream  tcp  nowait root  internal
+tcpmux          stream  tcp  nowait root  internal
 # @r{Handle @samp{scp-to} service}.
 tcpmux/+scp-to  stream  tcp  nowait root  /usr/sbin/tcpd  /bin/rushmail
 @end smallexample

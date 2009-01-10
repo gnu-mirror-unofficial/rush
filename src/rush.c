@@ -1,5 +1,5 @@
 /* This file is part of Rush.                  
-   Copyright (C) 2008 Sergey Poznyakoff
+   Copyright (C) 2008, 2009 Sergey Poznyakoff
 
    Rush is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -328,7 +328,7 @@ expand_tilde(const char *dir, const char *home)
 static char *
 find_env(char *name, int val)
 {
-        int nlen = strcspn(name, "+=");
+        int nlen = strcspn(name, "?+=");
         int i;
 
         for (i = 0; environ[i]; i++) {
@@ -444,7 +444,10 @@ env_setup(char **env)
                                                           p - env[i],
                                                           p + 2,
                                                           find_env(env[i], 1));
-                        else
+			else if (p[-1] == '?') {
+				if (!find_env(env[i], 0))
+					new_env[n++] = p + 1;
+			} else
                                 new_env[n++] = env[i];
                 } else {
                         p = find_env(env[i], 0);
