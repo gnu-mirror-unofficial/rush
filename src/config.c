@@ -1,5 +1,5 @@
 /* This file is part of Rush.                  
-   Copyright (C) 2008 Sergey Poznyakoff
+   Copyright (C) 2008, 2009 Sergey Poznyakoff
 
    Rush is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -132,7 +132,9 @@ free_input_buf(input_buf_ptr *ibufptr)
 {
 	if (ibufptr && *ibufptr) {
 		input_buf_ptr ibuf = *ibufptr;
-		free(ibuf->file);
+		/* FIXME: We cannot free ibuf->file, because it is stored
+		   in rule->tag. Need a hash table for it. */
+		/* free(ibuf->file); */
 		free(ibuf->buf);
 		free(ibuf);
 		*ibufptr = NULL;
@@ -877,7 +879,7 @@ parse_url(input_buf_ptr ibuf, const char *cstr,
 
 		if (!fp) {
 			logmsg(LOG_NOTICE,
-			       _("%s:%d: unknown socket family"),
+			       _("%s:%d: unknown address family"),
 			       ibuf->file, ibuf->line);
 			return 1;
 		}
@@ -1043,6 +1045,8 @@ static int
 _parse_locale(input_buf_ptr ibuf, struct rush_rule *rule,
 	      char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
 {
+	if (strcmp(val, "\"\"") == 0)
+		val = "";
 	rule->i18n.locale = xstrdup(val);
 	return 0;
 }

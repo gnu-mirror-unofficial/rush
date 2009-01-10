@@ -37,7 +37,7 @@ char *error_msg[] = {
            "Contact the systems administrator for further assistance.\n"),
         
         /* nologin_error */
-        N_("You do not have interactive login access to this machine." 
+        N_("You do not have interactive login access to this machine.\n" 
            "Contact the systems administrator for further assistance.\n"),
         
         /* config_error */
@@ -606,6 +606,22 @@ run_rule(struct rush_rule *rule, struct rush_request *req)
         debug3(2, _("Rule %s at %s:%d matched"),
 	       rule->tag, rule->file, rule->line);
 
+        new_env = env_setup(rule->env);
+        if (__debug_p(2)) {
+                int i;
+                logmsg(LOG_DEBUG, _("Final environment:"));
+                for (i = 0; new_env[i]; i++)
+                        logmsg(LOG_DEBUG, "% 4d: %s", i, new_env[i]);
+        }
+        environ = new_env;
+        
+	if (rule->i18n.text_domain)
+		req->i18n.text_domain = rule->i18n.text_domain;
+	if (rule->i18n.localedir)
+		req->i18n.localedir = rule->i18n.localedir;
+	if (rule->i18n.locale)
+		req->i18n.locale = rule->i18n.locale;
+
         if (rule->error_msg) {
 		const char *msg;
 
@@ -627,15 +643,6 @@ run_rule(struct rush_rule *rule, struct rush_request *req)
 
         run_transforms(rule, req);
 
-        new_env = env_setup(rule->env);
-        if (__debug_p(2)) {
-                int i;
-                logmsg(LOG_DEBUG, _("Final environment:"));
-                for (i = 0; new_env[i]; i++)
-                        logmsg(LOG_DEBUG, "% 4d: %s", i, new_env[i]);
-        }
-        environ = new_env;
-        
         if (rule->home_dir) {
                 free(req->home_dir);
                 req->home_dir = expand_tilde(rule->home_dir, req->pw->pw_dir);
@@ -672,7 +679,6 @@ run_rule(struct rush_rule *rule, struct rush_request *req)
 	if (rule->mask != NO_UMASK) 
 		req->umask = rule->mask;
 
-	req->i18n = rule->i18n;
         if (rule->fall_through)
                 return;
 
@@ -748,7 +754,7 @@ OPTIONS are:\n\
        --usage                   Display a concise usage summary.\n\
 \n\
 Optional FILE specifies alternative configuration file to use instead of the\n\
-default.  It is valid only in conjunction with --lint argument.\n");
+default.  It is valid only in conjunction with the --lint option.\n");
 	       
 void
 help()
