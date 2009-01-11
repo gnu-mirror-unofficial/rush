@@ -100,23 +100,30 @@ Appendices
 
 Configuration File
 
-* Syntax::
-* Rule::
-* Debugging::
-* Regex::
-* Sleep Time::
-* Error Messages::
+* Syntax::                      
+* Rule::                        
+* Include::                     
+* Debugging::                   
+* Regex::                       
+* Sleep Time::                  
+* Error Messages::              
 
 Rule
 
-* Conditions::
-* Transformations::
-* System Actions::
-* Environment::
-* Fall-through::
-* Accounting and Forked Mode::
-* Notification::
+* Conditions::                  
+* Transformations::             
+* System Actions::              
+* Environment::                 
+* Fall-through::                
+* Accounting and Forked Mode::  
+* Notification::                
 * Exit::
+* Localization::
+
+Localization
+
+* Localization Directives::
+* Writing Your Localization::
 
 Usage Tips
 
@@ -126,6 +133,7 @@ Usage Tips
 * cvs::
 * svn::
 * git::
+* notification example::
 
 The @code{rushwho} utility.
 
@@ -961,7 +969,7 @@ This rule will trap all git invocations that do not match the
 @cindex internationalization
 @cindex l10n
 @cindex localization
-  Rush is completely internationalized, which means that it is able to
+  Rush is internationalized, which means that it is able to
 produce log and diagnostic messages in any language, if a
 corresponding translation file is provided.  This file is called a
 @dfn{localization} or @dfn{domain} file.  To find an appropriate
@@ -993,6 +1001,7 @@ predefined set of directories is searched for the matching file.
 @dfn{Text domain} defines the base name of the localization file.
 @end table
 
+@anchor{mo-name}
 Given these parameters, the name of the full pathname of the
 localization file is defined as:
 
@@ -1091,8 +1100,87 @@ implement this.
   
 @node Writing Your Localization
 @subsubsection Writing Your Localization
-@UNREVISED
+  You need to write a localization file for your configuration script
+if it implements exit rules (@pxref{Exit}) and changes user locale
+(@pxref{Localization Directives, locale}).
 
+  Preparing localization consists of three stages: extracting exit
+messages and forming a @acronym{PO} file, editing this file, compiling and
+installing it.  The discussion below describes these stages in detail.
+
+@enumerate 1
+@item Creating @samp{po} file.
+
+  A @acronym{PO} (@dfn{Portable Object}) file is a plain text file,
+containing original messages and their translations for a particular
+language.  @xref{PO Files, The Format of PO Files,,gettext, GNU
+gettext utilities}, for a description of its format.
+
+@cindex rush-po.awk
+  The script @command{rush-po.awk} serves for extracting messages from
+the configuration file and forming a @acronym{PO} file.  This script
+is installed in the @file{@var{prefix}/share/rush}
+directory@footnote{To be precise, it is installed in
+@file{@var{dataroot}/rush}, where @var{dataroot} is a directory for
+read-only architecture-independent data, which is set by the
+@option{--datarootdir} option to @command{configure}.  Unless that
+option is used, this directory defaults to
+@file{@var{prefix}/share/rush}}, where @var{prefix} stands for your
+installation prefix. 
+
+  Supposing the package is installed in the default prefix, the
+following command will create a @acronym{PO} file from your
+configuration file:
+
+@smallexample
+@group
+  awk -f /usr/local/share/rush/rush-po.awk \
+         /usr/local/etc/rush.rc > myconf.po
+@end group
+@end smallexample
+
+  Please note, that @command{rush-po.awk} does not handle
+@code{include} directives (@pxref{Include}).  If your configuration
+file uses these directives, you need to specify each include file in
+the @command{rush-po.awk} command line, e.g.:
+
+@smallexample
+@group
+  awk -f /usr/local/share/rush/rush-po.awk \
+         /usr/local/etc/rush.rc /home/*/.rush > myconf.po
+@end group
+@end smallexample
+
+@item Editing the @acronym{PO} file
+
+Open the created @acronym{PO} file with your favorit editor and supply
+message translations after @code{msgstr} keywords.  Although you can
+use any editor, capable of handling plain text files, we recommend to
+use GNU Emacs, which provides a special @dfn{po-mode}.  @xref{Basics,
+PO Files and PO Mode Basics,,gettext, GNU gettext utilities}, for guidelines
+on editing @acronym{PO} files and using the po-mode.
+
+@item Compiling the @acronym{PO} file
+
+@pindex msgfmt
+When ready, the @acronym{PO} file needs be compiled into a
+@acronym{MO} (@dfn{Message Object}) file, which is directly readable
+by @command{rush}.  This is done using @command{msgfmt} utility from
+GNU gettext:
+
+@smallexample
+  msgfmt -o myconf.mo myconf.po
+@end smallexample
+
+@xref{msgfmt Invocation,,,gettext, GNU gettext utilities}, for a
+detailed description of the @command{msgfmt} utility.
+
+After creating the @acronym{MO} file, copy it into an appropriate
+directory.  It is important that the installed @acronym{MO} file uses
+the naming scheme described in @ref{mo-name, localization file
+naming}.
+@end enumerate
+  
 @node Include
 @section Include
 @cindex include

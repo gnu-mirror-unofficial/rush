@@ -14,3 +14,6 @@ POTFILES
 rush.pot
 stamp-po
 *.po
+LINGUAS
+*.mo
+*.gmo
