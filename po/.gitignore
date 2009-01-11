@@ -1,5 +1,11 @@
+*.gmo
+*.mo
+*.po
+LINGUAS
 Makefile.in.in
+Makevars
 Makevars.template
+POTFILES
 Rules-quot
 boldquot.sed
 en@boldquot.header
@@ -9,11 +15,5 @@ insert-header.sin
 quot.sed
 remove-potcdate.sed
 remove-potcdate.sin
-Makevars
-POTFILES
 rush.pot
 stamp-po
-*.po
-LINGUAS
-*.mo
-*.gmo

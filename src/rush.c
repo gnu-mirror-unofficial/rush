@@ -733,13 +733,15 @@ struct option longopts[] = {
         { "lint", no_argument, 0, 't' },
         { "test", no_argument, 0, 't' },
 	{ "user", required_argument, 0, 'u' },
+	{ "safety-check", required_argument, 0, 'C' },
+	
         { "version", no_argument, 0, 'v' },
         { "help", no_argument, 0, 'h' },
         { "usage", no_argument, 0, USAGE_OPTION },
         { NULL }
 };
 
-char *shortopts = "c:d:tu:vh";
+char *shortopts = "C:c:d:tu:vh";
 
 const char help_msg[] = N_("\
 Rush - a restricted user shell.\n\
@@ -751,6 +753,7 @@ OPTIONS are:\n\
        -t, --test, --lint        Run in test mode.\n\
        -u, --user=NAME           Supply user name for test mode.\n\
        -c COMMAND                Emulate execution of COMMAND.\n\
+       -C, --safety-check=CHECK  Add or remove configuration safety check.\n\
 \n\
        -v, --version             Display program version.\n\
        -h, --help                Display this help message.\n\
@@ -767,8 +770,9 @@ help()
 }
 
 const char user_msg[] = N_("\
-rush [-htv] [-d N] [-c COMMAND] [--debug=NUMBER] [-u USER] [--help] [--lint]\n\
-     [--user=USER] [--version] [--usage] [FILE]\n");
+rush [-htv] [-d N] [-c COMMAND] [-C CHECK] [--debug=NUMBER] [-u USER]\n\
+     [--safety-check=CHECK] [--help] [--lint] [--user=USER] [--version]\n\
+     [--usage] [FILE]\n");
 
 void
 usage()
@@ -799,6 +803,12 @@ main(int argc, char **argv)
 	while ((rc = getopt_long(argc, argv, shortopts, longopts, NULL))
 	       != EOF) {
 		switch (rc) {
+		case 'C':
+			if (cfck_keyword(optarg, strlen(optarg)))
+				die(usage_error, NULL,
+				    _("unknown keyword: %s"), optarg);
+			break;
+			
 		case 'c':
 			command = optarg;
 			break;

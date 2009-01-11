@@ -84,6 +84,8 @@ init_input_buf(input_buf_ptr *ibufptr, const char *file)
 		die(system_error, NULL, _("cannot stat file %s: %s"),
 		    file, strerror(errno));
 	}
+	if (check_config_permissions(file, &st)) 
+		die(config_error, NULL, _("%s: file is not safe"), file);
 
 	ibuf = xzalloc(sizeof(*ibuf));
 	ibuf->size = st.st_size;
@@ -1073,6 +1075,7 @@ _parse_include(input_buf_ptr ibuf, struct rush_rule *rule,
 			debug1(1, _("Ignoring non-existing include file %s"),
 			       name);
 			free(name);
+			*ret_buf = NULL;
 			return 0;
 		}
 		logmsg(LOG_NOTICE,
@@ -1090,6 +1093,29 @@ _parse_include(input_buf_ptr ibuf, struct rush_rule *rule,
 
 	rc = init_input_buf(ret_buf, name);
 	free(name);
+	return rc;
+}
+
+static int
+_parse_config_safety(input_buf_ptr ibuf, struct rush_rule *rule,
+		     char *kw, char *val, input_buf_ptr *ret_buf)
+{
+	int rc = 0;
+	while (*val) {
+		char *kw;
+		size_t len;
+		
+		kw = skipws(val);
+		val = eow(kw);
+		len = val - kw;
+		if (cfck_keyword(kw, len)) {
+			logmsg(LOG_NOTICE,
+			       _("%s:%d: unknown keyword: %*.*s"),
+			       ibuf->file, ibuf->line,
+			       len, len, kw);
+			rc++;
+		}
+	}
 	return rc;
 }
 
@@ -1126,6 +1152,13 @@ struct token toktab[] = {
 	{ KW("limits"),        TOK_DFL, _parse_limits },
 	{ KW("chdir"),         TOK_DFL, _parse_chdir },
 	{ KW("env"),           TOK_DFL, _parse_env },
+	{ KW("fork"),          TOK_DFL, _parse_fork },
+	{ KW("acct"),          TOK_DFL, _parse_acct },
+	{ KW("post-socket"),   TOK_DFL, _parse_post_socket },
+	{ KW("text-domain"),   TOK_DFL, _parse_text_domain },
+	{ KW("locale-dir"),    TOK_DFL, _parse_locale_dir },
+	{ KW("locale"),        TOK_DFL, _parse_locale },
+	{ KW("include"),       TOK_DFL|TOK_NEWBUF, _parse_include },
 	{ KW("fall-through"),  TOK_RUL, _parse_fall_through },
 	{ KW("exit"),          TOK_RUL, _parse_exit },
 	{ KW("debug"),         TOK_ARG, _parse_debug },
@@ -1135,13 +1168,7 @@ struct token toktab[] = {
 	{ KW("config-error"),  TOK_ARG, _parse_config_error },
 	{ KW("system-error"),  TOK_ARG, _parse_system_error },
 	{ KW("regexp"),        TOK_ARG, _parse_re_flags },
-	{ KW("fork"),          TOK_DFL, _parse_fork },
-	{ KW("acct"),          TOK_DFL, _parse_acct },
-	{ KW("post-socket"),   TOK_DFL, _parse_post_socket },
-	{ KW("text-domain"),   TOK_DFL, _parse_text_domain },
-	{ KW("locale-dir"),    TOK_DFL, _parse_locale_dir },
-	{ KW("locale"),        TOK_DFL, _parse_locale },
-	{ KW("include"),       TOK_DFL|TOK_NEWBUF, _parse_include },
+	{ KW("config-safety"), TOK_ARG, _parse_config_safety },
 	{ NULL }
 };
 
@@ -1239,7 +1266,7 @@ parse_input_buf(input_buf_ptr ibuf)
 
 		rc = tok->parser(ibuf, rule, kw + len, val, &ret_buf);
 		err |= rc;
-		if (rc == 0 && tok->flags & TOK_NEWBUF) {
+		if (rc == 0 && tok->flags & TOK_NEWBUF && ret_buf) {
 			ret_buf->next = ibuf;
 			ibuf = ret_buf;
 			debug1(3, _("Parsing %s"), ibuf->file);

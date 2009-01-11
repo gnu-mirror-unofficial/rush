@@ -1,7 +1,9 @@
 # List of gnulib modules needed for Rush.
 # A module name per line. Empty lines and comments are ignored.
 
+argmatch
 c-ctype
+dirname
 error
 fprintftime
 getopt

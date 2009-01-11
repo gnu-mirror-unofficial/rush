@@ -22,6 +22,7 @@ EXTRA_DIST = rush-po.awk
 rush_SOURCES=\
  argcv.c\
  argcv.h\
+ cfck.c\
  config.c\
  defines.h\
  limits.c\

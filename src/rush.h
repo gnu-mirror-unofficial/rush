@@ -262,3 +262,23 @@ int post_socket_send(const struct rush_sockaddr *sockaddr,
 char *make_file_name(const char *dir, const char *name);
 char *expand_tilde(const char *dir, const char *home);
 
+
+/* cfck.c */
+#define RUSH_CHK_OWNER      0x0001
+#define RUSH_CHK_IWGRP      0x0002
+#define RUSH_CHK_IWOTH      0x0004
+#define RUSH_CHK_LINK       0x0008
+#define RUSH_CHK_DIR_IWGRP  0x0010
+#define RUSH_CHK_DIR_IWOTH  0x0020
+#define RUSH_CHK_ALL        \
+	(RUSH_CHK_OWNER|RUSH_CHK_IWGRP|RUSH_CHK_IWOTH|\
+	 RUSH_CHK_LINK|RUSH_CHK_DIR_IWGRP|RUSH_CHK_DIR_IWOTH)
+#ifndef RUSH_CHK_DEFAULT
+# define RUSH_CHK_DEFAULT RUSH_CHK_ALL
+#endif
+
+int check_config_permissions(const char *filename, struct stat *st);
+int cfck_keyword(const char *name, size_t len);
+
+
+
