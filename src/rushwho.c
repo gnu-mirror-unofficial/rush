@@ -18,50 +18,12 @@
 #include "error.h"
 
 char *program_name;
+char *base_name = RUSH_DB;
+struct rush_wtmp *wtmp = NULL;
+int  display_header = 1;  /* Display header line */
+char *format;
 
-#define USAGE_OPTION 256
-
-struct option longopts[] = {
-	{ "file", required_argument, 0, 'f' },
-	{ "no-header", no_argument, 0, 'H' },
-	{ "format", required_argument, 0, 'F' },
-        { "version", no_argument, 0, 'v' },
-        { "help", no_argument, 0, 'h' },
-        { "usage", no_argument, 0, USAGE_OPTION },
-        { NULL }
-};
-
-
-const char help_msg[] = N_("\
-rushwho - show listing of online Rush users.\n\
-Usage: rushwho [OPTIONS]\n\
-\n\
-OPTIONS are:\n\
-       -F, --format=STRING       Use STRING instead of the default format.\n\
-       -f, --file=DIR            Look for database files in DIR.\n\
-       -H, --no-header           Do not display header line.\n\
-\n\
-       -v, --version             Display program version.\n\
-       -h, --help                Display this help message.\n\
-       --usage                   Display a concise usage summary.\n");
-
-void
-help()
-{
-        fputs(gettext(help_msg), stdout);
-	printf(_("\nReport bugs to <%s>.\n"), PACKAGE_BUGREPORT);
-}
-
-const char user_msg[] = N_("\
-rushwho [-F FORMAT] [-f DBDIR] [-Hh] [-v]\n\
-        [--file DBDIR] [--format FORMAT] [--help] [--no-header] [--usage]\n\
-        [--version]\n");
-
-void
-usage()
-{
-	fputs(gettext(user_msg), stdout);
-}
+#include "rwopt.h"
 
 void
 xalloc_die()
@@ -83,12 +45,8 @@ int
 main(int argc, char **argv)
 {
 	int rc;
-	char *base_name = RUSH_DB;
-	struct rush_wtmp *wtmp = NULL;
 	int status;
 	rushdb_format_t form;
-	int  display_header = 1;  /* Display header line */
-	char *format;
 	
 	rush_i18n_init();
 	program_name = strrchr(argv[0], '/');
@@ -99,38 +57,8 @@ main(int argc, char **argv)
 	format = getenv("RUSHWHO_FORMAT");
 	if (!format)
 		format = default_format;
-	while ((rc = getopt_long(argc, argv, "F:f:Hhv", longopts, NULL))
-	       != EOF) {
-		switch (rc) {
-		case 'F':
-			format = optarg;
-			break;
 
-		case 'f':
-			base_name = optarg;
-			break;
-
-		case 'H':
-			display_header = 0;
-			break;
-			
-		case 'v':
-			version(program_name);
-			exit(0);
-                                
-		case 'h':
-			help();
-			exit(0);
-			
-		case USAGE_OPTION:
-			usage();
-			exit(0);
-
-		default:
-			exit(1);
-		}
-	}
-
+	get_options(argc, argv);
 	argc -= optind;
 	argv += optind;
 

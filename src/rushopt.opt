@@ -1,0 +1,68 @@
+/* This file is part of Rush.                  
+   Copyright (C) 2008, 2009 Sergey Poznyakoff
+
+   Rush is free software; you can redistribute it and/or modify
+   it under the terms of the GNU General Public License as published by
+   the Free Software Foundation; either version 3, or (at your option)
+   any later version.
+
+   Rush is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License for more details.
+
+   You should have received a copy of the GNU General Public License
+   along with Rush.  If not, see <http://www.gnu.org/licenses/>. */
+
+OPTIONS_BEGIN(gnu, "rush",
+              [<rush - a restricted user shell.>],
+	      [<[FILE]>])
+
+OPTION(debug,d,NUMBER,
+       [<Set debugging level.>])
+BEGIN
+	debug_level = atoi(optarg);
+	debug_option = 1;
+END
+
+OPTION(test,t,,
+       [<Run in test mode.>])
+ALIAS(lint)
+BEGIN
+	lint_option = 1;
+END
+
+OPTION(user,u,NAME,
+       [<Supply user name in test mode.>])
+BEGIN
+       lint_option = 1;
+       if (getuid())
+		die(usage_error,
+		    NULL,
+		    _("the --user option is allowed "
+		      "for the superuser only"));
+	test_user_name = optarg;
+END
+
+OPTION(,c,COMMAND,
+       [<Execute COMMAND.>])
+BEGIN
+	command = optarg;
+END
+
+OPTION(safety-check,C,CHECK,
+       [<Add or remove configuration safety check.>])
+BEGIN
+	if (cfck_keyword(optarg, strlen(optarg)))
+		die(usage_error, NULL,
+		    _("unknown keyword: %s"), optarg);
+END
+
+
+OPTIONS_END
+
+void
+get_options(int argc, char *argv[])
+{
+    GETOPT(argc, argv)
+}

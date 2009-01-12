@@ -726,59 +726,10 @@ run_rule(struct rush_rule *rule, struct rush_request *req)
 }
 
 
+static char *command = NULL;
+static char *test_user_name = NULL;
 
-#define USAGE_OPTION 256
-struct option longopts[] = {
-        { "debug", required_argument, 0, 'd' },
-        { "lint", no_argument, 0, 't' },
-        { "test", no_argument, 0, 't' },
-	{ "user", required_argument, 0, 'u' },
-	{ "safety-check", required_argument, 0, 'C' },
-	
-        { "version", no_argument, 0, 'v' },
-        { "help", no_argument, 0, 'h' },
-        { "usage", no_argument, 0, USAGE_OPTION },
-        { NULL }
-};
-
-char *shortopts = "C:c:d:tu:vh";
-
-const char help_msg[] = N_("\
-Rush - a restricted user shell.\n\
-Usage: rush -c command\n\
-       rush OPTIONS [FILE]\n\
-\n\
-OPTIONS are:\n\
-       -d, --debug=NUMBER        Set debugging level.\n\
-       -t, --test, --lint        Run in test mode.\n\
-       -u, --user=NAME           Supply user name for test mode.\n\
-       -c COMMAND                Emulate execution of COMMAND.\n\
-       -C, --safety-check=CHECK  Add or remove configuration safety check.\n\
-\n\
-       -v, --version             Display program version.\n\
-       -h, --help                Display this help message.\n\
-       --usage                   Display a concise usage summary.\n\
-\n\
-Optional FILE specifies alternative configuration file to use instead of the\n\
-default.  It is valid only in conjunction with the --lint option.\n");
-	       
-void
-help()
-{
-        fputs(gettext (help_msg), stdout);
-	printf(_("\nReport bugs to <%s>.\n"), PACKAGE_BUGREPORT);
-}
-
-const char user_msg[] = N_("\
-rush [-htv] [-d N] [-c COMMAND] [-C CHECK] [--debug=NUMBER] [-u USER]\n\
-     [--safety-check=CHECK] [--help] [--lint] [--user=USER] [--version]\n\
-     [--usage] [FILE]\n");
-
-void
-usage()
-{
-	fputs(gettext (user_msg), stdout);
-}
+#include "rushopt.h"
 
 int
 main(int argc, char **argv)
@@ -787,8 +738,7 @@ main(int argc, char **argv)
         uid_t uid;
         struct rush_rule *rule;
         struct rush_request req;
-	char *command = NULL;
-	char *test_user = NULL;
+
 
 	rush_i18n_init();
         progname = strrchr(argv[0], '/');
@@ -800,52 +750,7 @@ main(int argc, char **argv)
         
         openlog(progname, LOG_NDELAY|LOG_PID, LOG_AUTHPRIV);
 
-	while ((rc = getopt_long(argc, argv, shortopts, longopts, NULL))
-	       != EOF) {
-		switch (rc) {
-		case 'C':
-			if (cfck_keyword(optarg, strlen(optarg)))
-				die(usage_error, NULL,
-				    _("unknown keyword: %s"), optarg);
-			break;
-			
-		case 'c':
-			command = optarg;
-			break;
-			
-		case 'd':
-			debug_level = atoi(optarg);
-			debug_option = 1;
-			break;
-
-		case 'u':
-			lint_option = 1;
-			if (getuid())
-				die(usage_error,
-				    NULL,
-				    _("the --user option is allowed "
-				      "for the superuser only"));
-			test_user = optarg;
-			break;
-			
-		case 't':
-			lint_option = 1;
-			break;
-                                
-		case 'v':
-			version(progname);
-			exit(0);
-                                
-		case 'h':
-			help();
-			exit(0);
-			
-		case USAGE_OPTION:
-			usage();
-			exit(0);
-		}
-	}
-	
+	get_options(argc, argv);
 
 	if (argc == optind + 1) {
 		if (lint_option)
@@ -855,8 +760,8 @@ main(int argc, char **argv)
 	} else if (argc > optind)
 		die(usage_error, NULL, _("invalid command line"));
 	
-	if (test_user) {
-		struct passwd *pw = getpwnam(test_user);
+	if (test_user_name) {
+		struct passwd *pw = getpwnam(test_user_name);
 		if (!pw)
 			die(usage_error, NULL, _("invalid user name"));
 		setreuid(pw->pw_uid, 0);

@@ -292,7 +292,7 @@ check_dir(const char *dir, input_buf_ptr ibuf)
 			logmsg(LOG_NOTICE,
 			       "%s:%d: %s",
 			       ibuf->file, ibuf->line,
-			       _("not an absolute directory"));
+			       _("not an absolute directory name"));
 			return 1;
 		}
 		return 0;
@@ -300,7 +300,7 @@ check_dir(const char *dir, input_buf_ptr ibuf)
 		logmsg(LOG_NOTICE,
 		       "%s:%d: %s",
 		       ibuf->file, ibuf->line,
-		       _("not an absolute directory"));
+		       _("not an absolute directory name"));
 		return 1;
 	}
 
@@ -1097,8 +1097,8 @@ _parse_include(input_buf_ptr ibuf, struct rush_rule *rule,
 }
 
 static int
-_parse_config_safety(input_buf_ptr ibuf, struct rush_rule *rule,
-		     char *kw, char *val, input_buf_ptr *ret_buf)
+_parse_include_safety(input_buf_ptr ibuf, struct rush_rule *rule,
+		      char *kw, char *val, input_buf_ptr *ret_buf)
 {
 	int rc = 0;
 	while (*val) {
@@ -1138,37 +1138,37 @@ struct token {
 
 struct token toktab[] = {
 #define KW(s) s, sizeof(s)-1
-	{ KW("command"),       TOK_DFL, _parse_command },
-	{ KW("match"),         TOK_RUL|TOK_IND, _parse_match },
-	{ KW("argc"),          TOK_DFL, _parse_argc },
-	{ KW("uid"),           TOK_DFL, _parse_uid },
-	{ KW("gid"),           TOK_DFL, _parse_gid },
-	{ KW("user"),          TOK_DFL, _parse_user },
-	{ KW("group"),         TOK_DFL, _parse_group },
-	{ KW("transform"),     TOK_DFL, _parse_transform },
-	{ KW("transform"),     TOK_RUL|TOK_IND, _parse_transform_ar },
-	{ KW("umask"),         TOK_DFL, _parse_umask },
-	{ KW("chroot"),        TOK_DFL, _parse_chroot },
-	{ KW("limits"),        TOK_DFL, _parse_limits },
-	{ KW("chdir"),         TOK_DFL, _parse_chdir },
-	{ KW("env"),           TOK_DFL, _parse_env },
-	{ KW("fork"),          TOK_DFL, _parse_fork },
-	{ KW("acct"),          TOK_DFL, _parse_acct },
-	{ KW("post-socket"),   TOK_DFL, _parse_post_socket },
-	{ KW("text-domain"),   TOK_DFL, _parse_text_domain },
-	{ KW("locale-dir"),    TOK_DFL, _parse_locale_dir },
-	{ KW("locale"),        TOK_DFL, _parse_locale },
-	{ KW("include"),       TOK_DFL|TOK_NEWBUF, _parse_include },
-	{ KW("fall-through"),  TOK_RUL, _parse_fall_through },
-	{ KW("exit"),          TOK_RUL, _parse_exit },
-	{ KW("debug"),         TOK_ARG, _parse_debug },
-	{ KW("sleep-time"),    TOK_ARG, _parse_sleep_time },
-	{ KW("usage-error"),   TOK_ARG, _parse_usage_error },
-	{ KW("nologin-error"), TOK_ARG, _parse_nologin_error },
-	{ KW("config-error"),  TOK_ARG, _parse_config_error },
-	{ KW("system-error"),  TOK_ARG, _parse_system_error },
-	{ KW("regexp"),        TOK_ARG, _parse_re_flags },
-	{ KW("config-safety"), TOK_ARG, _parse_config_safety },
+	{ KW("command"),        TOK_DFL, _parse_command },
+	{ KW("match"),          TOK_RUL|TOK_IND, _parse_match },
+	{ KW("argc"),           TOK_DFL, _parse_argc },
+	{ KW("uid"),            TOK_DFL, _parse_uid },
+	{ KW("gid"),            TOK_DFL, _parse_gid },
+	{ KW("user"),           TOK_DFL, _parse_user },
+	{ KW("group"),          TOK_DFL, _parse_group },
+	{ KW("transform"),      TOK_DFL, _parse_transform },
+	{ KW("transform"),      TOK_RUL|TOK_IND, _parse_transform_ar },
+	{ KW("umask"),          TOK_DFL, _parse_umask },
+	{ KW("chroot"),         TOK_DFL, _parse_chroot },
+	{ KW("limits"),         TOK_DFL, _parse_limits },
+	{ KW("chdir"),          TOK_DFL, _parse_chdir },
+	{ KW("env"),            TOK_DFL, _parse_env },
+	{ KW("fork"),           TOK_DFL, _parse_fork },
+	{ KW("acct"),           TOK_DFL, _parse_acct },
+	{ KW("post-socket"),    TOK_DFL, _parse_post_socket },
+	{ KW("text-domain"),    TOK_DFL, _parse_text_domain },
+	{ KW("locale-dir"),     TOK_DFL, _parse_locale_dir },
+	{ KW("locale"),         TOK_DFL, _parse_locale },
+	{ KW("include"),        TOK_DFL|TOK_NEWBUF, _parse_include },
+	{ KW("fall-through"),   TOK_RUL, _parse_fall_through },
+	{ KW("exit"),           TOK_RUL, _parse_exit },
+	{ KW("debug"),          TOK_ARG, _parse_debug },
+	{ KW("sleep-time"),     TOK_ARG, _parse_sleep_time },
+	{ KW("usage-error"),    TOK_ARG, _parse_usage_error },
+	{ KW("nologin-error"),  TOK_ARG, _parse_nologin_error },
+	{ KW("config-error"),   TOK_ARG, _parse_config_error },
+	{ KW("system-error"),   TOK_ARG, _parse_system_error },
+	{ KW("regexp"),         TOK_ARG, _parse_re_flags },
+	{ KW("include-safety"), TOK_ARG, _parse_include_safety },
 	{ NULL }
 };
 

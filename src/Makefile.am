@@ -17,7 +17,6 @@
 sbin_PROGRAMS=rush
 bin_PROGRAMS=rushlast rushwho
 pkgdata_DATA = rush-po.awk
-EXTRA_DIST = rush-po.awk
 
 rush_SOURCES=\
  argcv.c\
@@ -28,19 +27,23 @@ rush_SOURCES=\
  limits.c\
  rush.c\
  rush.h\
+ rushopt.h\
  socket.c\
  transform.c
 
-rushlast_SOURCES=rushlast.c
-rushwho_SOURCES=rushwho.c
-
+rushlast_SOURCES=rushlast.c rlopt.h
+rushwho_SOURCES=rushwho.c rwopt.h
+rushlast.c: rlopt.h
+rushwho.c: rwopt.h
+EXTRA_DIST=rush-po.awk rushopt.opt rlopt.opt rwopt.opt getopt.m4
 INCLUDES=-I$(top_srcdir)/gnu -I$(top_builddir)/gnu -I$(top_srcdir)/lib
 LDADD=../lib/librush.a ../gnu/libgnu.a
 
 sbinPROGRAMS_INSTALL = $(INSTALL_PROGRAM) -m 4755
 
-BUILT_SOURCES = defines.h
+BUILT_SOURCES = defines.h rushopt.h 
 CLEANFILES = defines.h
+MAINTAINER_CLEANFILES = rushopt.h rwopt.h rlopt.h
 
 defines.h: Makefile
 	p=`echo rush | sed 's/$(EXEEXT)$$//'`; \
@@ -50,3 +53,7 @@ defines.h: Makefile
 	echo "#define LOCALSTATEDIR \"$(localstatedir)\"" >> $@-t
 	mv $@-t $@
 
+SUFFIXES=.opt .c .h
+
+.opt.h:
+	m4 -s $(srcdir)/getopt.m4 $< | sed '1d' > $@

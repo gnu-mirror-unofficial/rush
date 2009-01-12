@@ -1,0 +1,77 @@
+/* This file is part of Rush.                  
+   Copyright (C) 2008, 2009 Sergey Poznyakoff
+
+   Rush is free software; you can redistribute it and/or modify
+   it under the terms of the GNU General Public License as published by
+   the Free Software Foundation; either version 3, or (at your option)
+   any later version.
+
+   Rush is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License for more details.
+
+   You should have received a copy of the GNU General Public License
+   along with Rush.  If not, see <http://www.gnu.org/licenses/>. */
+
+OPTIONS_BEGIN(gnu, "rushlast",
+              [<rushlast - show listing of last Rush logins.>],
+	      [<[user [user...]]>])
+
+OPTION(format,F,STRING,
+       [<Use STRING instead of the default format.>])
+BEGIN
+	format = optarg;
+END
+
+OPTION(file,f,DIR,
+       [<Look for database files in DIR.>])
+BEGIN
+	base_name = optarg;
+END
+
+OPTION(forward,,,
+       [<Show entries in chronological order.>])
+BEGIN
+	forward = 1;
+END
+
+OPTION(no-header,H,,
+       [<Do not display header line.>])
+BEGIN
+	display_header = 0;
+END
+
+OPTION(count,n,NUMBER,
+       [<Show at most NUM records.>])
+BEGIN
+	char *p;
+	count = strtoul(optarg, &p, 10);
+        if (*p) 
+		error(1, 0, _("invalid number (%s)"), optarg);
+END
+
+OPTIONS_END
+
+void
+get_options(int argc, char *argv[])
+{
+	GETOPT(argc, argv,[<
+        if (c_isdigit(optopt)) {
+		char *p;
+		count = strtoul(argv[optind-1] + 1, &p, 10);
+                if (*p) 		
+			error(1, 0, _("invalid number (%s)"),
+                              argv[optind-1]);
+                if (optind < argc) 
+                        continue;
+                else
+                        break;
+        }
+        if (argv[optind-1][1] == '-') 
+		error(1, 0, _("unrecognized option `%s'"),
+		      argv[optind-1]);
+	else
+                error(1, 0, _("invalid option -- %c"), optopt)>]);
+}
+

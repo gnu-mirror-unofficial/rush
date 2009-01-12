@@ -1,0 +1,45 @@
+/* This file is part of Rush.                  
+   Copyright (C) 2008, 2009 Sergey Poznyakoff
+
+   Rush is free software; you can redistribute it and/or modify
+   it under the terms of the GNU General Public License as published by
+   the Free Software Foundation; either version 3, or (at your option)
+   any later version.
+
+   Rush is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License for more details.
+
+   You should have received a copy of the GNU General Public License
+   along with Rush.  If not, see <http://www.gnu.org/licenses/>. */
+
+OPTIONS_BEGIN(gnu, "rushwho",
+              [<rushwho - show listing of online Rush users.>])
+
+OPTION(format,F,STRING,
+       [<Use STRING instead of the default format.>])
+BEGIN
+	format = optarg;
+END
+
+OPTION(file,f,DIR,
+       [<Look for database files in DIR.>])
+BEGIN
+	base_name = optarg;
+END
+
+OPTION(no-header,H,,
+       [<Do not display header line.>])
+BEGIN
+	display_header = 0;
+END
+
+OPTIONS_END
+
+void
+get_options(int argc, char *argv[])
+{
+	GETOPT(argc, argv);
+}
+

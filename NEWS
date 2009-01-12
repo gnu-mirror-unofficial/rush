@@ -1,4 +1,4 @@
-Rush NEWS -- history of user-visible changes. 2009-01-10
+Rush NEWS -- history of user-visible changes. 2009-01-11
 Copyright (C) 2008, 2009 Sergey Poznyakoff
 See the end of file for copying conditions.
 
@@ -14,8 +14,23 @@ over a TCP/IP or UNIX socket.
 
 * Include statement
 
-An include statement allows to inlcude contents of a file into the
+The include statement allows to inlcude contents of a file into the
 main rush configuration file.
+
+* Safety checks.
+
+Before parsing, rush checks permissions and ownership of its
+configuration file. The file is rejected if:
+
+- It is not owned by root.
+- It is group or world writable
+- It resides in a group or world writable directory
+- It is a symbolic link to a file residing in a group or world
+  writable directory
+
+The same checks are performed for any included file.  The safety
+checks for included files can be changed using the global statement
+"include-safety".
 
 * Internationalization
 
