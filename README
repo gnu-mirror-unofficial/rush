@@ -1,12 +1,12 @@
-Rush README
+GNU Rush README
 Copyright (C) 2008, 2009 Sergey Poznyakoff
 
 * Introduction
 
 This file contains brief information about configuring, testing
-and running Rush. It is *not* intended as a replacement
+and running GNU Rush. It is *not* intended as a replacement
 for the documentation, it is provided as a brief reference only.
-The complete documentation for Rush is available in info format.
+The complete documentation for GNU Rush is available in info format.
 To read it without installing the package run `info -f ./rush.info'.
 After installation, the documentation can be accessed running
 `info rush'. 
@@ -16,7 +16,7 @@ at http://rush.man.gnu.org.ua.
 
 * Overview
 
-Rush is a restricted user shell, designed for use with ssh, sftp,
+GNU Rush is a restricted user shell, designed for use with ssh, sftp,
 and similar programs.
 
 * Building
@@ -30,14 +30,14 @@ The usual sequence applies:
 Refer to the INSTALL file for information about generic configure
 options.
 
-Rush can be compiled with the default configuration built into the
+GNU Rush can be compiled with the default configuration built into the
 binary.  To do so, store the configuration in a file, and use the
 command:
 
   ./configure --with-default-config=FILE
 
 where FILE is the full file name.  For more information, refer to
-chapter 5, `Default Configuration' in the Rush manual.
+chapter 5, `Default Configuration' in the GNU Rush manual.
 
 * Bug reporting.		
 

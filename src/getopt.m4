@@ -1,18 +1,18 @@
-dnl This file is part of Rush.
+dnl This file is part of GNU Rush.
 dnl Copyright (C) 2007, 2008, 2009 Sergey Poznyakoff.
 dnl 
-dnl Rush is free software; you can redistribute it and/or modify
+dnl GNU Rush is free software; you can redistribute it and/or modify
 dnl it under the terms of the GNU General Public License as published by
 dnl the Free Software Foundation; either version 3, or (at your option)
 dnl any later version.
 dnl
-dnl Rush is distributed in the hope that it will be useful,
+dnl GNU Rush is distributed in the hope that it will be useful,
 dnl but WITHOUT ANY WARRANTY; without even the implied warranty of
 dnl MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 dnl GNU General Public License for more details.
 dnl
 dnl You should have received a copy of the GNU General Public License
-dnl along with Rush.  If not, see <http://www.gnu.org/licenses/>.
+dnl along with GNU Rush.  If not, see <http://www.gnu.org/licenses/>.
 divert(-1)
 changequote([<,>])
 changecom(/*,*/)

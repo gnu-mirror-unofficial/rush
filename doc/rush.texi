@@ -2,7 +2,7 @@
 @smallbook
 @c %**start of header
 @setfilename rush.info
-@settitle Rush -- a restricted user shell.
+@settitle GNU Rush -- a restricted user shell.
 @c %**end of header
 @setchapternewpage odd
 
@@ -28,8 +28,8 @@
 @dircategory System Administration Utilities
 @direntry
 * rush: (rush).              A restricted user shell.
-* rushwho: (rush)Rushwho.    Show who is using Rush currently.
-* rushlast: (rush)Rushlast.  Show listing of recent Rush sessions.
+* rushwho: (rush)Rushwho.    Show who is using GNU Rush currently.
+* rushlast: (rush)Rushlast.  Show listing of recent GNU Rush sessions.
 @end direntry
 @end ifinfo
 
@@ -43,7 +43,7 @@ Copyright @copyright{} 2008, 2009 Sergey Poznyakoff
 Permission is granted to copy, distribute and/or modify this document
 under the terms of the GNU Free Documentation License, Version 1.3 or
 any later version published by the Free Software Foundation; with no
-Invariant Sections, with the Front-Cover texts being ``Rush -- a
+Invariant Sections, with the Front-Cover texts being ``GNU Rush -- a
 restricted user shell'' and with the Back-Cover Texts as in (a) below.
 A copy of the license is included in the section entitled ``GNU Free
 Documentation License''. 
@@ -54,7 +54,7 @@ Software Foundation raise funds for GNU development.''
 @end copying
 
 @titlepage
-@title Rush -- a restricted user shell
+@title GNU Rush -- a restricted user shell
 @subtitle version @value{VERSION}, @value{UPDATED}
 @author Sergey Poznyakoff
 @page
@@ -69,10 +69,10 @@ Software Foundation raise funds for GNU development.''
 
 @ifnottex
 @node Top
-@top Rush
+@top GNU Rush
 
-This edition of the @cite{Rush Manual}, last updated @value{UPDATED},
-documents Rush Version @value{VERSION}.
+This edition of the @cite{GNU Rush Manual}, last updated @value{UPDATED},
+documents GNU Rush Version @value{VERSION}.
 
 @end ifnottex
 
@@ -155,18 +155,18 @@ Accounting Database
 
 @node Intro
 @chapter Introduction
-  Rush is a Restricted User Shell, designed for sites that provide
+  GNU Rush is a Restricted User Shell, designed for sites that provide
 limited remote access to their resources, such as svn or git  
 repositories, scp, or the like.  Using a sophisticated configuration
-file, Rush gives you complete control over the command lines that
+file, GNU Rush gives you complete control over the command lines that
 users execute, as well as over the usage of system resources, such as 
 virtual memory, CPU time, etc.
 
 @node Operation
 @chapter Operation
-  Rush is usually installed as a user shell.  When a user connects to
+  GNU Rush is usually installed as a user shell.  When a user connects to
 the server (e.g. by using using SSH protocol), the shell binary,
-@command{rush}, is executed.  Rush must be called with exactly two
+@command{rush}, is executed.  GNU Rush must be called with exactly two
 arguments: the @option{-c} command line option and a command line to
 be executed on the host machine.  If wrong arguments are supplied, the
 shell aborts.
@@ -207,13 +207,13 @@ the @option{-c} option.
   A special kind of rules, called @dfn{fall-through} ones, is
 provided.  Fall-through rules differ from other rules in that they do
 not execute the command.  After all actions in a fall-through rule
-have been executed, Rush continues to search for another matching rule
+have been executed, GNU Rush continues to search for another matching rule
 in its configuration and applies it, if found.  Fall-through rules
 are useful to set default values for subsequent rules.
 
 @node Quick Start
 @chapter Quick Start
-  To give you the feel of Rush possibilities, let's consider the
+  To give you the feel of GNU Rush possibilities, let's consider the
 following configuration file rule:
 
 @smallexample
@@ -252,12 +252,12 @@ whose @acronym{UID}s are greater than or equal to 100.
 modify the first argument of the command line (i.e. the command
 name).  These instructions are in the form of @code{sed} replace
 expression (@pxref{Transformations, transformation expression}).  The
-expression in our example instructs Rush to replace the command name with
+expression in our example instructs GNU Rush to replace the command name with
 @samp{bin/sftp-server}. 
 
   The @code{umask} clause sets the file creation mask.
 
-  The @code{chroot} clause instructs Rush to chroot to the user home
+  The @code{chroot} clause instructs GNU Rush to chroot to the user home
 directory before executing the command.
 
   Finally, the @code{chdir} statement sets the directory to change to
@@ -269,7 +269,7 @@ after installing the chroot.
   The configuration file is called @file{rush.rc} and is located in
 @file{/usr/local/etc} by default.@footnote{The exact location of the
 configuration file is defined when configuring the package.  See the
-file @file{INSTALL} in the Rush source directory for more information}.
+file @file{INSTALL} in the GNU Rush source directory for more information}.
 
   The configuration file is read and parsed right after start up.  Any
 errors occurred in parsing are reported using @code{syslog} facility
@@ -341,7 +341,7 @@ usage-error Contact your system administrator
 @node Rule
 @section Rule
 @cindex @code{rule} statement
-  The @code{rule} statement configures a Rush rule.  This is a
+  The @code{rule} statement configures a GNU Rush rule.  This is a
 @dfn{block} statement, which means that all statements located between
 it and the next @code{rule} statement (or end of file, whichever
 occurs first) modify the definition of the rule.
@@ -356,8 +356,8 @@ occurs first) modify the definition of the rule.
 @cindex tag, rule
 The @var{tag} argument is optional.  If it is given, it supplies a
 @dfn{tag} for the rule, i.e. a (presumably unique) identifier, which
-is used to label this rule.  Rush uses this tag in its diagnostic
-messages.  For rules without explicit @var{tag}, Rush supplies a
+is used to label this rule.  @command{Rush} uses this tag in its diagnostic
+messages.  For rules without explicit @var{tag}, @command{Rush} supplies a
 default tag, which is constructed by concatenating @samp{#} character
 and the ordinal number of rule in the configuration file, in decimal
 notation.  Rule numbering begins from @samp{1}.
@@ -532,7 +532,7 @@ sed, GNU sed}).
 Only replace the @var{number}th match of the @var{regexp}.
 
 Note: the @acronym{POSIX} standard does not specify what should happen
-when you mix the @samp{g} and @var{number} modifiers.  Rush
+when you mix the @samp{g} and @var{number} modifiers.  @command{Rush}
 follows the GNU @command{sed} implementation in this regard, so
 the interaction is defined to be: ignore matches before the
 @var{number}th, and then match and replace all matches from the
@@ -786,7 +786,7 @@ rule default
 @node Accounting and Forked Mode
 @subsection Accounting and Forked Mode
 @cindex accounting
-  Rush is able to operate in two modes, which we call default and
+  GNU Rush is able to operate in two modes, which we call default and
 forked.  When operating in the default mode, the process image of
 @command{rush} itself is overwritten by the command being executed.
 Thus, when it comes to the launching of the requested command,
@@ -802,7 +802,7 @@ its execution.  Once the command terminates, @command{rush} exits.
 @dfn{accounting}, i.e. to note who is doing what and to keep a
 history of invocations.  The accounting, in turn, can be used to limit
 simultaneous executions of commands by the users (@dfn{logins}, in
-Rush terminology), as requested by @samp{L} command to @code{limit}
+GNU Rush terminology), as requested by @samp{L} command to @code{limit}
 statement (@pxref{L limit}).
 
   The forked mode is enabled on a per-rule basis, for rules that
@@ -887,7 +887,7 @@ rule default
 @end smallexample
 @end deffn
 
-  The Rush notification protocol is based on @acronym{TCPMUX}
+  The GNU Rush notification protocol is based on @acronym{TCPMUX}
 (@uref{http://www.rfc-editor.org/rfc/rfc1078.txt, RFC 1078}).
 
   After establishing connection, @command{rush} sends the rule tag
@@ -992,7 +992,7 @@ This rule will trap all git invocations that do not match the
 @cindex internationalization
 @cindex l10n
 @cindex localization
-  Rush is internationalized, which means that it is able to
+  GNU Rush is internationalized, which means that it is able to
 produce log and diagnostic messages in any language, if a
 corresponding translation file is provided.  This file is called a
 @dfn{localization} or @dfn{domain} file.  To find an appropriate
@@ -1032,11 +1032,11 @@ localization file is defined as:
 @var{locale_dir}/@var{locale}/LC_MESSAGES/@var{domain}.mo
 @end smallexample
 
-Rush produces three kinds of messages:
+GNU Rush produces three kinds of messages:
 
 @table @asis
 @item diagnostics
-These are diagnostics messages that Rush produces to its log output
+These are diagnostics messages that GNU Rush produces to its log output
 (syslog, unless in test mode).
 
 @item error messages
@@ -1055,7 +1055,7 @@ compile time and defaults to @file{@var{prefix}/share/locale}, where
 @var{prefix} stands for the installation prefix, which is
 @file{/usr/local}, by default.
 
-Rush is shipped with several localization files, which are installed
+GNU Rush is shipped with several localization files, which are installed
 by default. These files cover the following locales:
 
 @table @asis
@@ -1491,7 +1491,7 @@ You can inspect the built-in configuration using the
 
 @node Usage Tips
 @chapter Usage Tips
-In this chapter we will explain how to write Rush configuration rules
+In this chapter we will explain how to write GNU Rush configuration rules
 for several popular remote copy and version control system
 utilities.  For this purpose, we assume the following setup:
 
@@ -1828,9 +1828,9 @@ Following is its simplest implementation:
 read user command
 
 /usr/sbin/sendmail -oi -t <<EOT
-From: Rush Notification <devnull@@localhost>
+From: GNU Rush Notification <devnull@@localhost>
 To: <root@@localhost>
-Subject: Rush notification
+Subject: GNU Rush notification
 
 Be informed that $user executed $command.
 EOT
@@ -1844,10 +1844,10 @@ EOT
 @opindex --test
 @opindex --lint
 @opindex -c
-  Rush provides a special @dfn{test mode}, intended to test
+  GNU Rush provides a special @dfn{test mode}, intended to test
 configuration files and to emulate execution of commands.  The test
 mode is enabled by @option{--test} command line option (aliases:
-@option{--lint}, @option{-t}).  When Rush is given this option, the 
+@option{--lint}, @option{-t}).  When @command{rush} is given this option, the 
 following occurs:
 
 @enumerate 1
@@ -1924,7 +1924,7 @@ $ rush --test --debug=2 -c "cvs server" sample.rc
 @node Option Summary
 @chapter Option Summary
 @cindex options, command line
-This chapter provides a short summary of Rush command line options.
+This chapter provides a short summary of @command{rush} command line options.
 
 @table @option
 @opindex -c, @r{rush}
@@ -2095,7 +2095,7 @@ Display a concise usage summary.
 @section Output Formats
 @cindex output formats
 
-A format string controls the output of every record from Rush
+A format string controls the output of every record from GNU Rush
 accounting database.  It may contain following four types of objects:
 
 @table @asis
@@ -2254,7 +2254,7 @@ line option (@pxref{format option}):
 @node Rushlast
 @chapter The @code{rushlast} utility.
 @prindex rushlast
-The @command{rushlast} utility searches back through the Rush database
+The @command{rushlast} utility searches back through the GNU Rush database
 and displays a list of all user sessions since the database was
 created.  By default, it displays the following information:
 
@@ -2488,7 +2488,7 @@ needed in order to find the bug:
 @item Conditions under which the bug appears.
 @item It is often helpful to send the contents of @file{config.log}
 file along with your bug report. This file is created after running
-@command{./configure} in the Rush source root directory.
+@command{./configure} in the GNU Rush source root directory.
 @end itemize
 
 @node Time and Date Formats

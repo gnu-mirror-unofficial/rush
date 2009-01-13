@@ -1,4 +1,4 @@
-# This file is part of Rush.
+# This file is part of GNU Rush.
 # Copyright (C) 2009 Sergey Poznyakoff
 # Distributed under the terms of the GNU General Public License, either
 # version 3, or (at your option) any later version. See file COPYING
