@@ -5,6 +5,9 @@ src/rushlast.c
 src/rushwho.c
 src/socket.c
 src/transform.c
+src/rushopt.h
+src/rwopt.h
+src/rlopt.h
 
 lib/readfmt.c
 lib/rushdb.c
