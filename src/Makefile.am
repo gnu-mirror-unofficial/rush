@@ -35,13 +35,13 @@ rushlast_SOURCES=rushlast.c rlopt.h
 rushwho_SOURCES=rushwho.c rwopt.h
 rushlast.c: rlopt.h
 rushwho.c: rwopt.h
-EXTRA_DIST=rush-po.awk rushopt.opt rlopt.opt rwopt.opt getopt.m4
+EXTRA_DIST=rush-po.awk rushopt.opt rlopt.opt rwopt.opt getopt.m4 defconf.sed
 INCLUDES=-I$(top_srcdir)/gnu -I$(top_builddir)/gnu -I$(top_srcdir)/lib
 LDADD=../lib/librush.a ../gnu/libgnu.a
 
 sbinPROGRAMS_INSTALL = $(INSTALL_PROGRAM) -m 4755
 
-BUILT_SOURCES = defines.h rushopt.h 
+BUILT_SOURCES = defines.h rushopt.h rwopt.h rlopt.h
 CLEANFILES = defines.h
 MAINTAINER_CLEANFILES = rushopt.h rwopt.h rlopt.h
 
@@ -51,6 +51,11 @@ defines.h: Makefile
 	echo "#define CANONICAL_PROGRAM_NAME \"$(sbindir)/$$f\"" | tr -s / > $@-t
 	echo "#define SYSCONFDIR \"$(sysconfdir)\"" >> $@-t 
 	echo "#define LOCALSTATEDIR \"$(localstatedir)\"" >> $@-t
+	if test -n "$(RUSH_DEFAULT_CONFIG)" && \
+           test -f "$(RUSH_DEFAULT_CONFIG)"; then \
+           echo "#define RUSH_DEFAULT_CONFIG \\" >> $@-t; \
+	   sed -f $(srcdir)/defconf.sed "$(RUSH_DEFAULT_CONFIG)" >> $@-t; \
+	fi; \
 	mv $@-t $@
 
 SUFFIXES=.opt .c .h

@@ -81,6 +81,7 @@ documents Rush Version @value{VERSION}.
 * Operation::
 * Quick Start::
 * Configuration File::
+* Default Configuration::
 * Usage Tips::
 * Test Mode::
 * Option Summary::
@@ -276,6 +277,28 @@ errors occurred in parsing are reported using @code{syslog} facility
 mode, all diagnostics is displayed on standard error
 output. @xref{Test Mode}, for a detailed description of ways to debug
 and test your configurations.
+
+@anchor{security checks}
+  Before parsing, @command{rush} checks the ownership and permissions
+of the configuration file for possible security breaches.  The
+configuration file is considered unsafe if any of the following
+conditions are met:
+
+@enumerate 1
+@item It is not owned by root.
+@item It is group writable.
+@item It is world writable.
+@item It resides in a group writable directory.
+@item It resides in a world writable directory.
+@item It is a symbolic link to a file residing in a group or world
+writable directory.
+@end enumerate
+
+If the file is considered unsafe, @command{rush} rejects it and aborts
+execution.
+
+Any of these tests can be disabled using the
+@command{--security-check} option (@pxref{--security-check}).
 
 @menu
 * Syntax::                      
@@ -1066,7 +1089,7 @@ the system administrator to provide and install such files.
 @subsubsection Localization Directives
 @cindex localization directives
 
-The fillowing configuration directives control localization. They
+The following configuration directives control localization. They
 are available for use in @code{rule} statement:
 
 @deffn {Configuration} locale @var{name}
@@ -1153,7 +1176,7 @@ the @command{rush-po.awk} command line, e.g.:
 
 @item Editing the @acronym{PO} file
 
-Open the created @acronym{PO} file with your favorit editor and supply
+Open the created @acronym{PO} file with your favorite editor and supply
 message translations after @code{msgstr} keywords.  Although you can
 use any editor, capable of handling plain text files, we recommend to
 use GNU Emacs, which provides a special @dfn{po-mode}.  @xref{Basics,
@@ -1184,7 +1207,7 @@ naming}.
 @node Include
 @section Include
 @cindex include
-  The @code{include} statements forces inclusion of the named file in
+  The @code{include} statement forces inclusion of the named file in
 that file location:
 
 @deffn {Configuration} include @var{file}
@@ -1198,11 +1221,73 @@ full path name of current user home directory.
 
 If @var{file} is a directory, that directory is searched for a file
 whose name coincides with the current user name.  If such a file is
-found, it is inluded.
+found, it is included.
 
 In any case, if the file named by @var{file} (after tilde expansion)
 does not exist, no error is reported, and parsing of the configuration
 file continues.
+
+Before including the file, @command{rush} checks if it is secure, using
+the same rules as for the main configuration file (@pxref{security
+checks}).  The exact list of checks can be tuned using the
+@code{include-security} statement:
+
+@anchor{include-security}
+@deffn {Configuration} include-security @var{list}
+Configure the security checks for include files.  This statement takes
+a list of arguments, separated by white space.  The following
+arguments are recognized:
+
+@table @code
+@item all
+Enable all checks.
+
+@item owner
+The file is not owned by root.
+
+@item iwgrp
+@itemx groupwritablefile
+The file is group writable.
+
+@item iwoth
+@itemx worldwritablefile
+The file is world writable.
+
+@item dir_iwgrp
+@itemx groupwritabledir
+The file resides in a group writable directory.
+
+@item dir_iwoth
+@itemx worldwritabledir
+The file resides in a world writable directory.
+
+@item link
+The file is a symbolic link to a file residing in a group or world
+writable directory.
+@end table
+
+Each of the above keywords may be prefixed by @samp{no}, which
+reverses its meaning.  Each keyword adds or removes a particular test
+to the existing check list, which is initialized as described in
+@ref{security checks}.  Thus, the foll owning statement results in all
+checks, except for the file ownership:
+
+@smallexample
+include-security noowner
+@end smallexample
+
+In the example below, the check list is first cleared by using the
+@code{noall} statement, and then a set of checks is added to it:
+
+@smallexample
+include-security noall owner iwoth iwgrp
+@end smallexample
+
+The @code{include-security} statement is global, i.e. it affects all
+@code{include} statements appearing below it, up to the next
+@code{include-security} statement, or end of configuration file,
+whichever occurs first.
+@end deffn
 
 The @code{include} statement can appear in any place of the
 configuration file, both within or outside a rule.
@@ -1373,6 +1458,36 @@ Default message is:
 A system error occurred while attempting to execute command.
 @end smallexample
 @end deffn
+
+@node Default Configuration
+@chapter Default Configuration
+
+You can compile @command{rush} with the default configuration built in
+the binary.  Such a binary can then be run without configuration file.
+However, if a configuration file is present, it takes priority over
+the built-in configuration.
+
+To compile @command{rush} with the built-in configuration, first
+compile the package as usual.  Then, prepare a configuration file, and
+test it using @command{rush --lint}.  If the test shows no errors,
+reconfigure the package, using the @option{--with-default-config}
+option:
+
+@smallexample
+  ./configure --with-default-config=@var{file}
+@end smallexample
+
+@noindent
+where @var{file} is the full pathname of your configuration file.
+Then, recompile and install the package.
+
+@opindex --show-default
+You can inspect the built-in configuration using the
+@option{--show-default} option:
+
+@smallexample
+  rush --show-default
+@end smallexample
 
 @node Usage Tips
 @chapter Usage Tips
@@ -1692,7 +1807,7 @@ Missing port in @code{post-socket} statement means @command{rush} will
 be using the default @samp{tcpmux} port.
 
 To receive and process these requests, you will need an
-@command{inetd} capable to handle @acronym{TCPMUX}.  We recomment the
+@command{inetd} capable to handle @acronym{TCPMUX}.  We recommend the
 one from GNU Inetutils package
 (@uref{http://www.gnu.org/software/inetutils, GNU Inetutils}).  In
 @file{/etc/inetd.conf} file, we add:
@@ -1816,11 +1931,25 @@ This chapter provides a short summary of Rush command line options.
 @item -c @var{command}
 Specify the command to run.
 
+@anchor{--security-check}
+@opindex -C, @r{rush}
+@opindex --security-check, @r{rush}
+@item -C @var{test}
+@itemx --security-check=@var{test}
+Configure security checks for the main configuration file.
+@xref{include-security}, for the description of @var{test} argument.
+@xref{security checks}, for the discussion of the available security tests.
+
 @opindex -d, @r{rush}
 @opindex --debug, @r{rush}
 @item -d @var{number}
 @itemx --debug=@var{number}
 Set debugging level.
+
+@opindex --show-default, @r{rush}
+@item --show-default
+Display the default built-in configuration.  @xref{Default
+Configuration}, for more information.
 
 @opindex -t, @r{rush}
 @opindex --test, @r{rush}

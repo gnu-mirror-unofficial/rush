@@ -74,6 +74,10 @@ case `echo $VERSION|sed  's/[[^.]]//g'` in
 *)     RENDITION=PROOF;;
 esac
 
+AC_ARG_WITH([default-config],
+            AC_HELP_STRING([--with-default-config=FILE],
+	                   [read the default configuration from FILE]),
+            [AC_SUBST(RUSH_DEFAULT_CONFIG, $withval)])
 
 AC_CONFIG_FILES([confpaths.h:confpaths.h.in
 		 Makefile

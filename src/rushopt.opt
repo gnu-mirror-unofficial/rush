@@ -35,8 +35,8 @@ END
 OPTION(user,u,NAME,
        [<Supply user name in test mode.>])
 BEGIN
-       lint_option = 1;
-       if (getuid())
+	lint_option = 1;
+	if (getuid())
 		die(usage_error,
 		    NULL,
 		    _("the --user option is allowed "
@@ -50,14 +50,24 @@ BEGIN
 	command = optarg;
 END
 
-OPTION(safety-check,C,CHECK,
-       [<Add or remove configuration safety check.>])
+OPTION(security-check,C,CHECK,
+       [<Add or remove configuration security check.>])
 BEGIN
 	if (cfck_keyword(optarg, strlen(optarg)))
 		die(usage_error, NULL,
 		    _("unknown keyword: %s"), optarg);
 END
 
+OPTION(show-default,,,
+       [<Show default configuration.>])
+BEGIN
+#ifdef RUSH_DEFAULT_CONFIG
+	printf("%s\n", RUSH_DEFAULT_CONFIG);
+	exit(0);
+#else
+	error(1, 0, _("No default configuration"));	
+#endif
+END
 
 OPTIONS_END
 
