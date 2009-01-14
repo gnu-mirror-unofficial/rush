@@ -29,6 +29,13 @@
 # define RUSH_PRINTFLIKE(fmt,narg) __attribute__ ((__format__ (__printf__, fmt, narg)))
 #endif
 
+
+extern const char *program_name;
+
+void rush_set_program_name(const char *argv0);
+
+
+
 struct rush_wtmp {
 	size_t reclen;
 	pid_t pid;

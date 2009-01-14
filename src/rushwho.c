@@ -47,8 +47,8 @@ main(int argc, char **argv)
 	int status;
 	rushdb_format_t form;
 	
+	rush_set_program_name(argv[0]);
 	rush_i18n_init();
-	set_program_name(argv[0]);
 
 	format = getenv("RUSHWHO_FORMAT");
 	if (!format)

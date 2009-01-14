@@ -61,8 +61,8 @@ main(int argc, char **argv)
         rushdb_format_t form;
         unsigned long i;
         
+	rush_set_program_name(argv[0]);
         rush_i18n_init();
-	set_program_name(argv[0]);
 
         format = getenv("RUSHLAST_FORMAT");
         if (!format)

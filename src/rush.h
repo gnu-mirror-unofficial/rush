@@ -45,7 +45,6 @@
 #include <c-ctype.h>
 #include <argcv.h>
 #include <inttostr.h>
-#include <progname.h>
 
 #include <defines.h>
 #include <librush.h>

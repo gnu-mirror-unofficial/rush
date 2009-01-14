@@ -1,15 +1,15 @@
-GNU Rush NEWS -- history of user-visible changes. 2009-01-13
+GNU Rush NEWS -- history of user-visible changes. 2009-01-14
 Copyright (C) 2008, 2009 Sergey Poznyakoff
 See the end of file for copying conditions.
 
 Please send bug reports to <bug-rush@gnu.org.ua>
 
 
-Version 1.4.90, (Git)
+Version 1.5, 2009-01-14
 
 * Post-process notification
 
-After completing particular rules, Rush can send notifications
+After completing a rule, Rush can send a notification
 over a TCP/IP or UNIX socket.  
 
 * Include statement
@@ -30,7 +30,7 @@ configuration file. The file is rejected if:
 
 The same checks are performed for any included file.  The safety
 checks for included files can be changed using the global statement
-"include-safety".
+`include-security'.
 
 * Default configuration
 
@@ -85,7 +85,7 @@ Version 1.1, 2008-08-30
 
 * A condition can be negated.
 
-Placing ! between the keyword and expression of a condition indicates
+Placing ! between the keyword and conditional expression indicates
 its negation, e.g.:
 
   command ! ^cvs
@@ -94,8 +94,8 @@ matches any command line that does not begin with `cvs'
 
 * New action `exit'
 
-The `exit' statement insructs rush to write the supplied error message
-to the specified file descriptor and exit immediately.  If file
+The `exit' statement instructs rush to write a supplied error message
+to specified file descriptor and exit immediately.  If file
 descriptor is not given, 2 (standard error) is used.
 
 Exit actions are useful for writing ``trap rules'', i.e. rules that

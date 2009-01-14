@@ -737,8 +737,8 @@ main(int argc, char **argv)
         struct rush_rule *rule;
         struct rush_request req;
 
+	rush_set_program_name(argv[0]);
 	rush_i18n_init();
-	set_program_name(argv[0]);
         umask(~(mode_t)0);
         
         openlog(program_name, LOG_NDELAY|LOG_PID, LOG_AUTHPRIV);
