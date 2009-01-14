@@ -34,11 +34,18 @@
 #include <signal.h>
 #include <getopt.h>
 
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <sys/un.h>
+#include <netdb.h>
+#include <arpa/inet.h>
+
 #include <xalloc.h>
 #include <regex.h>
 #include <c-ctype.h>
 #include <argcv.h>
 #include <inttostr.h>
+#include <progname.h>
 
 #include <defines.h>
 #include <librush.h>

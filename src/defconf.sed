@@ -9,7 +9,7 @@
 "\\
 
 # Provide trailing quote
-$i\
+$a\
 "
 
 # Remove empty lines and comments

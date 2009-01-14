@@ -15,11 +15,6 @@
    along with GNU Rush.  If not, see <http://www.gnu.org/licenses/>. */
 
 #include <rush.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <sys/un.h>
-#include <netdb.h>
-#include <arpa/inet.h>
 
 int
 post_socket_send(const struct rush_sockaddr *sockaddr,

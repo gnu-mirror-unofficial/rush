@@ -26,8 +26,6 @@ int debug_option;
 struct rush_rule *rule_head, *rule_tail;
 struct passwd *rush_pw;
 
-static char *progname;
-
 #define STDOUT_FILENO 1
 #define STDERR_FILENO 2
 
@@ -60,7 +58,7 @@ void
 vlogmsg(int prio, const char *fmt, va_list ap)
 {
 	if (lint_option) {
-		fprintf(stderr, "%s: ", progname);
+		fprintf(stderr, "%s: ", program_name);
 		switch (prio) {
 		case LOG_DEBUG:
 			fprintf(stderr, _("Debug: "));
@@ -739,16 +737,11 @@ main(int argc, char **argv)
         struct rush_rule *rule;
         struct rush_request req;
 
-
 	rush_i18n_init();
-        progname = strrchr(argv[0], '/');
-        if (progname)
-                progname++;
-        else
-                progname = argv[0];
+	set_program_name(argv[0]);
         umask(~(mode_t)0);
         
-        openlog(progname, LOG_NDELAY|LOG_PID, LOG_AUTHPRIV);
+        openlog(program_name, LOG_NDELAY|LOG_PID, LOG_AUTHPRIV);
 
 	get_options(argc, argv);
 

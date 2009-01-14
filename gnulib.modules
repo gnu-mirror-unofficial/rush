@@ -11,6 +11,7 @@ gettext-h
 gitlog-to-changelog
 inttostr
 malloc
+progname
 realloc
 regex
 strerror

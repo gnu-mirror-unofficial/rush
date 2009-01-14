@@ -36,8 +36,8 @@ command:
 
   ./configure --with-default-config=FILE
 
-where FILE is the full file name.  For more information, refer to
-chapter 5, `Default Configuration' in the GNU Rush manual.
+For more information, refer to chapter 5, `Default Configuration' in
+the GNU Rush manual.
 
 * Bug reporting.		
 

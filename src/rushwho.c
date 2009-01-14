@@ -17,7 +17,6 @@
 #include <rush.h>
 #include "error.h"
 
-char *program_name;
 char *base_name = RUSH_DB;
 struct rush_wtmp *wtmp = NULL;
 int  display_header = 1;  /* Display header line */
@@ -49,11 +48,8 @@ main(int argc, char **argv)
 	rushdb_format_t form;
 	
 	rush_i18n_init();
-	program_name = strrchr(argv[0], '/');
-        if (program_name)
-                program_name++;
-        else
-                program_name = argv[0];
+	set_program_name(argv[0]);
+
 	format = getenv("RUSHWHO_FORMAT");
 	if (!format)
 		format = default_format;

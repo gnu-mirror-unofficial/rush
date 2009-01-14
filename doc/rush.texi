@@ -1478,8 +1478,8 @@ option:
 @end smallexample
 
 @noindent
-where @var{file} is the full pathname of your configuration file.
-Then, recompile and install the package.
+where @var{file} is the name of your configuration file.  Then,
+recompile and install the package.
 
 @opindex --show-default
 You can inspect the built-in configuration using the

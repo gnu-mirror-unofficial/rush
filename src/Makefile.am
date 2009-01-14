@@ -37,7 +37,7 @@ rushlast.c: rlopt.h
 rushwho.c: rwopt.h
 EXTRA_DIST=rush-po.awk rushopt.opt rlopt.opt rwopt.opt getopt.m4 defconf.sed
 INCLUDES=-I$(top_srcdir)/gnu -I$(top_builddir)/gnu -I$(top_srcdir)/lib
-LDADD=../lib/librush.a ../gnu/libgnu.a
+LDADD=../lib/librush.a ../gnu/libgnu.a @LTLIBINTL@
 
 sbinPROGRAMS_INSTALL = $(INSTALL_PROGRAM) -m 4755
 

@@ -77,10 +77,16 @@ esac
 AC_ARG_WITH([default-config],
             AC_HELP_STRING([--with-default-config=FILE],
 	                   [read the default configuration from FILE]),
-            [AC_SUBST(RUSH_DEFAULT_CONFIG, $withval)])
+            [dir=`AS_DIRNAME(["$withval"])`
+	     if test -d $dir; then
+	       dir=`cd $dir; pwd`
+	     else
+	       AC_MSG_ERROR([No such directory: $dir])
+	     fi
+	     name=`expr x"$withval" : '.*/\(.*\)'`
+	     AC_SUBST(RUSH_DEFAULT_CONFIG, $dir/$name)])
 
-AC_CONFIG_FILES([confpaths.h:confpaths.h.in
-		 Makefile
+AC_CONFIG_FILES([Makefile
                  gnu/Makefile
 		 lib/Makefile
 		 src/Makefile
