@@ -206,6 +206,7 @@ extern struct rush_rule *rule_head, *rule_tail;
 extern unsigned debug_level;
 extern int debug_option;
 extern struct passwd *rush_pw;
+extern char *rush_interactive_shell;
 
 #define __debug_p(x) ((x) <= debug_level)
 

@@ -1121,6 +1121,14 @@ _parse_include_security(input_buf_ptr ibuf, struct rush_rule *rule,
 	return rc;
 }
 
+static int
+_parse_interactive(input_buf_ptr ibuf, struct rush_rule *rule,
+		   char *kw, char *val, input_buf_ptr *ret_buf)
+{
+	rush_interactive_shell = xstrdup(val);
+	return 0;
+}
+
 
 #define TOK_NONE   0x00   /* No flags */
 #define TOK_ARG    0x01   /* Token requires an argument */
@@ -1171,6 +1179,7 @@ struct token toktab[] = {
 	{ KW("system-error"),     TOK_ARG, _parse_system_error },
 	{ KW("regexp"),           TOK_ARG, _parse_re_flags },
 	{ KW("include-security"), TOK_ARG, _parse_include_security },
+	{ KW("interactive"),      TOK_ARG, _parse_interactive },
 	{ NULL }
 };
 

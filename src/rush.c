@@ -25,6 +25,7 @@ unsigned debug_level;
 int debug_option;
 struct rush_rule *rule_head, *rule_tail;
 struct passwd *rush_pw;
+char *rush_interactive_shell;
 
 #define STDOUT_FILENO 1
 #define STDERR_FILENO 2
@@ -773,7 +774,12 @@ main(int argc, char **argv)
 	if (!command) {
 		if (lint_option) 
 			exit(0);
-		die(usage_error, NULL, _("invalid command line"));
+		else if (rush_interactive_shell) {
+			command = rush_interactive_shell;
+			debug1(2, _("Mapping interactive shell to \"%s\""),
+			       command);
+		} else 
+			die(usage_error, NULL, _("invalid command line"));
 	}
 
         if (__debug_p(2)) {
