@@ -83,45 +83,57 @@ argcv_scan (struct argcv_info *ap)
       if (i >= len)
 	return i + 1;
 
-      /* Skip initial whitespace */
-      while (i < len && isws (command[i]))
-	i++;
+      if (ap->flags & ARGCV_WS)
+	{
+	  /* Skip initial whitespace */
+	  while (i < len && isws (command[i]))
+	    i++;
+	}
       ap->start = i;
 
       if (!isdelim (command[i], delim))
 	{
 	  while (i < len)
 	    {
-	      if (command[i] == '\\')
+	      if (ap->flags & ARGCV_QUOTE)
 		{
-		  if (++i == len)
-		    break;
-		  i++;
-		  continue;
-		}
+		  if (command[i] == '\\')
+		    {
+		      if (++i == len)
+			break;
+		      i++;
+		      continue;
+		    }
 	      
-	      if (command[i] == '\'' || command[i] == '"')
-		{
-		  int j;
-		  for (j = i + 1; j < len && command[j] != command[i]; j++)
-		    if (command[j] == '\\')
-		      j++;
-		  if (j < len)
-		    i = j + 1;
-		  else
-		    i++;
+		  if (command[i] == '\'' || command[i] == '"')
+		    {
+		      int j;
+		      for (j = i + 1; j < len && command[j] != command[i]; j++)
+			if (command[j] == '\\')
+			  j++;
+		      if (j < len)
+			i = j + 1;
+		      else
+			i++;
+		      continue;
+		    }
 		}
-	      else if (isws (command[i]) || isdelim (command[i], delim))
+	      if ((ap->flags & ARGCV_WS && isws (command[i]))
+		  || isdelim (command[i], delim))
 		break;
 	      else
-		i++; /* skip the escaped character */
+		i++;
 	    }
 	  i--;
 	}
       else if (!(ap->flags & ARGCV_RETURN_DELIMS))
 	{
-	  while (i < len && isdelim (command[i], delim))
+	  if (ap->flags & ARGCV_SQUEEZE_DELIMS)
+	    while (i < len && isdelim (command[i], delim))
+	      i++;
+	  else if (i < len)
 	    i++;
+
 	  ap->save = i;
 	  continue;
 	}
@@ -381,7 +393,7 @@ argcv_get_np (const char *command, int len,
   char **argv;
   
   if (!delim)
-    delim = "";
+    delim = " ";
   if (!cmnt)
     cmnt = "";
 
@@ -440,11 +452,14 @@ argcv_get_np (const char *command, int len,
   return 0;
 }
 
+#define ARGCV_DEFFLAGS \
+  (ARGCV_WS | ARGCV_QUOTE | ARGCV_SQUEEZE_DELIMS | ARGCV_RETURN_DELIMS)
+
 int
 argcv_get_n (const char *command, int len, const char *delim, const char *cmnt,
 	     int *pargc, char ***pargv)
 {
-  return argcv_get_np (command, len, delim, cmnt, ARGCV_RETURN_DELIMS,
+  return argcv_get_np (command, len, delim, cmnt, ARGCV_DEFFLAGS,
 		       pargc, pargv, NULL);
 }
 
@@ -452,7 +467,9 @@ int
 argcv_get (const char *command, const char *delim, const char *cmnt,
 	   int *argc, char ***argv)
 {
-  return argcv_get_n (command, strlen (command), delim, cmnt, argc, argv);
+  return argcv_get_np (command, strlen (command), delim, cmnt,
+		       ARGCV_DEFFLAGS,
+		       argc, argv, NULL);
 }
 
 

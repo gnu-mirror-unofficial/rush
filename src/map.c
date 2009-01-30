@@ -212,9 +212,14 @@ map_string(struct rush_map *map, struct rush_request *req)
 		int fldc;
 		char **fldv;
 		int rc;
-
+		size_t len;
+		
 		line++;
-		rc = argcv_get_np(buf, strlen(buf), map->delim, NULL,
+		
+		len = strlen(buf);
+		while (len > 0 && buf[len-1] == '\n')
+			buf[--len] = 0;
+		rc = argcv_get_np(buf, len, map->delim, NULL,
 				  0, &fldc, &fldv, NULL);
 		if (rc)
 			die(system_error, &req->i18n,

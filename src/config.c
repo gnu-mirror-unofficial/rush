@@ -1157,7 +1157,7 @@ _parse_map_ar(input_buf_ptr ibuf, struct rush_rule *rule,
 	}
 
 	if (env->argc == 6)
-		node->v.map.defval = env->argv[5];
+		node->v.map.defval = xstrdup(env->argv[5]);
 	return 0;
 }
 

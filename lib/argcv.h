@@ -27,7 +27,15 @@
 extern "C" {
 #endif
 
-#define ARGCV_RETURN_DELIMS 0x01
+	/* Treat whitespace as delimiters */
+#define ARGCV_WS                0x01
+	/* Handle quotes and escape directives */
+#define ARGCV_QUOTE             0x02
+	/* replace each input sequence of repeated delimiters into a single
+	   delimiter */
+#define ARGCV_SQUEEZE_DELIMS   0x04
+	/* Return delimiters */
+#define ARGCV_RETURN_DELIMS     0x08
 
 enum argcv_quoting_style {
     argcv_quoting_octal,

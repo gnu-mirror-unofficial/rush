@@ -17,6 +17,8 @@
 noinst_LIBRARIES=librush.a
 
 librush_a_SOURCES=\
+ argcv.c\
+ argcv.h\
  i18n.c\
  progname.c\
  readfmt.c\

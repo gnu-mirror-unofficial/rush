@@ -19,8 +19,6 @@ bin_PROGRAMS=rushlast rushwho
 pkgdata_DATA = rush-po.awk
 
 rush_SOURCES=\
- argcv.c\
- argcv.h\
  cfck.c\
  config.c\
  defines.h\
