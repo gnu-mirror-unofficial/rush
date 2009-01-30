@@ -152,17 +152,14 @@ int chk_vals[] = {
 ARGMATCH_VERIFY(chk_args, chk_vals);
 
 int
-cfck_keyword(const char *name, size_t len)
+cfck_keyword(const char *name)
 {
 	int negate = 0;
-	int val;
 	char *str;
 	char *kw;
 	ptrdiff_t d;
 
-	str = xmalloc(len + 1);
-	memcpy(str, name, len);
-	str[len] = 0;
+	str = xstrdup(name);
 	for (kw = str; *kw; kw++)
 		*kw = tolower(*kw);
 	kw = str;

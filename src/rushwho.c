@@ -43,7 +43,6 @@ char *default_format =
 int
 main(int argc, char **argv)
 {
-	int rc;
 	int status;
 	rushdb_format_t form;
 	

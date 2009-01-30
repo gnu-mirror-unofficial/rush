@@ -496,7 +496,7 @@ run_transforms(struct rush_rule *rule, struct rush_request *req)
                                 args_transformed = 0;
                         }
                         debug(2, _("Transforming command line"));
-                        p = transform_string(node->trans, req->cmdline);
+                        p = transform_string(node->v.trans, req->cmdline);
                         free(req->cmdline);
                         req->cmdline = p;
                         debug1(2, _("Command line: %s"), req->cmdline);
@@ -512,10 +512,36 @@ run_transforms(struct rush_rule *rule, struct rush_request *req)
 				    &req->i18n, 
                                     _("not enough arguments in command: %s"),
                                     req->cmdline);
-                        p = transform_string(node->trans, req->argv[arg_no]);
+                        p = transform_string(node->v.trans, req->argv[arg_no]);
                         free(req->argv[arg_no]);
                         req->argv[arg_no] = p;
                         args_transformed = 1;
+			break;
+
+		case transform_map:
+                        arg_no = node->arg_no;
+                        if (arg_no == -1)
+                                arg_no = req->argc - 1;
+                        if (arg_no >= req->argc) 
+                                die(usage_error,
+				    &req->i18n, 
+                                    _("not enough arguments in command: %s"),
+                                    req->cmdline);
+                        debug7(2, _("Transforming arg %u, map: %s, %s, %s, %u, %u, %s"),
+			       arg_no,
+			       node->v.map.file,
+			       node->v.map.delim,
+			       node->v.map.key,
+			       node->v.map.key_field,
+			       node->v.map.val_field,
+			       node->v.map.defval);
+                        p = map_string(&node->v.map, req);
+			if (p) {
+				free(req->argv[arg_no]);
+				req->argv[arg_no] = p;
+				args_transformed = 1;
+			}
+			break;
                 }
         }
 
@@ -710,7 +736,7 @@ run_rule(struct rush_rule *rule, struct rush_request *req)
 
         if (setuid(req->pw->pw_uid))
                 die(system_error, &req->i18n, _("cannot enforce uid %lu: %s"),
-                    req->pw->pw_uid, strerror(errno));
+                    (unsigned long) req->pw->pw_uid, strerror(errno));
 
 	if (req->pw->pw_uid && setuid(0) == 0) 
 		die(system_error, &req->i18n,

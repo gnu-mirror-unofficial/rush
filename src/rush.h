@@ -33,6 +33,7 @@
 #include <fcntl.h>
 #include <signal.h>
 #include <getopt.h>
+#include <ctype.h>
 
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -79,16 +80,29 @@ enum error_type {
 typedef struct limits_rec *limits_record_t;
 typedef struct transform *transform_t;
 
+struct rush_map {
+	char *file;
+	char *delim;
+	char *key;
+	unsigned key_field;
+	unsigned val_field;
+	char *defval;
+};
+	
 enum transform_node_type {
 	transform_cmdline,
-	transform_arg
+	transform_arg,
+	transform_map
 };
 
 struct transform_node {
 	struct transform_node *next;
 	enum transform_node_type type;
-	transform_t trans;
 	int arg_no;
+	union {
+		transform_t trans;
+		struct rush_map map;
+	} v;
 };
 
 /* Comparison operator */
@@ -243,11 +257,17 @@ extern char *rush_interactive_shell;
 			logmsg(LOG_DEBUG, fmt, x1, x2,	\
 			       x3, x4, x5);		\
 	} while(0)
-#define debug6(lev,fmt,x1,x2,x3,x4,x5)		        \
+#define debug6(lev,fmt,x1,x2,x3,x4,x5,x6)	        \
 	do {						\
 		if (__debug_p(lev))			\
 			logmsg(LOG_DEBUG, fmt, x1, x2,	\
 			       x3, x4, x5, x6);		\
+	} while(0)
+#define debug7(lev,fmt,x1,x2,x3,x4,x5,x6,x7)	        \
+	do {						\
+		if (__debug_p(lev))			\
+			logmsg(LOG_DEBUG, fmt, x1, x2,	\
+			       x3, x4, x5, x6, x7);	\
 	} while(0)
 
 void die(enum error_type type, struct rush_i18n *i18n, const char *fmt, ...)
@@ -285,7 +305,10 @@ char *expand_tilde(const char *dir, const char *home);
 #endif
 
 int check_config_permissions(const char *filename, struct stat *st);
-int cfck_keyword(const char *name, size_t len);
+int cfck_keyword(const char *name);
 
+
+/* map.c */
+char *map_string(struct rush_map *map, struct rush_request *req);
 
 

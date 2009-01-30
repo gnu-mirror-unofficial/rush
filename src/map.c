@@ -184,6 +184,7 @@ static struct metadef mapdef[] = {
 char *
 map_string(struct rush_map *map, struct rush_request *req)
 {
+	char *file;
 	FILE *fp;
 	struct stat st;
 	char *buf = NULL;
@@ -191,19 +192,20 @@ map_string(struct rush_map *map, struct rush_request *req)
 	size_t line = 0;
 	char *key;
 	char *ret = NULL;
-	
-	if (stat(map->file, &st)) {
-		die(system_error, &req->i18n, _("cannot stat file %s: %s"),
-		    map->file, strerror(errno));
-	}
-	if (check_config_permissions(map->file, &st)) 
-		die(config_error, &req->i18n, _("%s: file is not safe"),
-		    map->file);
 
-	fp = fopen(map->file, "r");
+	file = expand_tilde(map->file, req->pw->pw_dir);
+	if (stat(file, &st)) {
+		die(system_error, &req->i18n, _("cannot stat file %s: %s"),
+		    file, strerror(errno));
+	}
+	if (check_config_permissions(file, &st)) 
+		die(config_error, &req->i18n, _("%s: file is not safe"),
+		    file);
+
+	fp = fopen(file, "r");
 	if (!fp)
 		die(system_error, &req->i18n, _("%s: cannot open map file"),
-		    map->file);
+		    file);
 
 	key = meta_expand_string(map->key, mapdef, req);
 	while (getline(&buf, &size, fp) != -1) {
@@ -217,7 +219,7 @@ map_string(struct rush_map *map, struct rush_request *req)
 		if (rc)
 			die(system_error, &req->i18n,
 			    _("%s:%lu: failed to parse line: %s"),
-			    map->file, (unsigned long)line, strerror(rc));
+			    file, (unsigned long)line, strerror(rc));
 		if (map->key_field <= fldc && map->val_field <= fldc
 		    && strcmp(fldv[map->key_field - 1], key) == 0) {
 			ret = xstrdup(fldv[map->val_field - 1]);
@@ -226,6 +228,7 @@ map_string(struct rush_map *map, struct rush_request *req)
 	}
 	fclose(fp);
 	free(key);
+	free(file);
 	if (!ret && map->defval)
 		ret = xstrdup(map->defval);
 	return ret;

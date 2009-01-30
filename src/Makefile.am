@@ -25,6 +25,7 @@ rush_SOURCES=\
  config.c\
  defines.h\
  limits.c\
+ map.c\
  rush.c\
  rush.h\
  rushopt.h\

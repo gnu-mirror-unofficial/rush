@@ -6,11 +6,13 @@ c-ctype
 dirname
 error
 fprintftime
+getline
 getopt
 gettext-h
 gitlog-to-changelog
 inttostr
 malloc
+obstack
 realloc
 regex
 strerror

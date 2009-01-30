@@ -384,7 +384,7 @@ parse_numtest(input_buf_ptr ibuf, struct test_numeric_node *numtest,
 {
 	char *q;
 	
-	if (parse_cmp_op (&numtest->op, &val)) {
+	if (parse_cmp_op(&numtest->op, &val)) {
 		logmsg(LOG_NOTICE,
 		       _("%s:%d: invalid opcode"),
 		       ibuf->file, ibuf->line);
@@ -400,15 +400,27 @@ parse_numtest(input_buf_ptr ibuf, struct test_numeric_node *numtest,
 	return 0;
 }
 
-int
-parse_strv(input_buf_ptr ibuf, struct test_node *node, char *val)
+struct stmt_env {
+	char *kw;              /* Keyword (with the index, if specified) */
+	char *val;             /* Value */
+	int argc;              /* Number of arguments (if TOK_ARGN) */
+	char **argv;           /* Parsed out value */
+	int index;             /* Index, if given */
+	input_buf_ptr ret_buf; /* Return input buffer, for TOK_NEWBUF */
+};
+
+void
+parse_neg_strv(input_buf_ptr ibuf, struct test_node *node,
+	       struct stmt_env *env)
 {
-	int n, rc = argcv_get(val, NULL, "#", &n, &node->v.strv);
-	if (rc)
-		logmsg(LOG_NOTICE,
-		       _("%s:%d: failed to parse value: %s"),
-		       ibuf->file, ibuf->line, strerror (rc));
-	return rc;
+	if (env->argv[0][0] == '!' && env->argv[0][1] != '=') {
+		node->negate = 1;
+		memmove(env->argv, env->argv + 1,
+			env->argc * sizeof env->argv[0]);
+	}
+	node->v.strv = env->argv;
+	env->argv = NULL;
+	env->argc = 0;
 }
 
 void
@@ -422,17 +434,11 @@ regexp_error(input_buf_ptr ibuf, regex_t *regex, int rc)
 
 static int
 _parse_re_flags(input_buf_ptr ibuf, struct rush_rule *rule,
-		char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
+		struct stmt_env *env)
 {
-	int fc, i;
-	char **fv;
+	int fc = env->argc, i;
+	char **fv = env->argv;
 
-	if ((i = argcv_get(val, NULL, "#", &fc, &fv))) {
-		logmsg(LOG_NOTICE,
-		       _("%s:%d: failed to parse value: %s"),
-		       ibuf->file, ibuf->line, strerror (i));
-		return 1;
-	}
 	for (i = 0; i < fc; i++) {
 		int enable, flag;
 		char *p = fv[i];
@@ -472,19 +478,19 @@ _parse_re_flags(input_buf_ptr ibuf, struct rush_rule *rule,
 		else
 			re_flags &= ~flag;
 	}
-	argcv_free(fc, fv);
 	return 0;
 }
 
 static int
 _parse_command(input_buf_ptr ibuf, struct rush_rule *rule,
-	       char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
+	       struct stmt_env *env)
 {
 	int rc;
 	struct test_node *node;
+	const char *val;
 
 	node = new_test_node(rule, test_cmdline);
-	val = _parse_negation(node, val);
+	val = _parse_negation(node, env->val);
 	rc = regcomp(&node->v.regex, val, re_flags|REG_NOSUB);
 	if (rc) 
 		regexp_error(ibuf, &node->v.regex, rc);
@@ -493,26 +499,15 @@ _parse_command(input_buf_ptr ibuf, struct rush_rule *rule,
 	
 static int
 _parse_match(input_buf_ptr ibuf, struct rush_rule *rule,
-	     char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
+	     struct stmt_env *env)
 {
-	char *q;
 	struct test_node *node;
-	int rc, n;
-
-	if (kw[1] == '$') {
-		n = -1;
-		q = kw + 2;
-	} else 
-		n = strtoul(kw + 1, &q, 10);
-	if (*q != ']') {
-		logmsg(LOG_NOTICE,
-		       _("%s:%d: missing ]"),
-			       ibuf->file, ibuf->line);
-		return 1;
-	}
+	int rc;
+	const char *val;
+	
 	node = new_test_node(rule, test_arg);
-	node->v.arg.arg_no = n;
-	val = _parse_negation(node, val);
+	node->v.arg.arg_no = env->index;
+	val = _parse_negation(node, env->val);
 	rc = regcomp(&node->v.arg.regex, val, re_flags|REG_NOSUB);
 	if (rc) 
 		regexp_error(ibuf, &node->v.regex, rc);
@@ -521,59 +516,59 @@ _parse_match(input_buf_ptr ibuf, struct rush_rule *rule,
 	
 static int
 _parse_argc(input_buf_ptr ibuf, struct rush_rule *rule,
-	    char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
+	    struct stmt_env *env)
 {
 	struct test_node *node = new_test_node(rule, test_argc);
-	val = _parse_negation(node, val);
+	char *val = _parse_negation(node, env->val);
 	return parse_numtest(ibuf, &node->v.num, val);
 }
 
 static int
 _parse_uid(input_buf_ptr ibuf, struct rush_rule *rule,
-	   char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
+	   struct stmt_env *env)
 {
 	struct test_node *node = new_test_node(rule, test_uid);
-	val = _parse_negation(node, val);
+	char *val = _parse_negation(node, env->val);
 	return parse_numtest(ibuf, &node->v.num, val);
 }
 
 static int
 _parse_gid(input_buf_ptr ibuf, struct rush_rule *rule,
-	   char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
+	   struct stmt_env *env)
 {
 	struct test_node *node = new_test_node(rule, test_gid);
-	val = _parse_negation(node, val);
+	char *val = _parse_negation(node, env->val);
 	return parse_numtest(ibuf, &node->v.num, val);
 }
 
 static int
 _parse_user(input_buf_ptr ibuf, struct rush_rule *rule,
-	    char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
+	    struct stmt_env *env)
 {
 	struct test_node *node = new_test_node(rule, test_user);
-	val = _parse_negation(node, val);
-	return parse_strv(ibuf, node, val);
+	parse_neg_strv(ibuf, node, env);
+	return 0;
 }
 
 static int
 _parse_group(input_buf_ptr ibuf, struct rush_rule *rule,
-	     char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
+	     struct stmt_env *env)
 {
 	struct test_node *node = new_test_node(rule, test_group);
-	val = _parse_negation(node, val);
-	return parse_strv(ibuf, node, val);
+	parse_neg_strv(ibuf, node, env);
+	return 0;
 }
 
 static int
 _parse_umask(input_buf_ptr ibuf, struct rush_rule *rule,
-	     char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
+	     struct stmt_env *env)
 {
 	char *q;
-	unsigned int n = strtoul(val, &q, 8);
+	unsigned int n = strtoul(env->val, &q, 8);
 	if (*q || (n & ~0777)) {
 		logmsg(LOG_NOTICE,
 		       _("%s:%d: invalid umask: %s"),
-		       ibuf->file, ibuf->line, val);
+		       ibuf->file, ibuf->line, env->val);
 		return 1;
 	} else
 		rule->mask = n;
@@ -582,9 +577,9 @@ _parse_umask(input_buf_ptr ibuf, struct rush_rule *rule,
 
 static int
 _parse_chroot(input_buf_ptr ibuf, struct rush_rule *rule,
-	      char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
+	      struct stmt_env *env)
 {
-	char *chroot_dir = xstrdup(val);
+	char *chroot_dir = xstrdup(env->val);
 	if (trimslash(chroot_dir) == 0) {
 		logmsg(LOG_NOTICE,
 		       _("%s:%d: invalid chroot directory"),
@@ -598,11 +593,11 @@ _parse_chroot(input_buf_ptr ibuf, struct rush_rule *rule,
 
 static int
 _parse_limits(input_buf_ptr ibuf, struct rush_rule *rule,
-	      char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
+	      struct stmt_env *env)
 {
 	char *q;
 			
-	if (parse_limits(&rule->limits, val, &q)) {
+	if (parse_limits(&rule->limits, env->val, &q)) {
 		logmsg(LOG_NOTICE,
 		       _("%s:%d: unknown limit: %s"),
 		       ibuf->file, ibuf->line, q);
@@ -613,44 +608,30 @@ _parse_limits(input_buf_ptr ibuf, struct rush_rule *rule,
 
 static int
 _parse_transform(input_buf_ptr ibuf, struct rush_rule *rule,
-		 char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
+		 struct stmt_env *env)
 {
 	struct transform_node *node;
 	node = new_transform_node(rule, transform_cmdline);
-	node->trans = compile_transform_expr(val);
+	node->v.trans = compile_transform_expr(env->val);
 	return 0;
 }
 
 static int
 _parse_transform_ar(input_buf_ptr ibuf, struct rush_rule *rule,
-		    char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
+		    struct stmt_env *env)
 {
-	char *q;
 	struct transform_node *node;
-	int n;
-	
-	if (kw[1] == '$') {
-		n = -1;
-		q = kw + 2;
-	} else 
-		n = strtoul(kw + 1, &q, 10);
-	if (*q != ']') {
-		logmsg(LOG_NOTICE,
-		       _("%s:%d: missing ]"),
-		       ibuf->file, ibuf->line);
-		return 1;
-	}
 	node = new_transform_node(rule, transform_arg);
-	node->arg_no = n;
-	node->trans = compile_transform_expr(val);
+	node->arg_no = env->index;
+	node->v.trans = compile_transform_expr(env->val);
 	return 0;
 }
 
 static int
 _parse_chdir(input_buf_ptr ibuf, struct rush_rule *rule,
-	     char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
+	     struct stmt_env *env)
 {
-	char *home_dir = rule->home_dir = xstrdup(val);
+	char *home_dir = rule->home_dir = xstrdup(env->val);
 	if (trimslash(home_dir) == 0) {
 		logmsg(LOG_NOTICE,
 		       _("%s:%d: invalid home directory"),
@@ -664,25 +645,21 @@ _parse_chdir(input_buf_ptr ibuf, struct rush_rule *rule,
 }
 
 static int
-_parse_env(input_buf_ptr ibuf, struct rush_rule *rule,
-	   char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
+_parse_env(input_buf_ptr ibuf, struct rush_rule *rule, struct stmt_env *env)
 {
-	int rc, n;
-	rc = argcv_get(val, NULL, "#", &n, &rule->env);
-	if (rc) 
-		logmsg(LOG_NOTICE,
-		       _("%s:%d: failed to parse value: %s"),
-		       ibuf->file, ibuf->line, strerror (rc));
-	return rc;
+	rule->env = env->argv;
+	env->argv = NULL;
+	env->argc = 0;
+	return 0;
 }
 
 /* Global statements */
 static int
 _parse_debug(input_buf_ptr ibuf, struct rush_rule *rule,
-	     char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
+	     struct stmt_env *env)
 {
 	if (!debug_option) {
-		debug_level = strtoul(val, NULL, 0);
+		debug_level = strtoul(env->val, NULL, 0);
 		debug1(0, _("debug level set to %d"), debug_level);
 	}
 	return 0;
@@ -690,14 +667,14 @@ _parse_debug(input_buf_ptr ibuf, struct rush_rule *rule,
 
 static int
 _parse_sleep_time(input_buf_ptr ibuf, struct rush_rule *rule,
-		  char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
+		  struct stmt_env *env)
 {
 	char *q;
-	sleep_time = strtoul(val, &q, 10);
+	sleep_time = strtoul(env->val, &q, 10);
 	if (*q) {
 		logmsg(LOG_NOTICE,
 		       _("%s:%d: invalid time: %s"),
-		       ibuf->file, ibuf->line, val);
+		       ibuf->file, ibuf->line, env->val);
 		return 1;
 	}
 	return 0;
@@ -705,39 +682,39 @@ _parse_sleep_time(input_buf_ptr ibuf, struct rush_rule *rule,
 
 static int
 _parse_usage_error(input_buf_ptr ibuf, struct rush_rule *rule,
-		   char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
+		   struct stmt_env *env)
 {
-	error_msg[usage_error] = copy_string(val);
+	error_msg[usage_error] = copy_string(env->val);
 	return 0;
 }
 
 static int
 _parse_nologin_error(input_buf_ptr ibuf, struct rush_rule *rule,
-		     char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
+		     struct stmt_env *env)
 {
-	error_msg[nologin_error] = copy_string(val);
+	error_msg[nologin_error] = copy_string(env->val);
 	return 0;
 }
 
 static int
 _parse_config_error(input_buf_ptr ibuf, struct rush_rule *rule,
-		    char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
+		    struct stmt_env *env)
 {
-	error_msg[config_error] = copy_string(val);
+	error_msg[config_error] = copy_string(env->val);
 	return 0;
 }
 
 static int
 _parse_system_error(input_buf_ptr ibuf, struct rush_rule *rule,
-		    char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
+		    struct stmt_env *env)
 {
-	error_msg[system_error] = copy_string(val);
+	error_msg[system_error] = copy_string(env->val);
 	return 0;
 }
 
 static int
 _parse_fall_through(input_buf_ptr ibuf, struct rush_rule *rule,
-		    char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
+		    struct stmt_env *env RUSH_ARG_UNUSED)
 {
 	rule->fall_through = 1;
 	return 0;
@@ -745,17 +722,19 @@ _parse_fall_through(input_buf_ptr ibuf, struct rush_rule *rule,
 
 static int
 _parse_exit(input_buf_ptr ibuf, struct rush_rule *rule,
-	    char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
+	    struct stmt_env *env)
 {
+	const char *val = env->val;
 	if (c_isdigit(val[0])) {
-		unsigned long n = strtoul(val, &val, 10);
-		if (!ISWS(val[0]) || n > getmaxfd()) {
+		char *p;
+		unsigned long n = strtoul(val, &p, 10);
+		if (!ISWS(p[0]) || n > getmaxfd()) {
 			logmsg(LOG_NOTICE,
 			       _("%s:%d: invalid file descriptor"),
 			       ibuf->file, ibuf->line);
 			return 1;
 		}
-		val = skipws(val);
+		val = skipws(p);
 		rule->error_fd = n;
 	} else
 		rule->error_fd = 2;
@@ -764,7 +743,7 @@ _parse_exit(input_buf_ptr ibuf, struct rush_rule *rule,
 }
 
 static int
-get_bool(char *val, int *res)
+get_bool(const char *val, int *res)
 {
 	if (strcmp (val, "yes") == 0
 	    || strcmp (val, "on") == 0
@@ -785,13 +764,13 @@ get_bool(char *val, int *res)
 
 static int
 _parse_fork(input_buf_ptr ibuf, struct rush_rule *rule,
-	    char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
+	    struct stmt_env *env)
 {
 	int yes;
-	if (get_bool(val, &yes)) {
+	if (get_bool(env->val, &yes)) {
 		logmsg(LOG_NOTICE,
 		       _("%s:%d: expected boolean value, but found `%s'"),
-		       ibuf->file, ibuf->line, val);
+		       ibuf->file, ibuf->line, env->val);
 		return 1;
 	}
 	rule->fork = yes ? rush_true : rush_false;
@@ -800,13 +779,13 @@ _parse_fork(input_buf_ptr ibuf, struct rush_rule *rule,
 
 static int
 _parse_acct(input_buf_ptr ibuf, struct rush_rule *rule,
-	    char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
+	    struct stmt_env *env)
 {
 	int yes;
-	if (get_bool(val, &yes)) {
+	if (get_bool(env->val, &yes)) {
 		logmsg(LOG_NOTICE,
 		       _("%s:%d: expected boolean value, but found `%s'"),
-		       ibuf->file, ibuf->line, val);
+		       ibuf->file, ibuf->line, env->val);
 		return 1;
 	}
 	rule->acct = yes ? rush_true : rush_false;
@@ -911,6 +890,7 @@ parse_url(input_buf_ptr ibuf, const char *cstr,
 		*ppath = strdup(cstr);
 		return *ppath == NULL;
 	}
+	return 0;
 }
 
 static int
@@ -1012,14 +992,14 @@ make_socket(input_buf_ptr ibuf, int family,
 		
 static int
 _parse_post_socket(input_buf_ptr ibuf, struct rush_rule *rule,
-		   char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
+		   struct stmt_env *env)
 {
 	int family;
 	char *path;
 	char *port;
 	int rc;
 	
-	if (parse_url(ibuf, val,  &family, &port, &path))
+	if (parse_url(ibuf, env->val,  &family, &port, &path))
 		return 1;
 	rc = make_socket(ibuf, family, port ? port : "tcpmux", path,
 			 &rule->post_sockaddr);
@@ -1031,39 +1011,42 @@ _parse_post_socket(input_buf_ptr ibuf, struct rush_rule *rule,
 
 static int
 _parse_text_domain(input_buf_ptr ibuf, struct rush_rule *rule,
-		   char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
+		   struct stmt_env *env)
 {
-	rule->i18n.text_domain = xstrdup(val);
+	rule->i18n.text_domain = xstrdup(env->val);
 	return 0;
 }
 
 static int
 _parse_locale_dir(input_buf_ptr ibuf, struct rush_rule *rule,
-		  char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
+		  struct stmt_env *env)
 {
-	rule->i18n.localedir = xstrdup(val);
+	rule->i18n.localedir = xstrdup(env->val);
 	return 0;
 }
 
 static int
 _parse_locale(input_buf_ptr ibuf, struct rush_rule *rule,
-	      char *kw, char *val, input_buf_ptr *ret_buf RUSH_ARG_UNUSED)
+	      struct stmt_env *env)
 {
-	if (strcmp(val, "\"\"") == 0)
+	const char *val;
+	if (strcmp(env->val, "\"\"") == 0)
 		val = "";
+	else
+		val = env->val;
 	rule->i18n.locale = xstrdup(val);
 	return 0;
 }
 
 static int
 _parse_include(input_buf_ptr ibuf, struct rush_rule *rule,
-	       char *kw, char *val, input_buf_ptr *ret_buf)
+	       struct stmt_env *env)
 {
 	int rc;
 	char *name;
 	struct stat st;
 	
-	name = expand_tilde(val, rush_pw->pw_dir);
+	name = expand_tilde(env->val, rush_pw->pw_dir);
 	if (trimslash(name) == 0) {
 		logmsg(LOG_NOTICE,
 		       _("%s:%d: invalid include file name"),
@@ -1077,7 +1060,7 @@ _parse_include(input_buf_ptr ibuf, struct rush_rule *rule,
 			debug1(1, _("Ignoring non-existing include file %s"),
 			       name);
 			free(name);
-			*ret_buf = NULL;
+			env->ret_buf = NULL;
 			return 0;
 		}
 		logmsg(LOG_NOTICE,
@@ -1093,28 +1076,23 @@ _parse_include(input_buf_ptr ibuf, struct rush_rule *rule,
 		name = file;
 	} 
 
-	rc = init_input_buf(ret_buf, name);
+	rc = init_input_buf(&env->ret_buf, name);
 	free(name);
 	return rc;
 }
 
 static int
 _parse_include_security(input_buf_ptr ibuf, struct rush_rule *rule,
-			char *kw, char *val, input_buf_ptr *ret_buf)
+			struct stmt_env *env)
 {
+	int i;
 	int rc = 0;
-	while (*val) {
-		char *kw;
-		size_t len;
-		
-		kw = skipws(val);
-		val = eow(kw);
-		len = val - kw;
-		if (cfck_keyword(kw, len)) {
+	
+	for (i = 0; i < env->argc; i++) {
+		if (cfck_keyword(env->argv[i])) {
 			logmsg(LOG_NOTICE,
-			       _("%s:%d: unknown keyword: %*.*s"),
-			       ibuf->file, ibuf->line,
-			       len, len, kw);
+			       _("%s:%d: unknown keyword: %s"),
+			       ibuf->file, ibuf->line, env->argv[i]);
 			rc++;
 		}
 	}
@@ -1123,45 +1101,100 @@ _parse_include_security(input_buf_ptr ibuf, struct rush_rule *rule,
 
 static int
 _parse_interactive(input_buf_ptr ibuf, struct rush_rule *rule,
-		   char *kw, char *val, input_buf_ptr *ret_buf)
+		   struct stmt_env *env)
 {
-	rush_interactive_shell = xstrdup(val);
+	rush_interactive_shell = xstrdup(env->val);
+	return 0;
+}
+
+/*
+           0     1    2    3     4       5
+   map[N] FILE DELIM KEY FIELD FIELD [DEFAULT]
+
+   map[0] /etc/rush/shells : ${user} 1 2 default
+*/
+
+static int
+_parse_map_ar(input_buf_ptr ibuf, struct rush_rule *rule,
+	      struct stmt_env *env)
+{
+	struct transform_node *node;
+	unsigned long n;
+	char *p;
+	
+	if (env->argc < 5) {
+		logmsg(LOG_NOTICE,
+		       _("%s:%d: too few arguments"),
+		       ibuf->file, ibuf->line);
+		return 1;
+	}
+	if (env->argc > 6) {
+		logmsg(LOG_NOTICE,
+		       _("%s:%d: too many arguments"),
+		       ibuf->file, ibuf->line);
+		return 1;
+	}
+
+	node = new_transform_node(rule, transform_map);
+	node->v.map.file = xstrdup(env->argv[0]);
+	node->v.map.delim = xstrdup(env->argv[1]);
+	node->v.map.key = xstrdup(env->argv[2]);
+	
+	n = node->v.map.key_field = strtoul(env->argv[3], &p, 10);
+	if (*p || n != node->v.map.key_field) {
+		logmsg(LOG_NOTICE,
+		       _("%s:%d: key field is not a number"),
+		       ibuf->file, ibuf->line);
+		return 1;
+	}
+
+	n = node->v.map.val_field = strtoul(env->argv[4], &p, 10);
+	if (*p || n != node->v.map.val_field) {
+		logmsg(LOG_NOTICE,
+		       _("%s:%d: value field is not a number"),
+		       ibuf->file, ibuf->line);
+		return 1;
+	}
+
+	if (env->argc == 6)
+		node->v.map.defval = env->argv[5];
 	return 0;
 }
 
 
 #define TOK_NONE   0x00   /* No flags */
 #define TOK_ARG    0x01   /* Token requires an argument */
-#define TOK_IND    0x02   /* Token must be followed by an index */
-#define TOK_RUL    0x04   /* Token is valid only within a rule */
-#define TOK_NEWBUF 0x08
+#define TOK_ARGN   0x02   /* Token requires one or more arguments */
+#define TOK_IND    0x04   /* Token must be followed by an index */
+#define TOK_RUL    0x08   /* Token is valid only within a rule */
+#define TOK_NEWBUF 0x10   /* Token may create new input buffer */
 #define TOK_DFL   TOK_ARG|TOK_RUL
+#define TOK_DFLN  TOK_ARGN|TOK_RUL
 
 struct token {
 	char *name;
 	size_t namelen;
 	int flags;
-	int (*parser) (input_buf_ptr, struct rush_rule *,
-		       char *, char *, input_buf_ptr *);
+	int (*parser) (input_buf_ptr, struct rush_rule *, struct stmt_env *);
 };
-
 
 struct token toktab[] = {
 #define KW(s) s, sizeof(s)-1
 	{ KW("command"),          TOK_DFL, _parse_command },
-	{ KW("match"),            TOK_RUL|TOK_IND, _parse_match },
+	{ KW("match"),            TOK_DFL|TOK_IND, _parse_match },
 	{ KW("argc"),             TOK_DFL, _parse_argc },
 	{ KW("uid"),              TOK_DFL, _parse_uid },
 	{ KW("gid"),              TOK_DFL, _parse_gid },
-	{ KW("user"),             TOK_DFL, _parse_user },
-	{ KW("group"),            TOK_DFL, _parse_group },
+	{ KW("user"),             TOK_DFLN, _parse_user },
+	{ KW("group"),            TOK_DFLN, _parse_group },
 	{ KW("transform"),        TOK_DFL, _parse_transform },
-	{ KW("transform"),        TOK_RUL|TOK_IND, _parse_transform_ar },
+	{ KW("transform"),        TOK_DFL|TOK_IND, _parse_transform_ar },
+	{ KW("map"),              TOK_RUL|TOK_ARGN|TOK_IND, _parse_map_ar },
 	{ KW("umask"),            TOK_DFL, _parse_umask },
 	{ KW("chroot"),           TOK_DFL, _parse_chroot },
 	{ KW("limits"),           TOK_DFL, _parse_limits },
 	{ KW("chdir"),            TOK_DFL, _parse_chdir },
-	{ KW("env"),              TOK_DFL, _parse_env },
+	{ KW("env"),              TOK_DFLN, _parse_env },
 	{ KW("fork"),             TOK_DFL, _parse_fork },
 	{ KW("acct"),             TOK_DFL, _parse_acct },
 	{ KW("post-socket"),      TOK_DFL, _parse_post_socket },
@@ -1177,10 +1210,11 @@ struct token toktab[] = {
 	{ KW("nologin-error"),    TOK_ARG, _parse_nologin_error },
 	{ KW("config-error"),     TOK_ARG, _parse_config_error },
 	{ KW("system-error"),     TOK_ARG, _parse_system_error },
-	{ KW("regexp"),           TOK_ARG, _parse_re_flags },
-	{ KW("include-security"), TOK_ARG, _parse_include_security },
+	{ KW("regexp"),           TOK_ARGN, _parse_re_flags },
+	{ KW("include-security"), TOK_ARGN, _parse_include_security },
 	{ KW("interactive"),      TOK_ARG, _parse_interactive },
 	{ NULL }
+#undef KW
 };
 
 struct token *
@@ -1216,8 +1250,10 @@ parse_input_buf(input_buf_ptr ibuf)
 		struct token *tok;
 		int len;
 		int rc;
-		input_buf_ptr ret_buf;
+		struct stmt_env env;
 		
+		memset(&env, 0, sizeof env);
+
 		p = skipws(buf);
 		debug3(3, "%s:%d: %s", ibuf->file, ibuf->line, p);
 		if (p[0] == 0 || p[0] == '#')
@@ -1257,7 +1293,28 @@ parse_input_buf(input_buf_ptr ibuf)
 			continue;
 		}
 
-		if (tok->flags & TOK_ARG && !(val && *val)) {
+		env.kw = kw;
+		env.val = val;
+
+		kw += len;
+		if (tok->flags & TOK_IND) {
+			char *q;
+			
+			if (kw[1] == '$') {
+				env.index = -1;
+				q = kw + 2;
+			} else 
+				env.index = strtoul(kw + 1, &q, 10);
+			if (*q != ']') {
+				logmsg(LOG_NOTICE,
+				       _("%s:%d: missing ]"),
+				       ibuf->file, ibuf->line);
+				err = 1;
+				continue;
+			}
+		}
+		
+		if (tok->flags & (TOK_ARG || TOK_ARGN) && !(val && *val)) {
 			logmsg(LOG_NOTICE,
 			       _("%s:%d: invalid statement: missing value"),
 			       ibuf->file, ibuf->line);
@@ -1265,6 +1322,18 @@ parse_input_buf(input_buf_ptr ibuf)
 			continue;
 		}
 
+		if (tok->flags & TOK_ARGN) {
+			int rc = argcv_get(val, NULL, "#",
+					   &env.argc, &env.argv);
+			if (rc) {
+				logmsg(LOG_NOTICE,
+				       _("%s:%d: failed to parse value: %s"),
+				       ibuf->file, ibuf->line, strerror (rc));
+				err = 1;
+				continue;
+			}
+		}
+		
 		if (tok->flags & TOK_RUL) {
 			if (!rule) {
 				logmsg(LOG_NOTICE,
@@ -1275,17 +1344,19 @@ parse_input_buf(input_buf_ptr ibuf)
 			}
 		} 
 
-		rc = tok->parser(ibuf, rule, kw + len, val, &ret_buf);
+		rc = tok->parser(ibuf, rule, &env);
 		err |= rc;
-		if (rc == 0 && tok->flags & TOK_NEWBUF && ret_buf) {
-			ret_buf->next = ibuf;
-			ibuf = ret_buf;
+		if (rc == 0 && tok->flags & TOK_NEWBUF && env.ret_buf) {
+			env.ret_buf->next = ibuf;
+			ibuf = env.ret_buf;
 			debug1(3, _("Parsing %s"), ibuf->file);
 		}
+		if (tok->flags & TOK_ARGN) 
+			argcv_free(env.argc, env.argv);
 	}
 	free(buf);
 	if (err)
-		die(config_error, NULL, _("error parsing config file"));
+		die(config_error, NULL, _("errors parsing config file"));
 }
 
 #ifdef RUSH_DEFAULT_CONFIG

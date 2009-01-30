@@ -56,7 +56,6 @@ want_record(struct rush_wtmp *wtmp, int argc, char **argv)
 int
 main(int argc, char **argv)
 {
-        int rc;
         struct rush_wtmp *wtmp = NULL;
         rushdb_format_t form;
         unsigned long i;
