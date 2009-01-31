@@ -322,11 +322,13 @@ check_dir(const char *dir, input_buf_ptr ibuf)
 }
 	
 struct transform_node *
-new_transform_node(struct rush_rule *rule, enum transform_node_type type)
+new_transform_node(struct rush_rule *rule, enum transform_node_type type,
+	int arg_no)
 {
 	struct transform_node *p = xzalloc(sizeof(*p));
 	LIST_APPEND(p, rule->transform_head, rule->transform_tail);
 	p->type = type;
+	p->arg_no = arg_no;
 	return p;
 }
 
@@ -611,7 +613,7 @@ _parse_transform(input_buf_ptr ibuf, struct rush_rule *rule,
 		 struct stmt_env *env)
 {
 	struct transform_node *node;
-	node = new_transform_node(rule, transform_cmdline);
+	node = new_transform_node(rule, transform_cmdline, 0);
 	node->v.trans = compile_transform_expr(env->val);
 	return 0;
 }
@@ -621,8 +623,7 @@ _parse_transform_ar(input_buf_ptr ibuf, struct rush_rule *rule,
 		    struct stmt_env *env)
 {
 	struct transform_node *node;
-	node = new_transform_node(rule, transform_arg);
-	node->arg_no = env->index;
+	node = new_transform_node(rule, transform_arg, env->index);
 	node->v.trans = compile_transform_expr(env->val);
 	return 0;
 }
@@ -1135,7 +1136,7 @@ _parse_map_ar(input_buf_ptr ibuf, struct rush_rule *rule,
 		return 1;
 	}
 
-	node = new_transform_node(rule, transform_map);
+	node = new_transform_node(rule, transform_map, env->index);
 	node->v.map.file = xstrdup(env->argv[0]);
 	node->v.map.delim = xstrdup(env->argv[1]);
 	node->v.map.key = xstrdup(env->argv[2]);
