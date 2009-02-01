@@ -323,12 +323,13 @@ check_dir(const char *dir, input_buf_ptr ibuf)
 	
 struct transform_node *
 new_transform_node(struct rush_rule *rule, enum transform_node_type type,
-	int arg_no)
+		   int arg_no, int progmod)
 {
 	struct transform_node *p = xzalloc(sizeof(*p));
 	LIST_APPEND(p, rule->transform_head, rule->transform_tail);
 	p->type = type;
 	p->arg_no = arg_no;
+	p->progmod = progmod;
 	return p;
 }
 
@@ -408,6 +409,7 @@ struct stmt_env {
 	int argc;              /* Number of arguments (if TOK_ARGN) */
 	char **argv;           /* Parsed out value */
 	int index;             /* Index, if given */
+	int progmod;           /* Modify program name */ 
 	input_buf_ptr ret_buf; /* Return input buffer, for TOK_NEWBUF */
 };
 
@@ -613,7 +615,7 @@ _parse_transform(input_buf_ptr ibuf, struct rush_rule *rule,
 		 struct stmt_env *env)
 {
 	struct transform_node *node;
-	node = new_transform_node(rule, transform_cmdline, 0);
+	node = new_transform_node(rule, transform_cmdline, 0, 0);
 	node->v.trans = compile_transform_expr(env->val);
 	return 0;
 }
@@ -623,7 +625,8 @@ _parse_transform_ar(input_buf_ptr ibuf, struct rush_rule *rule,
 		    struct stmt_env *env)
 {
 	struct transform_node *node;
-	node = new_transform_node(rule, transform_arg, env->index);
+	node = new_transform_node(rule, transform_arg, env->index,
+				  env->progmod);
 	node->v.trans = compile_transform_expr(env->val);
 	return 0;
 }
@@ -638,8 +641,7 @@ _parse_chdir(input_buf_ptr ibuf, struct rush_rule *rule,
 		       _("%s:%d: invalid home directory"),
 		       ibuf->file, ibuf->line);
 		return 1;
-	}
-	else if (!rule->chroot_dir && check_dir(home_dir, ibuf))
+	} else if (!rule->chroot_dir && check_dir(home_dir, ibuf))
 		return 1;
 	rule->home_dir = home_dir;
 	return 0;
@@ -1108,6 +1110,24 @@ _parse_interactive(input_buf_ptr ibuf, struct rush_rule *rule,
 	return 0;
 }
 
+static int
+check_argc(input_buf_ptr ibuf, struct stmt_env *env, int min, int max)
+{
+	if (env->argc < min) {
+		logmsg(LOG_NOTICE,
+		       _("%s:%d: too few arguments"),
+		       ibuf->file, ibuf->line);
+		return 1;
+	}
+	if (env->argc > max) {
+		logmsg(LOG_NOTICE,
+		       _("%s:%d: too many arguments"),
+		       ibuf->file, ibuf->line);
+		return 1;
+	}
+	return 0;
+}
+
 /*
            0     1    2    3     4       5
    map[N] FILE DELIM KEY FIELD FIELD [DEFAULT]
@@ -1122,21 +1142,12 @@ _parse_map_ar(input_buf_ptr ibuf, struct rush_rule *rule,
 	struct transform_node *node;
 	unsigned long n;
 	char *p;
-	
-	if (env->argc < 5) {
-		logmsg(LOG_NOTICE,
-		       _("%s:%d: too few arguments"),
-		       ibuf->file, ibuf->line);
-		return 1;
-	}
-	if (env->argc > 6) {
-		logmsg(LOG_NOTICE,
-		       _("%s:%d: too many arguments"),
-		       ibuf->file, ibuf->line);
-		return 1;
-	}
 
-	node = new_transform_node(rule, transform_map, env->index);
+	if (check_argc(ibuf, env, 5, 6))
+		return 1;
+
+	node = new_transform_node(rule, transform_map, env->index,
+				  env->progmod);
 	node->v.map.file = xstrdup(env->argv[0]);
 	node->v.map.delim = xstrdup(env->argv[1]);
 	node->v.map.key = xstrdup(env->argv[2]);
@@ -1162,6 +1173,81 @@ _parse_map_ar(input_buf_ptr ibuf, struct rush_rule *rule,
 	return 0;
 }
 
+static int
+_parse_delete_ar(input_buf_ptr ibuf, struct rush_rule *rule,
+		 struct stmt_env *env)
+{
+	struct transform_node *node = new_transform_node(rule,
+							 transform_delarg,
+							 env->index, 0);
+	node->v.arg_end = env->index;
+	return 0;
+}
+
+static int
+get_arg_index(char *str, char **end)
+{
+	if (*str == '$') {
+		*end = str + 1;
+		return -1;
+	} 
+	return strtol(str, end, 10);
+}
+
+static int
+_parse_delete(input_buf_ptr ibuf, struct rush_rule *rule,
+	      struct stmt_env *env)
+{
+	struct transform_node *node;
+	int from, to;
+	char *p;
+	
+	if (check_argc(ibuf, env, 2, 2))
+		return 1;
+
+	from = get_arg_index(env->argv[0], &p);
+	if (*p) {
+		logmsg(LOG_NOTICE,
+		       _("%s:%d: %s: not a number"),
+		       ibuf->file, ibuf->line, env->argv[0]);
+		return 1;
+	}
+	to = get_arg_index(env->argv[1], &p);
+	if (*p) {
+		logmsg(LOG_NOTICE,
+		       _("%s:%d: %s: not a number"),
+		       ibuf->file, ibuf->line, env->argv[1]);
+		return 1;
+	}
+	
+	node = new_transform_node(rule, transform_delarg, from, 0);
+	node->v.arg_end = to;
+	return 0;
+}
+
+static int
+_parse_set(input_buf_ptr ibuf, struct rush_rule *rule,
+	   struct stmt_env *env)
+{
+	struct transform_node *node = new_transform_node(rule,
+							 transform_setcmd,
+							 0, 0);
+	node->v.val = xstrdup(env->val);
+	return 0;
+}
+	
+static int
+_parse_set_ar(input_buf_ptr ibuf, struct rush_rule *rule,
+	      struct stmt_env *env)
+{
+	struct transform_node *node = new_transform_node(rule,
+							 transform_setarg,
+							 env->index,
+							 env->progmod);
+	node->v.val = xstrdup(env->val);
+	return 0;
+}
+
 
 #define TOK_NONE   0x00   /* No flags */
 #define TOK_ARG    0x01   /* Token requires an argument */
@@ -1169,6 +1255,7 @@ _parse_map_ar(input_buf_ptr ibuf, struct rush_rule *rule,
 #define TOK_IND    0x04   /* Token must be followed by an index */
 #define TOK_RUL    0x08   /* Token is valid only within a rule */
 #define TOK_NEWBUF 0x10   /* Token may create new input buffer */
+#define TOK_CRT    0x24   /* Index after the token may contain ^ */
 #define TOK_DFL   TOK_ARG|TOK_RUL
 #define TOK_DFLN  TOK_ARGN|TOK_RUL
 
@@ -1189,8 +1276,15 @@ struct token toktab[] = {
 	{ KW("user"),             TOK_DFLN, _parse_user },
 	{ KW("group"),            TOK_DFLN, _parse_group },
 	{ KW("transform"),        TOK_DFL, _parse_transform },
-	{ KW("transform"),        TOK_DFL|TOK_IND, _parse_transform_ar },
-	{ KW("map"),              TOK_RUL|TOK_ARGN|TOK_IND, _parse_map_ar },
+	{ KW("transform"),        TOK_DFL|TOK_IND|TOK_CRT,
+	  _parse_transform_ar },
+	{ KW("map"),              TOK_RUL|TOK_ARGN|TOK_IND|TOK_CRT,
+	  _parse_map_ar },
+	{ KW("delete"),           TOK_RUL|TOK_IND, _parse_delete_ar },
+	{ KW("delete"),           TOK_RUL|TOK_ARGN, _parse_delete },
+	{ KW("set"),              TOK_DFL, _parse_set },  
+	{ KW("set"),              TOK_DFL|TOK_IND|TOK_CRT,
+	  _parse_set_ar },  
 	{ KW("umask"),            TOK_DFL, _parse_umask },
 	{ KW("chroot"),           TOK_DFL, _parse_chroot },
 	{ KW("limits"),           TOK_DFL, _parse_limits },
@@ -1304,8 +1398,11 @@ parse_input_buf(input_buf_ptr ibuf)
 			if (kw[1] == '$') {
 				env.index = -1;
 				q = kw + 2;
-			} else 
-				env.index = strtoul(kw + 1, &q, 10);
+			} else if (tok->flags & TOK_CRT && kw[1] == '^') {
+				env.progmod = 1;
+				q = kw + 2;
+			} else
+				env.index = strtol(kw + 1, &q, 10);
 			if (*q != ']') {
 				logmsg(LOG_NOTICE,
 				       _("%s:%d: missing ]"),

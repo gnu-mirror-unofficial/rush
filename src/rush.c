@@ -160,13 +160,13 @@ test_request_cmdline(struct test_node *node, struct rush_request *req)
         return regexec(&node->v.regex, req->cmdline, 0, NULL, 0);
 }
 
+#define ARG_NO(n,argc) (((n) < 0) ? (argc) + (n) : (n))
+
 int
 test_request_arg(struct test_node *node, struct rush_request *req)
 {
-        int n = node->v.arg.arg_no;
-        if (n == -1)
-                n = req->argc - 1;
-        if (n >= req->argc)
+        int n = ARG_NO(node->v.arg.arg_no, req->argc);
+        if (n < 0 || n >= req->argc)
                 return 1;
         return regexec(&node->v.arg.regex, req->argv[n], 0, NULL, 0);
 }
@@ -467,6 +467,8 @@ reparse_cmdline(struct rush_request *req)
         if ((rc = argcv_get(req->cmdline, NULL, NULL, &req->argc, &req->argv)))
                 die(system_error, &req->i18n, _("argcv_get(%s) failed: %s"),
                     req->cmdline, strerror(rc));
+	free(req->prog);
+	req->prog = NULL;
 }
 
 void
@@ -480,14 +482,50 @@ rebuild_cmdline(struct rush_request *req)
 		    _("argcv_string failed: %s"), strerror(rc));
 }
 
+static int
+get_arg_no(int index, struct rush_request *req)
+{
+	int arg_no = ARG_NO(index, req->argc);
+	if (arg_no < 0 || arg_no >= req->argc) 
+		die(config_error,
+		    &req->i18n, 
+		    _("no argument at index %d in command: %s"),
+		    index,
+		    req->cmdline);
+	return arg_no;
+}
+
+static void
+assign_string(char **pstr, char *val)
+{
+	debug2(2, _("Transform: \"%s\" -> \"%s\""), *pstr ? *pstr : "", val);
+	free(*pstr);
+	*pstr = val;
+}
+
 void
 run_transforms(struct rush_rule *rule, struct rush_request *req)
 {
         struct transform_node *node;
         char *p;
-        int arg_no;
+        int i, arg_no, arg_end;
         int args_transformed = 0;
-        
+	char *val, **target;
+	
+#define GET_TGT_VAL()							\
+	if (node->progmod) {						\
+		arg_no = 0;						\
+		target = &req->prog;					\
+		val = PROGFILE(req);					\
+		debug1(2, _("Modifying program name (%s)"), val);	\
+	} else {							\
+		arg_no = get_arg_no(node->arg_no, req);			\
+		target = &req->argv[arg_no];				\
+		val = *target;						\
+		args_transformed = 1;					\
+		debug1(2, _("Modifying argv[%d]"), arg_no);		\
+	} 								\
+
         for (node = rule->transform_head; node; node = node->next) {
                 switch (node->type) {
                 case transform_cmdline:
@@ -503,32 +541,28 @@ run_transforms(struct rush_rule *rule, struct rush_request *req)
                         reparse_cmdline(req);
                         break;
 
+		case transform_setcmd:
+			if (args_transformed) {
+                                rebuild_cmdline(req);
+                                args_transformed = 0;
+                        }
+                        debug(2, _("Setting command line"));
+                        free(req->cmdline);
+                        req->cmdline = xstrdup(node->v.val);
+                        debug1(2, _("Command line: %s"), req->cmdline);
+                        reparse_cmdline(req);
+                        break;
+			
                 case transform_arg:
-                        arg_no = node->arg_no;
-                        if (arg_no == -1)
-                                arg_no = req->argc - 1;
-                        if (arg_no >= req->argc) 
-                                die(usage_error,
-				    &req->i18n, 
-                                    _("not enough arguments in command: %s"),
-                                    req->cmdline);
-                        p = transform_string(node->v.trans, req->argv[arg_no]);
-                        free(req->argv[arg_no]);
-                        req->argv[arg_no] = p;
-                        args_transformed = 1;
+			GET_TGT_VAL();
+                        p = transform_string(node->v.trans, val);
+			assign_string(target, p);
 			break;
 
 		case transform_map:
-                        arg_no = node->arg_no;
-                        if (arg_no == -1)
-                                arg_no = req->argc - 1;
-                        if (arg_no >= req->argc) 
-                                die(usage_error,
-				    &req->i18n, 
-                                    _("not enough arguments in command: %s"),
-                                    req->cmdline);
-                        debug7(2, _("Transforming arg %u, map: %s, %s, %s, %u, %u, %s"),
-			       arg_no,
+			GET_TGT_VAL();
+			debug6(2,
+			       _("Transformation map: %s, %s, %s, %u, %u, %s"),
 			       node->v.map.file,
 			       node->v.map.delim,
 			       node->v.map.key,
@@ -536,12 +570,41 @@ run_transforms(struct rush_rule *rule, struct rush_request *req)
 			       node->v.map.val_field,
 			       node->v.map.defval);
                         p = map_string(&node->v.map, req);
-			if (p) {
-				free(req->argv[arg_no]);
-				req->argv[arg_no] = p;
-				args_transformed = 1;
-			}
+			if (p) 
+				assign_string(target, p);
+			else
+				args_transformed = 0;
 			break;
+
+		case transform_delarg:
+			arg_no = get_arg_no(node->arg_no, req);
+			arg_end = get_arg_no(node->v.arg_end, req);
+			if (arg_end < arg_no) {
+				int x = arg_end;
+				arg_end = arg_no;
+				arg_no = x;
+			}
+			debug2(2, _("Deleting arguments %d-%d"),
+			       arg_no, arg_end);
+			if (arg_no == 0 || arg_end == 0)
+				die(config_error,
+				    &req->i18n, _("cannot delete argv[0]"));
+			for (i = arg_no; i <= arg_end; i++) 
+				free(req->argv[i]);
+			i = arg_end - arg_no + 1;
+			memmove(req->argv + arg_no,
+				req->argv + arg_end + 1,
+				(req->argc - i)
+				  * sizeof(req->argv[0]));
+			req->argc -= i;
+			args_transformed = 1;
+			break;
+
+		case transform_setarg:
+			GET_TGT_VAL();
+			assign_string(target, xstrdup(node->v.val));
+			break;
+
                 }
         }
 
@@ -550,6 +613,7 @@ run_transforms(struct rush_rule *rule, struct rush_request *req)
 
         if (__debug_p(2)) {
                 int i;
+		logmsg(LOG_DEBUG, _("Program name: %s"), PROGFILE(req));
                 logmsg(LOG_DEBUG, _("Final arguments:"));
                 for (i = 0; i < req->argc; i++)
                         logmsg(LOG_DEBUG, "% 4d: %s", i, req->argv[i]);
@@ -727,7 +791,8 @@ run_rule(struct rush_rule *rule, struct rush_request *req)
                 die(system_error, &req->i18n, _("cannot change to dir %s: %s"),
                     req->home_dir, strerror(errno));
 
-        debug1(2, _("Executing %s"), req->cmdline);
+        debug2(2, _("Executing %s, %s"),
+	       PROGFILE(req), req->cmdline);
 	if (lint_option)
 		exit(0);
 
@@ -744,7 +809,7 @@ run_rule(struct rush_rule *rule, struct rush_request *req)
 	
         umask(req->umask);
 
-        execve(req->argv[0], req->argv, new_env);
+        execve(PROGFILE(req), req->argv, new_env);
         die(system_error, &req->i18n, _("%s:%d: %s: cannot execute %s: %s"),
             rule->file, rule->line, rule->tag,
             req->cmdline, strerror(errno));

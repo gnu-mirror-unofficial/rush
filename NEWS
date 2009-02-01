@@ -1,9 +1,93 @@
-GNU Rush NEWS -- history of user-visible changes. 2009-01-14
+GNU Rush NEWS -- history of user-visible changes. 2009-02-01
 Copyright (C) 2008, 2009 Sergey Poznyakoff
 See the end of file for copying conditions.
 
 Please send bug reports to <bug-rush@gnu.org.ua>
 
+
+Version 1.5.90 (Git)
+
+* The `map' statement.
+
+This statement sets a command line argument using a map file.
+
+   map[N] FILE DELIM KEY K V [DEFAULT]
+
+Each line in a map file FILE contains fields, separated by delimiter
+DELIM. The `map' statement looks for the record whose Kth field has
+the value of KEY. If such a record is found, the Nth argument
+is replaced with the value of its Vth field. Othervise, if DEFAULT is
+given, it is used as a new value. Otherwise, the argument retains its
+old value.
+
+KEY is an arbitrary string, which may contain meta-variables. The
+following meta-variables are defined:
+
+  ${user}             User name
+  ${group}            Name of the user's principal group
+  ${uid}              UID
+  ${gid}              GID
+  ${home}             User's home directory
+  ${gecos}            User's GECOS field
+  ${program}          Program name
+  $0 to $9            The value of the Nth command line argument
+  ${N}                The same as above, useful if N > 9 
+
+* The `set' statement.
+
+The `set' statement replaces the command line with the new value:
+
+rule foo
+  set /bin/scp -t /upload
+
+In indexed form, it replaces the given argument:
+
+  set[0] /bin/scp
+
+* The `delete' statement.
+
+This statement deletes the given argument, or range of arguments, from
+the command line. It has two forms:
+
+1. Delete the argument N:
+
+  delete[N]
+
+2. Delete arguments from N to M, inclusive:
+
+  delete N M
+
+* Modifying program name
+
+To modify the program name (as opposed to argv[0]), use ^ index, e.g.:
+
+  set[^] /bin/scp
+
+By default (unless [^] form is used) argv[0] will be used as the
+program name.
+
+* Negative argument indexes
+
+Negative argument indexes refer to arguments numbered from the end of the
+command line. E.g.:
+
+  transform[-1]         is the same as transform[$]
+  transform[-2]         will transform the last but one argument
+
+* New statement `interactive'
+
+This statement provides a replacement command line for interactive use
+of rush. By default, such use is prohibited. However, using
+`interactive' statement you can allow some users a limited interactive
+access. For example:
+
+interactive *shell*
+
+rule login
+  command *shell*
+  group rshell
+  map[0] /usr/local/etc/rush.shell : ${user} 1 2 none
+  
 
 Version 1.5, 2009-01-14
 

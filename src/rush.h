@@ -92,16 +92,22 @@ struct rush_map {
 enum transform_node_type {
 	transform_cmdline,
 	transform_arg,
-	transform_map
+	transform_map,
+	transform_delarg,
+	transform_setcmd,
+	transform_setarg
 };
 
 struct transform_node {
 	struct transform_node *next;
 	enum transform_node_type type;
 	int arg_no;
+	int progmod;
 	union {
 		transform_t trans;
 		struct rush_map map;
+		char *val;
+		int arg_end;
 	} v;
 };
 
@@ -197,12 +203,14 @@ struct rush_rule {
 };
 
 struct rush_request {
-        char *cmdline;
-        int argc;
-        char **argv;
-        struct passwd *pw;
-	unsigned umask;
-	char *chroot_dir;
+        char *cmdline;         /* Command line */
+        int argc;              /* Number of elements in argv */
+        char **argv;           /* Command line in parsed form */
+	char *prog;            /* Program file name, if different
+				  from argv[0] */
+        struct passwd *pw;     /* User passwd entry */
+	unsigned umask;        
+	char *chroot_dir;      
         char *home_dir;
 	enum rush_three_state fork;
 	enum rush_three_state acct;
@@ -210,6 +218,7 @@ struct rush_request {
 	struct rush_i18n i18n;
 };
 
+#define PROGFILE(req) ((req)->prog ? (req)->prog : (req)->argv[0])
 #define NO_UMASK ((mode_t)-1)
 
 extern char *rush_config_file;

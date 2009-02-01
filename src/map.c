@@ -171,6 +171,12 @@ meta_gecos(struct metadef *def, struct rush_request *req)
 	return req->pw->pw_gecos;
 }
 
+const char *
+meta_program(struct metadef *def, struct rush_request *req)
+{
+	return PROGFILE(req);
+}
+
 static struct metadef mapdef[] = {
 	{ "user", NULL, meta_user },
 	{ "group", NULL, meta_group },
@@ -178,6 +184,7 @@ static struct metadef mapdef[] = {
 	{ "gid", NULL, meta_gid },
 	{ "home", NULL, meta_home },
 	{ "gecos", NULL, meta_gecos },
+	{ "program", NULL, meta_program },
 	{ NULL }
 };
 
