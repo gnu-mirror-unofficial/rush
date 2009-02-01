@@ -511,6 +511,7 @@ run_transforms(struct rush_rule *rule, struct rush_request *req)
         int i, arg_no, arg_end;
         int args_transformed = 0;
 	char *val, **target;
+	char *temp;
 	
 #define GET_TGT_VAL()							\
 	if (node->progmod) {						\
@@ -525,8 +526,13 @@ run_transforms(struct rush_rule *rule, struct rush_request *req)
 		args_transformed = 1;					\
 		debug1(2, _("Modifying argv[%d]"), arg_no);		\
 	} 								\
+	if (node->pattern) {						\
+		temp = rush_expand_string(node->pattern, req);		\
+		val = temp;						\
+	}
 
         for (node = rule->transform_head; node; node = node->next) {
+		temp = NULL;
                 switch (node->type) {
                 case transform_cmdline:
                         if (args_transformed) {
@@ -606,6 +612,7 @@ run_transforms(struct rush_rule *rule, struct rush_request *req)
 			break;
 
                 }
+		free(temp);
         }
 
         if (args_transformed) 

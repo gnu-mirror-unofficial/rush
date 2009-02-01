@@ -486,6 +486,24 @@ _parse_re_flags(input_buf_ptr ibuf, struct rush_rule *rule,
 }
 
 static int
+check_argc(input_buf_ptr ibuf, struct stmt_env *env, int min, int max)
+{
+	if (env->argc < min) {
+		logmsg(LOG_NOTICE,
+		       _("%s:%d: too few arguments"),
+		       ibuf->file, ibuf->line);
+		return 1;
+	}
+	if (env->argc > max) {
+		logmsg(LOG_NOTICE,
+		       _("%s:%d: too many arguments"),
+		       ibuf->file, ibuf->line);
+		return 1;
+	}
+	return 0;
+}
+
+static int
 _parse_command(input_buf_ptr ibuf, struct rush_rule *rule,
 	       struct stmt_env *env)
 {
@@ -611,24 +629,49 @@ _parse_limits(input_buf_ptr ibuf, struct rush_rule *rule,
 }
 
 static int
+_parse_transform_common(input_buf_ptr ibuf, struct rush_rule *rule,
+			struct stmt_env *env, enum transform_node_type type)
+{
+	struct transform_node *node;
+	char *expr;
+	
+	if (check_argc(ibuf, env, 1, 3))
+		return 1;
+	else if (env->argc == 3 && strcmp(env->argv[1], "~")) {
+		logmsg(LOG_NOTICE,
+		       _("%s:%d: expected ~ as the second argument, but found %s"),
+		       ibuf->file, ibuf->line, env->argv[2]);
+		return 1;
+	}
+	node = new_transform_node(rule, type, env->index, env->progmod);
+	switch (env->argc) {
+	case 1:
+		expr = env->argv[0];
+		break;
+	case 2:
+		expr = env->argv[1];
+		break;
+	case 3:
+		expr = env->argv[2];
+	}
+	node->v.trans = compile_transform_expr(expr);
+	if (env->argc > 1) 
+		node->pattern = xstrdup(env->argv[0]);
+	return 0;
+}
+
+static int
 _parse_transform(input_buf_ptr ibuf, struct rush_rule *rule,
 		 struct stmt_env *env)
 {
-	struct transform_node *node;
-	node = new_transform_node(rule, transform_cmdline, 0, 0);
-	node->v.trans = compile_transform_expr(env->val);
-	return 0;
+	return _parse_transform_common(ibuf, rule, env, transform_cmdline);
 }
 
 static int
 _parse_transform_ar(input_buf_ptr ibuf, struct rush_rule *rule,
 		    struct stmt_env *env)
 {
-	struct transform_node *node;
-	node = new_transform_node(rule, transform_arg, env->index,
-				  env->progmod);
-	node->v.trans = compile_transform_expr(env->val);
-	return 0;
+	return _parse_transform_common(ibuf, rule, env, transform_arg);
 }
 
 static int
@@ -1110,24 +1153,6 @@ _parse_interactive(input_buf_ptr ibuf, struct rush_rule *rule,
 	return 0;
 }
 
-static int
-check_argc(input_buf_ptr ibuf, struct stmt_env *env, int min, int max)
-{
-	if (env->argc < min) {
-		logmsg(LOG_NOTICE,
-		       _("%s:%d: too few arguments"),
-		       ibuf->file, ibuf->line);
-		return 1;
-	}
-	if (env->argc > max) {
-		logmsg(LOG_NOTICE,
-		       _("%s:%d: too many arguments"),
-		       ibuf->file, ibuf->line);
-		return 1;
-	}
-	return 0;
-}
-
 /*
            0     1    2    3     4       5
    map[N] FILE DELIM KEY FIELD FIELD [DEFAULT]
@@ -1256,6 +1281,7 @@ _parse_set_ar(input_buf_ptr ibuf, struct rush_rule *rule,
 #define TOK_RUL    0x08   /* Token is valid only within a rule */
 #define TOK_NEWBUF 0x10   /* Token may create new input buffer */
 #define TOK_CRT    0x24   /* Index after the token may contain ^ */
+#define TOK_SED    0x42   /* Arguments contain sed-exprs */
 #define TOK_DFL   TOK_ARG|TOK_RUL
 #define TOK_DFLN  TOK_ARGN|TOK_RUL
 
@@ -1275,8 +1301,8 @@ struct token toktab[] = {
 	{ KW("gid"),              TOK_DFL, _parse_gid },
 	{ KW("user"),             TOK_DFLN, _parse_user },
 	{ KW("group"),            TOK_DFLN, _parse_group },
-	{ KW("transform"),        TOK_DFL, _parse_transform },
-	{ KW("transform"),        TOK_DFL|TOK_IND|TOK_CRT,
+	{ KW("transform"),        TOK_DFL|TOK_SED, _parse_transform },
+	{ KW("transform"),        TOK_DFL|TOK_IND|TOK_SED|TOK_CRT,
 	  _parse_transform_ar },
 	{ KW("map"),              TOK_RUL|TOK_ARGN|TOK_IND|TOK_CRT,
 	  _parse_map_ar },
@@ -1421,8 +1447,14 @@ parse_input_buf(input_buf_ptr ibuf)
 		}
 
 		if (tok->flags & TOK_ARGN) {
-			int rc = argcv_get(val, NULL, "#",
-					   &env.argc, &env.argv);
+			int rc;
+			int flags = ARGCV_DEFFLAGS;
+			if (tok->flags & TOK_SED)
+				flags |= ARGCV_SED_EXPR;
+			
+			rc = argcv_get_np(val, strlen(val), " ", "#",
+					  flags, &env.argc, &env.argv,
+					  NULL);
 			if (rc) {
 				logmsg(LOG_NOTICE,
 				       _("%s:%d: failed to parse value: %s"),

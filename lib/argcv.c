@@ -22,12 +22,16 @@
 #endif
 
 #include <ctype.h>
+#include <c-ctype.h>
 #include <errno.h>
 #include <unistd.h>
 #include <string.h>
 #include <argcv.h>
 
 enum argcv_quoting_style argcv_quoting_style;
+
+#define _ARGCV_WORD_SED_EXPR 0x1000
+#define _ARGCV_WORD_MASK 0xf000
 
 /*
  * takes a string and splits it into several strings, breaking at ' '
@@ -68,6 +72,40 @@ init_argcv_info (struct argcv_info *ap, int flags,
 }
 
 static int
+skip_sed_expr(const char *command, int i, int len)
+{
+  int state;
+	  
+  do
+    {
+      int delim;
+
+      if (command[i] == ';')
+	i++;
+      if (!(command[i] == 's' && i + 3 < len && c_ispunct(command[i+1])))
+	break;
+	  
+      delim = command[++i];
+      state = 1;
+      for (i++; i < len; i++)
+	{
+	  if (state == 3)
+	    {
+	      if (command[i] == delim || !c_isalnum(command[i]))
+		break;
+	    }
+	  else if (command[i] == '\\')
+	    i++;
+	  else if (command[i] == delim)
+	    state++;
+	}
+    }
+  while (state == 3 && i < len && command[i] == ';');
+  i--;
+  return i;
+}
+
+static int
 argcv_scan (struct argcv_info *ap)
 {
   int i = 0;
@@ -91,7 +129,15 @@ argcv_scan (struct argcv_info *ap)
 	}
       ap->start = i;
 
-      if (!isdelim (command[i], delim))
+      ap->flags &= ~_ARGCV_WORD_MASK;
+      
+      if (ap->flags & ARGCV_SED_EXPR
+	  && command[i] == 's' && i + 3 < len && c_ispunct(command[i+1]))
+	{
+	  ap->flags |= _ARGCV_WORD_SED_EXPR;
+	  i = skip_sed_expr(command, i, len);
+	}
+      else if (!isdelim (command[i], delim))
 	{
 	  while (i < len)
 	    {
@@ -417,18 +463,23 @@ argcv_get_np (const char *command, int len,
       
       argcv_scan (&info);
 
-      if ((command[info.start] == '"' || command[info.end] == '\'')
-	  && command[info.end] == command[info.start])
+      if (info.flags & ARGCV_QUOTE && !(info.flags & _ARGCV_WORD_SED_EXPR))
 	{
-	  if (info.start < info.end)
+	  if ((command[info.start] == '"' || command[info.end] == '\'')
+	      && command[info.end] == command[info.start])
 	    {
-	      info.start++;
-	      info.end--;
+	      if (info.start < info.end)
+		{
+		  info.start++;
+		  info.end--;
+		}
+	      unquote = 0;
 	    }
-	  unquote = 0;
+	  else
+	    unquote = 1;
 	}
-      else
-	unquote = 1;
+      else 
+	unquote = 0;
       
       n = info.end - info.start + 1;
       argv[i] = calloc (n + 1,  sizeof (char));
@@ -451,9 +502,6 @@ argcv_get_np (const char *command, int len,
     *endp = (char*) (command + info.finish_pos);
   return 0;
 }
-
-#define ARGCV_DEFFLAGS \
-  (ARGCV_WS | ARGCV_QUOTE | ARGCV_SQUEEZE_DELIMS | ARGCV_RETURN_DELIMS)
 
 int
 argcv_get_n (const char *command, int len, const char *delim, const char *cmnt,

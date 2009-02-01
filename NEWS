@@ -7,6 +7,39 @@ Please send bug reports to <bug-rush@gnu.org.ua>
 
 Version 1.5.90 (Git)
 
+* Patterns in `transform' statement
+
+The syntax of the `transform' statement has been extended to
+allow for specifying source string for transformation:
+
+ transform STRING REGEX
+or
+ transform[N] STRING REGEX
+
+STRING may contain meta-variables, which are expanded before
+performing the transformation. The following meta-variables are
+defined: 
+
+  ${user}             User name
+  ${group}            Name of the user's principal group
+  ${uid}              UID
+  ${gid}              GID
+  ${home}             User's home directory
+  ${gecos}            User's GECOS field
+  ${program}          Program name
+  ${command}          Full command line
+  $0 to $9            The value of the Nth command line argument
+  ${N}                Same as above, useful if N > 9 or N < 0 (see
+                      "Negative argument indexes", below).
+
+Thus, for example:
+
+  transform[0] s,.*/,/bin,
+  
+is equivalent to:
+
+  transform[0] $0 s,.*/,/bin,
+		      
 * The `map' statement.
 
 This statement sets a command line argument using a map file.
@@ -20,18 +53,8 @@ is replaced with the value of its Vth field. Othervise, if DEFAULT is
 given, it is used as a new value. Otherwise, the argument retains its
 old value.
 
-KEY is an arbitrary string, which may contain meta-variables. The
-following meta-variables are defined:
-
-  ${user}             User name
-  ${group}            Name of the user's principal group
-  ${uid}              UID
-  ${gid}              GID
-  ${home}             User's home directory
-  ${gecos}            User's GECOS field
-  ${program}          Program name
-  $0 to $9            The value of the Nth command line argument
-  ${N}                The same as above, useful if N > 9 
+The KEY may contain meta-variables described above (see "Patterns in
+`transform' statement").
 
 * The `set' statement.
 

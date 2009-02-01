@@ -103,6 +103,7 @@ struct transform_node {
 	enum transform_node_type type;
 	int arg_no;
 	int progmod;
+	char *pattern;
 	union {
 		transform_t trans;
 		struct rush_map map;
@@ -319,5 +320,6 @@ int cfck_keyword(const char *name);
 
 /* map.c */
 char *map_string(struct rush_map *map, struct rush_request *req);
+char *rush_expand_string(const char *string, struct rush_request *req);
 
 

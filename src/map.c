@@ -177,6 +177,12 @@ meta_program(struct metadef *def, struct rush_request *req)
 	return PROGFILE(req);
 }
 
+const char *
+meta_command(struct metadef *def, struct rush_request *req)
+{
+	return req->cmdline;
+}
+
 static struct metadef mapdef[] = {
 	{ "user", NULL, meta_user },
 	{ "group", NULL, meta_group },
@@ -185,8 +191,15 @@ static struct metadef mapdef[] = {
 	{ "home", NULL, meta_home },
 	{ "gecos", NULL, meta_gecos },
 	{ "program", NULL, meta_program },
+	{ "command", NULL, meta_command },
 	{ NULL }
 };
+
+char *
+rush_expand_string(const char *string, struct rush_request *req)
+{
+	return meta_expand_string(string, mapdef, req);
+}
 
 char *
 map_string(struct rush_map *map, struct rush_request *req)

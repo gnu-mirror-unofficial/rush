@@ -33,10 +33,15 @@ extern "C" {
 #define ARGCV_QUOTE             0x02
 	/* replace each input sequence of repeated delimiters into a single
 	   delimiter */
-#define ARGCV_SQUEEZE_DELIMS   0x04
+#define ARGCV_SQUEEZE_DELIMS    0x04
 	/* Return delimiters */
 #define ARGCV_RETURN_DELIMS     0x08
+	/* Treat sed expressions as words */
+#define ARGCV_SED_EXPR          0x10
 
+#define ARGCV_DEFFLAGS \
+  (ARGCV_WS | ARGCV_QUOTE | ARGCV_SQUEEZE_DELIMS | ARGCV_RETURN_DELIMS)
+	
 enum argcv_quoting_style {
     argcv_quoting_octal,
     argcv_quoting_hex
