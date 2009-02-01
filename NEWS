@@ -109,7 +109,8 @@ interactive *shell*
 rule login
   command *shell*
   group rshell
-  map[0] /usr/local/etc/rush.shell : ${user} 1 2 none
+  map[^] /usr/local/etc/rush.shell : ${user} 1 2 none
+  transform[0] ${program} s,.*/,-,
   
 
 Version 1.5, 2009-01-14
