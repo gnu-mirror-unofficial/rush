@@ -1257,7 +1257,7 @@ _parse_set(input_buf_ptr ibuf, struct rush_rule *rule,
 	struct transform_node *node = new_transform_node(rule,
 							 transform_setcmd,
 							 0, 0);
-	node->v.val = xstrdup(env->val);
+	node->pattern = xstrdup(env->val);
 	return 0;
 }
 	
@@ -1269,7 +1269,7 @@ _parse_set_ar(input_buf_ptr ibuf, struct rush_rule *rule,
 							 transform_setarg,
 							 env->index,
 							 env->progmod);
-	node->v.val = xstrdup(env->val);
+	node->pattern = xstrdup(env->val);
 	return 0;
 }
 

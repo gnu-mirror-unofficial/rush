@@ -107,7 +107,6 @@ struct transform_node {
 	union {
 		transform_t trans;
 		struct rush_map map;
-		char *val;
 		int arg_end;
 	} v;
 };

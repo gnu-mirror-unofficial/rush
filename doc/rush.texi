@@ -107,7 +107,8 @@ Configuration File
 * Debugging::                   
 * Regex::                       
 * Sleep Time::                  
-* Error Messages::              
+* Error Messages::
+* Interactive::
 
 Rule
 
@@ -120,6 +121,13 @@ Rule
 * Notification::                
 * Exit::
 * Localization::
+
+Transformations
+
+* set::
+* delete::
+* transform::
+* map::
 
 Localization
 
@@ -307,7 +315,8 @@ Any of these tests can be disabled using the
 * Debugging::                   
 * Regex::                       
 * Sleep Time::                  
-* Error Messages::              
+* Error Messages::
+* Interactive::
 @end menu
 
 @node Syntax
@@ -319,12 +328,57 @@ Any of these tests can be disabled using the
   A @dfn{comment} is any line whose first non-whitespace character is
 @samp{#}.  Empty lines and comments are ignored.
 
-  A @dfn{statement} consists of a keyword and an optional value.  If the
-value is supplied, it must be separated from the keyword by any amount
-of white space.  Statements are delimited by newline characters.
-Length of a statement line is not limited.  Long statements
-can be split over several lines by using backslash (@samp{\}) as a
-last character on line.  Thus, the following statement:
+  A @dfn{statement} consists of a keyword and optional argument,
+separated by any amount of whitespace.  Depending on the keyword, the
+statement may treat its argument as a single or as multiple values.
+For example, the @code{command} instruction takes a single 
+value as its argument, so parsing the statement
+
+@smallexample
+command ^scp -t /incoming/
+@end smallexample
+
+@noindent
+results in keyword @samp{command} and value @samp{^scp -t /incoming/}.
+
+If the keyword requires multiple values, its argument is split into
+words using the following algorithm:
+
+@enumerate 1
+@item Any sequence of one or more non-whitespace characters is a word.
+@item Any sequence of characters enclosed in single (@samp{'}) or
+double-quotes (@samp{"}) is a word.
+@item Words are separated by any amount of white space.
+@item If the keyword expects s-expressions (@pxref{s-expression}),
+these are treated as words, even if they contain white space.
+@end enumerate
+
+Arguments, obtained as a result of rules (1) and (2) are subject to
+@dfn{backslash interpretation}, during which the following @dfn{escape
+sequences} are replaced with single characters, as described in the
+table below:  
+
+@float Table, backslash-interpretation
+@caption{Backslash escapes}
+@multitable @columnfractions 0.30 .5
+@item Sequence @tab Replaced with
+@item \a @tab Audible bell character (@acronym{ASCII} 7)
+@item \b @tab Backspace character (@acronym{ASCII} 8)
+@item \f @tab Form-feed character (@acronym{ASCII} 12)
+@item \n @tab Newline character (@acronym{ASCII} 10)
+@item \r @tab Carriage return character (@acronym{ASCII} 13)
+@item \t @tab Horizontal tabulation character (@acronym{ASCII} 9)
+@item \v @tab Vertical tabulation character (@acronym{ASCII} 11)
+@end multitable
+@end float
+
+  Any escape sequence not listed in this table is replaced with its
+second character.
+
+  Statements are delimited by newline characters.  Length of a
+statement line is not limited.  To improve readability, long
+statements may be split over several lines by using backslash
+(@samp{\}) as a last character on line.  Thus, the following statement:
 
 @smallexample
 usage-error Contact your\
@@ -481,19 +535,208 @@ True if command line does not begin with @samp{scp}.
 @subsection Transformations
 @cindex transformations
   Special actions that allow to rewrite command line are called
-@dfn{transformations}.
+@dfn{transformations}.  GNU Rush supports five kinds of
+transformations: @samp{set}, @samp{transform}, @samp{delete}, 
+@samp{map}.  All of them operate on command line split into
+@dfn{words}.  Additionally, @samp{set} and @samp{transform} can
+operate on the entire command line.
+
+@anchor{indexing}
+@cindex word splitting
+@cindex indexing, words in command line
+  Rush performs word splitting using the same rules as @command{sh}.
+Transformation actions refer to words by their @dfn{index}.  Three
+kinds of indexes are supported.  First of all, a word may be referred
+to by its ordinal number in the command line.  The command name itself
+has index @samp{0}.  For example, given the command line:
+
+@smallexample
+/bin/scp -t /upload
+@end smallexample
+
+one gets:
+
+@multitable @columnfractions 0.3 0.7
+@headitem Index @tab Value
+@item 0 @tab /bin/scp
+@item 1 @tab -t
+@item 2 @tab /upload
+@end multitable
+
+  Negative indexes can also be used.  They refer to words in the
+backward order, as illustrated in the following table:
+
+@multitable @columnfractions 0.3 0.7
+@headitem Index @tab Value
+@item -1 @tab /upload
+@item -2 @tab -t
+@item -3 @tab /bin/scp
+@end multitable
+
+  Finally, the last word may be referred to as @samp{$}, and the
+command name itself as @samp{^}.  There is a subtle difference between
+@samp{0} and @samp{^}.  The notation @samp{^} refers to the name of
+the program that @command{rush} will executed at the end of the
+matching rule.  The notation @samp{0} refers to the 0th argument that
+will be passed to that program (@samp{argv[0]}).  Most of the time the
+two values coincide.  Unless a rule modifies @samp{^}, @samp{0}th word
+will be used as the program name.  They may, however, be some cases
+when you need to explicitly set @samp{^}.  @xref{Interactive},
+for a possible use of this feature.
+
+@anchor{patterns}
+@cindex patterns
+@cindex meta-variables
+  Some of the transformations implement @dfn{patterns}.  A pattern is
+a string which may contain @dfn{meta-variables}.  Before using, these
+meta-variables are expanded using the following rules:
+
+@multitable @columnfractions 0.3 0.7
+@headitem Meta-variable  @tab Expansion
+@vindex user
+@item $@{user@}          @tab User name
+@vindex group
+@item $@{group@}         @tab Name of the user's principal group
+@vindex uid
+@item $@{uid@}           @tab UID
+@vindex gid
+@item $@{gid@}           @tab GID
+@vindex home
+@item $@{home@}          @tab User's home directory
+@vindex gecos
+@item $@{gecos@}         @tab User's @acronym{GECOS} field
+@vindex program
+@item $@{program@}       @tab Program name (@samp{^})
+@vindex command
+@item $@{command@}       @tab Full command line
+@vindex $@var{n}
+@item $0 to $9           @tab Corresponding word from the command line
+@vindex $@{@var{n}@}
+@item $@{@var{N}@}       @tab @var{N}th word (see above for the
+allowed values of @var{N})
+@end multitable
+
+@menu
+* set::
+* delete::
+* transform::
+* map::
+@end menu
+
+@node set
+@subsubsection set
+@kwindex set
+  The @samp{set} transformation allows to replace entire command line,
+or any of its arguments, with the given value.
+
+@deffn {Rule Config} set @var{pattern}
+Command line is replaced with the expansion of @var{pattern}
+(@pxref{patterns}).  E.g.:
+
+@smallexample
+set /bin/echo "Command forbidden: $@{command@}"
+@end smallexample
+
+@anchor{set-command}
+  As another example, the following rule uses @code{transform} to
+ensure that @file{/usr/bin/cvs} binary is used:
+
+@smallexample
+@group
+rule cvs
+  command ^cvs server
+  set[0] /usr/bin/cvs
+@end group
+@end smallexample
+
+In versions of GNU Rush prior to 1.6, it was common to use the
+@code{transform} action for this purpose.
+@end deffn
+
+@deffn {Rule Config} set[@var{n}] @var{pattern}
+Replace @var{n}th argument with the expansion of @var{pattern}.
+Notice, that square brackets are part of the statement syntax.
+
+@xref{indexing}, for the description of @var{n}.  @xref{patterns}, for
+the description of @var{pattern}.  E.g.:
+
+@smallexample
+set[0] /bin/echo
+@end smallexample
+@end deffn
+
+@node delete
+@subsubsection delete
+@kwindex delete
+  The @samp{delete} action deletes the given word, or range of words,
+from the command line.  It has two forms.
+  
+@deffn {Rule Config} delete[@var{n}]
+Delete @var{n}th word.  @xref{indexing}, for a detailed description of
+@var{n} and its syntax.  However, see the note below.
+@end deffn
+
+@deffn {Rule Config} delete @var{n} @var{m}
+Delete words from @var{n} to @var{m}, inclusive.  For example, the
+following action removes all arguments, except the command name:
+
+@smallexample
+delete 1 $
+@end smallexample
+@end deffn
+
+Neither form can be used to delete the command name, i.e. @samp{[0]}
+or @samp{[^]}. 
+
+@node transform
+@subsubsection Transform
+@kwindex transform
+
+  The @code{transform} action modifies the value of the command line,
+or any particular word of it, according to a sed @dfn{s-expression}.
+The s-expressions are described in more detail below (@pxref{s-expression}).
+This action has several forms.
 
 @deffn {Rule Config} transform @var{expr}
-Apply expression @var{expr} to entire command line.
+Apply expression @var{expr} to entire command line.  For example, the
+action below adds a @option{-t} option after the command name:
+
+@smallexample
+transform s,^[^ ]+,& -t,
+@end smallexample
+@end deffn
+
+@deffn {Rule Config} transform @var{pattern} @var{expr}
+Expand @var{pattern} as described in @ref{patterns}, apply @var{expr}
+to the expansion, and replace the command line with the result.
 @end deffn
 
 @deffn {Rule Config} transform[@var{n}] @var{expr}
 Apply expression @var{expr} to @var{n}th @dfn{word} from the
 command line.  Notice, that square brackets are part of the statement
-syntax.  A special value @samp{$} can be used instead of @var{n} to
-denote the last word. 
+syntax.  @xref{indexing}, for a detailed description of @var{n} and
+its syntax.
 @end deffn
 
+@deffn {Rule Config} transform[@var{n}] @var{pattern} @var{expr}
+Apply expression @var{expr} to the expanded @var{pattern} and assign
+the result to @var{n}th word.  @xref{patterns}, for a description of
+patterns and their expansion.  @xref{indexing}, for a detailed
+description of @var{n} and its syntax.
+
+The example below replaces the 0th argument with the base name of the
+command, prefixed by a dash:
+
+@smallexample
+transform[0] $@{^@} s,.*/,-
+@end smallexample
+
+For instance, if command name is @samp{/bin/bash}, @samp{argv[0]} will
+become @samp{-bash}.
+@end deffn
+
+@cindex s-expression
+@anchor{s-expression}
 The transformation expression, @var{expr}, is a @command{sed}-like
 replace expression of the form:
 
@@ -565,6 +808,9 @@ rule cvs
 @end group
 @end smallexample
 
+ The same effect can be achieved with a @code{set} statement, as shown in
+@ref{set-command}. 
+
  As a more complex example, consider the following rule:
 
 @smallexample
@@ -579,6 +825,93 @@ rule svn
 @option{-r} option and its arguments from the command line, and then
 adds its own @option{-r} option and replaces @samp{svnserve} with a
 full name of the program.
+
+@node map
+@subsubsection map
+@kwindex map
+  The @samp{map} statement uses file lookup to find a new value for
+the command line word.
+
+@deffn {Rule Config} map[@var{n}] @var{file} @var{delim} @var{pattern} @
+        @var{kn} @var{vn}
+@deffnx {Rule Config} map[@var{n}] @var{file} @var{delim} @var{pattern} @
+         @var{kn} @var{vn} @var{default}
+Arguments are:
+
+@table @var
+@item n
+Argument index, as in @ref{indexing}.
+
+@item file
+Name of the @dfn{map file}.  It must begin with @samp{/} or
+@samp{~/}.  Before using, this file is checked using the procedure
+described in @ref{security checks}.
+
+@item delim
+A string containing allowed field delimiters.
+
+@item pattern
+The value of the lookup key.  Before using, it is expanded as
+described in @ref{patterns}.
+
+@item kn
+Number of the key field in @var{file}.  Fields are numbered starting
+from 1.
+
+@item vn
+Number of the value field.
+
+@item default
+If supplied, this value is used if the key was not found in
+@var{file}.
+@end table
+@end deffn
+
+  The map file consists of @dfn{records}, separated by newline
+characters (in other words, a record occupies one line).  Each record
+consists of fields, separated by delimiters, given in @var{delim}
+argument.  If @var{delim} contains a space character, then fields may
+be delimited by any amount of whitespace characters (spaces and/or
+tabulations).  Otherwise, exactly one delimiter delimits fields.
+
+  Fields are numbered starting from 1.
+
+  The @code{map} action works as follows:
+
+@enumerate 1
+@item
+The @var{pattern} argument is expanded as described in @ref{patterns}
+and the resulting value is used as lookup key.
+
+@item
+The @var{file} is scanned for a record whose @var{kn}th field
+matches the lookup key.
+
+@item
+If such a record is found, the value of its @var{vn}th field is
+assigned to the @var{n}th word (@pxref{indexing}, for a description of
+@var{n}).
+
+@item
+Otherwise, if @var{default} is supplied, it becomes the new value of the
+@var{n}the word.
+
+@item
+Otherwise, the @var{n}th word remains unchanged.
+@end enumerate
+
+  For example, suppose that the file @file{/etc/passwd.rush} has the
+same syntax as the system @file{passwd} file (@pxref{passwd, Password
+File,,passwd(5), passwd(5) man page}).  Then, the following statement
+will replace @samp{argv[0]} with the value of @samp{shell} field for
+the current user name:
+
+@smallexample
+map[0] /etc/passwd.rush : $@{user@} 1 7
+@end smallexample
+
+See also @ref{Interactive}, for another example of using this
+statement.
 
 @node System Actions
 @subsection System Actions
@@ -923,26 +1256,8 @@ optional argument @var{fd}.  If @var{fd} is absent, @samp{2} (standard
 error) is used.
 @end deffn
 
-The @var{message} argument is subject to backslash interpretation,
-during which the following @dfn{escape sequences} are replaced with
-the corresponding single characters, as described in the table below:
-
-@float Table, backslash-interpretation
-@caption{Backslash escapes}
-@multitable @columnfractions 0.30 .5
-@item Sequence @tab Replaced with
-@item \a @tab Audible bell character (@acronym{ASCII} 7)
-@item \b @tab Backspace character (@acronym{ASCII} 8)
-@item \f @tab Form-feed character (@acronym{ASCII} 12)
-@item \n @tab Newline character (@acronym{ASCII} 10)
-@item \r @tab Carriage return character (@acronym{ASCII} 13)
-@item \t @tab Horizontal tabulation character (@acronym{ASCII} 9)
-@item \\ @tab A single backslash (@samp{\}).
-@end multitable
-@end float
-
-Any escape sequence not listed in this table is replaced with its
-second character.
+The @var{message} argument is subject to backslash interpretation
+(@pxref{backslash-interpretation}).
 
 For example (note the use of line continuation character):
 
@@ -1458,6 +1773,48 @@ Default message is:
 A system error occurred while attempting to execute command.
 @end smallexample
 @end deffn
+
+@node Interactive
+@section Interactive Access
+@cindex interactice access
+  Sometimes it may be necessary to allow some group of users limited
+access to interactive shells.  GNU Rush contains provisions for such
+usage.
+
+@deffn {Configuration} interactive @var{string}
+If this statement is present in the configuration file, the invocation
+of @command{rush} without command line arguments (interactive usage)
+becomes equivalent to @command{rush -c @var{string}}.
+@end deffn
+
+This can be used to catch interactive invocations.  Consider the
+following example:
+
+@smallexample
+interactive //shell//
+
+rule login
+  command //shell//
+  group rshell
+  map[^] /etc/rush.shell : $@{user@} 1 2
+  transform[0] $@{program@} s,^,-r,
+
+rule nologin
+  command //shell//
+  exit You don't have interactive access to this machine.
+@end smallexample
+
+The @code{interactive} statement supplies a fake command line which
+will indicate an attempt of interactive usage.  It is common practice
+to select such a string that cannot be a valid system command.  The
+@samp{login} rule matches this command line if the user is a member
+of the group @samp{rshell}.  It uses @file{/etc/rush.shell} to select
+a shell to use for that user (@pxref{map}).  This map file consists of
+two fields, separated by a colon.  If the shell is found, its base
+name, prefixed with a dash is used as @samp{argv[0]} (this indicates a
+restricted login shell).  Otherwise, the trap rule @samp{nologin} is
+matched, which outputs the given diagnostics message and exits
+@command{rush}. 
 
 @node Default Configuration
 @chapter Default Configuration

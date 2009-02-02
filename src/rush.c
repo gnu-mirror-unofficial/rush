@@ -554,7 +554,7 @@ run_transforms(struct rush_rule *rule, struct rush_request *req)
                         }
                         debug(2, _("Setting command line"));
                         free(req->cmdline);
-                        req->cmdline = xstrdup(node->v.val);
+                        req->cmdline = xstrdup(val);
                         debug1(2, _("Command line: %s"), req->cmdline);
                         reparse_cmdline(req);
                         break;
@@ -608,7 +608,7 @@ run_transforms(struct rush_rule *rule, struct rush_request *req)
 
 		case transform_setarg:
 			GET_TGT_VAL();
-			assign_string(target, xstrdup(node->v.val));
+			assign_string(target, val);
 			break;
 
                 }
@@ -731,7 +731,7 @@ run_rule(struct rush_rule *rule, struct rush_request *req)
 				   rule->error_msg);
                 if (write(rule->error_fd, msg, strlen(msg)) < 0)
                         die(system_error, &req->i18n, 
-                            _("Error sending error message to descriptor %d: %s"),
+                            _("Error sending diagnostic message to descriptor %d: %s"),
                             rule->error_fd, strerror(errno));
                 exit(1);
         }

@@ -39,10 +39,19 @@
 
 @c Output marks for nodes needing revision, but not in PUBLISH rendition.
 
+@macro WRITEME
+@ifclear PUBLISH
+@quotation
+@emph{This node is to be written.}
+@end quotation
+@end ifclear
+@end macro
+
 @macro UNREVISED
 @ifclear PUBLISH
 @quotation
-@emph{(This message will disappear, once this node revised.)}
+(@emph{The information in this node may be obsolete or otherwise inaccurate.}
+This message will disappear, once this node revised.)
 @end quotation
 @end ifclear
 @end macro
