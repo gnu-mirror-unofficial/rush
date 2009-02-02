@@ -13,12 +13,12 @@ rule default
 	
 rule cvs
   command ^cvs server
-  transform[0] s|.*|/usr/bin/cvs|
+  set[0] /usr/bin/cvs
 
 # Secure cp requests
 rule scp-to
   command ^scp (-v )?-t /incoming/(alpha|ftp)
-  transform[0] s|.*|/bin/scp|
+  set[0] /bin/scp
   chroot /var/spool/sftp-upload
   chdir /incoming
 
@@ -37,8 +37,8 @@ rule svn
 rule git
   command ^git-(receive|upload)-pack
   match[1] ^/vcs-roots/git/[^ ]+\.git$
-  transform s|.*|/usr/bin/git-shell -c "&"|
-
+  transform[0] s|^|/usr/bin/|
+  
 # Trap the rest of Git requests:
 rule git-trap
   command ^git-(receive|upload)-pack
@@ -48,7 +48,7 @@ rule git-trap
 # 002 and execute bin/sftp-server.
 rule sftp
   command ^.*/sftp-server
-  transform[0] s,.*,bin/sftp-server,
+  set[0] bin/sftp-server
   umask 002
   chroot ~
   chdir /

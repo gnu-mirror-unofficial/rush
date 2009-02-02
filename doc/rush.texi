@@ -261,7 +261,14 @@ modify the first argument of the command line (i.e. the command
 name).  These instructions are in the form of @code{sed} replace
 expression (@pxref{Transformations, transformation expression}).  The
 expression in our example instructs GNU Rush to replace the command name with
-@samp{bin/sftp-server}. 
+@samp{bin/sftp-server}@footnote{In this particular case, the
+@code{set} statement, introduced in GNU Rush version 1.6, is probably more
+appropriate:
+
+@smallexample
+  set[0] bin/sftp-server
+@end smallexample
+}.
 
   The @code{umask} clause sets the file creation mask.
 
@@ -576,12 +583,12 @@ backward order, as illustrated in the following table:
   Finally, the last word may be referred to as @samp{$}, and the
 command name itself as @samp{^}.  There is a subtle difference between
 @samp{0} and @samp{^}.  The notation @samp{^} refers to the name of
-the program that @command{rush} will executed at the end of the
-matching rule.  The notation @samp{0} refers to the 0th argument that
-will be passed to that program (@samp{argv[0]}).  Most of the time the
-two values coincide.  Unless a rule modifies @samp{^}, @samp{0}th word
-will be used as the program name.  They may, however, be some cases
-when you need to explicitly set @samp{^}.  @xref{Interactive},
+the program that @command{rush} will execute at the end of the
+matching rule, whereas the notation @samp{0} refers to the 0th
+argument that will be passed to that program (@samp{argv[0]}).  Most
+of the time the two values coincide.  Unless a rule modifies @samp{^},
+@samp{0}th word will be used as the program name.  There may, however,
+be some cases when you need to explicitly set @samp{^}.  @xref{Interactive},
 for a possible use of this feature.
 
 @anchor{patterns}
@@ -694,7 +701,7 @@ or @samp{[^]}.
 
   The @code{transform} action modifies the value of the command line,
 or any particular word of it, according to a sed @dfn{s-expression}.
-The s-expressions are described in more detail below (@pxref{s-expression}).
+S-expressions are described in more detail below (@pxref{s-expression}).
 This action has several forms.
 
 @deffn {Rule Config} transform @var{expr}
@@ -942,7 +949,7 @@ directory:
 @group
 rule sftp
   command ^.*/sftp-server
-  transform[0] s,.*,bin/sftp-server,
+  set[0] bin/sftp-server
   chroot ~
 @end group
 @end smallexample
@@ -1776,7 +1783,7 @@ A system error occurred while attempting to execute command.
 
 @node Interactive
 @section Interactive Access
-@cindex interactice access
+@cindex interactive access
   Sometimes it may be necessary to allow some group of users limited
 access to interactive shells.  GNU Rush contains provisions for such
 usage.
@@ -1811,7 +1818,7 @@ to select such a string that cannot be a valid system command.  The
 of the group @samp{rshell}.  It uses @file{/etc/rush.shell} to select
 a shell to use for that user (@pxref{map}).  This map file consists of
 two fields, separated by a colon.  If the shell is found, its base
-name, prefixed with a dash is used as @samp{argv[0]} (this indicates a
+name, prefixed with @samp{-r}, is used as @samp{argv[0]} (this indicates a
 restricted login shell).  Otherwise, the trap rule @samp{nologin} is
 matched, which outputs the given diagnostics message and exits
 @command{rush}. 
@@ -1927,7 +1934,7 @@ that the user cannot get outside the @file{incoming} directory by using
 rule scp-to-incoming
   command ^scp (-v )?-t /incoming/
   match[$] ! \.\./
-  transform[0] s|.*|/bin/scp|
+  set[0] /bin/scp
   transform[$] s|^|/home/ftp/|
 @end smallexample
 
@@ -1953,7 +1960,7 @@ the server.  The corresponding rule is:
 rule scp-home
   command ^scp (-v )?-[tf] [^/].*
   match[$] ! \.\./
-  transform[0] s|.*|/bin/scp|
+  set[0] /bin/scp
   transform[$] s|^|public_html/|
   chdir ~
 @end smallexample
