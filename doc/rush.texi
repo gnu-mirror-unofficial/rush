@@ -110,6 +110,10 @@ Configuration File
 * Error Messages::
 * Interactive::
 
+Syntax
+
+* Quoted Strings::
+
 Rule
 
 * Conditions::                  
@@ -399,6 +403,67 @@ is equivalent to:
 usage-error Contact your system administrator
 @end smallexample
 
+@menu
+* Quoted Strings::
+@end menu
+
+@node Quoted Strings
+@subsection Notes on quoted strings
+@cindex quoted strings
+
+  The syntax of GNU Rush configuration file was designed so as to
+implement minimum amount of syntactic mark up.  Most statements
+treat their argument as a single value, even if it contains embedded
+white space.  However, leading and trailing whitespace is always
+removed.  Consider, for example, the following
+statement@footnote{@xref{match}, for information about
+@code{match} statement.}:
+
+@smallexample
+  match[1] ^/sources/[^ ]+\.git$
+@end smallexample
+
+@noindent
+Here, the argument is @samp{^/sources/[^ ]+\.git$}.  Note, that you
+may not quote it, because quotation marks would be considered part of
+the argument.
+
+There are, however, statements that take several arguments.  In these
+statements, arguments that contain embedded white space must be
+quoted.  For example, in the statement below@footnote{@xref{map}, for
+a description of @command{map} statement.} the second argument is a
+single space character.  It is quoted to prevent it from being treated
+as a delimiter:
+
+@smallexample
+  map[0] /etc/passwd.rush " " $@{user@} 1 7
+@end smallexample
+
+Notice also, that arguments to these statements are subject to
+backslash interpretation (@pxref{backslash-interpretation}).
+
+The table below lists all statements that take multiple arguments,
+with cross references to more in-depth explanations in the body of the
+manual.
+
+@table @asis
+@item user
+@xref{Conditions, user}.
+@item group
+@xref{Conditions, group}.
+@item transform @var{pattern} @var{expr}
+@itemx transform[@var{n}] @var{pattern} @var{expr}
+@xref{transform}.  
+@item map
+@xref{map}.
+@item env
+@xref{Environment}.
+@item regexp
+@xref{Regex}.
+@item include-security
+@xref{include-security}.
+@end table
+
 @node Rule
 @section Rule
 @cindex @code{rule} statement
@@ -462,6 +527,7 @@ By default, @acronym{POSIX} extended regular expressions are used.
 This, however can be changed using @code{regex} statement (@pxref{Regex}).
 @end deffn
 
+@anchor{match}
 @deffn {Rule Config} match[@var{n}] @var{regexp}
 True, if @var{n}th @dfn{word} from the command line matches
 regular expression @var{regexp}.  Notice, that square brackets form
@@ -1290,7 +1356,8 @@ rule git
 @end smallexample
 
 It allows to use only those Git repositories that are located under
-@file{/sources} directory.  If a user tries to access a repository
+@file{/sources} directory@footnote{@xref{git}, for a better way to
+handle Git accesses.}.  If a user tries to access a repository
 outside this root, he will be returned a default error message, saying
 @samp{You are not permitted to execute this command} (@pxref{Error
 Messages, usage-error}).  You can, however, provide a more convenient
