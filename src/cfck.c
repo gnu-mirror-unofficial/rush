@@ -16,7 +16,6 @@
 
 #include <rush.h>
 #include "dirname.h"
-#include "argmatch.h"
 
 int config_file_checks = RUSH_CHK_DEFAULT;
 

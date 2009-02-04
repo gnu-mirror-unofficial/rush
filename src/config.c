@@ -730,7 +730,7 @@ static int
 _parse_usage_error(input_buf_ptr ibuf, struct rush_rule *rule,
 		   struct stmt_env *env)
 {
-	error_msg[usage_error] = copy_string(env->val);
+	set_error_msg(usage_error, copy_string(env->val));
 	return 0;
 }
 
@@ -738,7 +738,7 @@ static int
 _parse_nologin_error(input_buf_ptr ibuf, struct rush_rule *rule,
 		     struct stmt_env *env)
 {
-	error_msg[nologin_error] = copy_string(env->val);
+	set_error_msg(nologin_error, copy_string(env->val));
 	return 0;
 }
 
@@ -746,7 +746,7 @@ static int
 _parse_config_error(input_buf_ptr ibuf, struct rush_rule *rule,
 		    struct stmt_env *env)
 {
-	error_msg[config_error] = copy_string(env->val);
+	set_error_msg(config_error, copy_string(env->val));
 	return 0;
 }
 
@@ -754,7 +754,7 @@ static int
 _parse_system_error(input_buf_ptr ibuf, struct rush_rule *rule,
 		    struct stmt_env *env)
 {
-	error_msg[system_error] = copy_string(env->val);
+	set_error_msg(system_error, copy_string(env->val));
 	return 0;
 }
 
@@ -784,7 +784,16 @@ _parse_exit(input_buf_ptr ibuf, struct rush_rule *rule,
 		rule->error_fd = n;
 	} else
 		rule->error_fd = 2;
-	rule->error_msg = copy_string(val);
+	if (val[0] == '@' && val[1] != '@') {
+		if (string_to_error_index(val + 1) == -1) {
+			logmsg(LOG_NOTICE,
+			       _("%s:%d: Unknown message reference"),
+			       ibuf->file, ibuf->line);
+			return 1;			
+		} else
+			rule->error_msg = xstrdup(val);
+	} else
+		rule->error_msg = copy_string(val);
 	return 0;
 }
 

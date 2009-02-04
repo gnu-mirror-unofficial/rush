@@ -30,24 +30,61 @@ char *rush_interactive_shell;
 #define STDOUT_FILENO 1
 #define STDERR_FILENO 2
 
-char *error_msg[] = {
-        /* usage_error */
-        N_("You are not permitted to execute this command.\n"             
-           "Contact the systems administrator for further assistance.\n"),
-        
-        /* nologin_error */
-        N_("You do not have interactive login access to this machine.\n" 
-           "Contact the systems administrator for further assistance.\n"),
-        
-        /* config_error */
-        N_("Local configuration error occurred.\n" 
-           "Contact the systems administrator for further assistance.\n"),
-        
-        /* system_error */
-        N_("A system error occurred while attempting to execute command.\n" 
-           "Contact the systems administrator for further assistance.\n")
+struct error_msg {
+	char *text;          /* Message text */
+	int custom;          /* True, if the message was customized */
 };
 
+struct error_msg error_msg[] = {
+        /* usage_error */
+	{ N_("You are not permitted to execute this command.\n"             
+	     "Contact the systems administrator for further assistance.\n"), },
+        
+        /* nologin_error */
+        { N_("You do not have interactive login access to this machine.\n" 
+	     "Contact the systems administrator for further assistance.\n") },
+        
+        /* config_error */
+        { N_("Local configuration error occurred.\n" 
+	     "Contact the systems administrator for further assistance.\n") },
+        
+        /* system_error */
+        { N_("A system error occurred while attempting to execute command.\n" 
+	     "Contact the systems administrator for further assistance.\n") }
+};
+
+void
+set_error_msg(enum error_type type, char *text)
+{
+	error_msg[type].text = text;
+	error_msg[type].custom = 1;
+}
+
+int
+string_to_error_index(const char *name)
+{
+	static const char *error_msg_name[] = {
+		"usage-error",
+		"nologin-error",
+		"config-error",
+		"system-error",
+		NULL
+	};
+	static int error_msg_index[] = {
+		usage_error,
+		nologin_error,
+		config_error,
+		system_error
+	};
+	ARGMATCH_VERIFY(error_msg_name, error_msg_index);
+
+	ptrdiff_t d = ARGMATCH(name, error_msg_name, error_msg_index);
+	if (d < 0)
+		return -1;
+	return error_msg_index[d];
+}
+	
+
 void
 send_msg(const char *msg, size_t len)
 {
@@ -103,14 +140,17 @@ die(enum error_type type, struct rush_i18n *i18n, const char *fmt, ...)
         vlogmsg(LOG_ERR, fmt, ap);
         va_end(ap);
 	if (!lint_option) {
-		const char *msg;
-		if (i18n) 
-			msg = user_gettext(i18n->locale,
-					   i18n->text_domain,
-					   i18n->localedir,
-					   error_msg[type]);
-		else
-			msg = error_msg[type];
+		const char *msg = error_msg[type].text;
+		if (error_msg[type].custom) {
+			/* If it is a customized version, translate it via
+			   user-supplied i18n */
+			if (i18n) 
+				msg = user_gettext(i18n->locale,
+						   i18n->text_domain,
+						   i18n->localedir,
+						   msg);
+		} else
+			msg = gettext(msg);
 		send_msg(msg, strlen(msg));
 		sleep(sleep_time);
 	}
@@ -511,7 +551,6 @@ run_transforms(struct rush_rule *rule, struct rush_request *req)
         int i, arg_no, arg_end;
         int args_transformed = 0;
 	char *val, **target;
-	char *temp;
 	
 #define GET_TGT_VAL()							\
 	if (node->progmod) {						\
@@ -527,12 +566,10 @@ run_transforms(struct rush_rule *rule, struct rush_request *req)
 		debug1(2, _("Modifying argv[%d]"), arg_no);		\
 	} 								\
 	if (node->pattern) {						\
-		temp = rush_expand_string(node->pattern, req);		\
-		val = temp;						\
+		val = rush_expand_string(node->pattern, req);		\
 	}
 
         for (node = rule->transform_head; node; node = node->next) {
-		temp = NULL;
                 switch (node->type) {
                 case transform_cmdline:
                         if (args_transformed) {
@@ -610,9 +647,7 @@ run_transforms(struct rush_rule *rule, struct rush_request *req)
 			GET_TGT_VAL();
 			assign_string(target, val);
 			break;
-
                 }
-		free(temp);
         }
 
         if (args_transformed) 
@@ -722,13 +757,32 @@ run_rule(struct rush_rule *rule, struct rush_request *req)
 		req->i18n.locale = rule->i18n.locale;
 
         if (rule->error_msg) {
-		const char *msg;
+		const char *msg = rule->error_msg;
+		int custom = 1;
+		
+                debug1(2, _("Error message: %s"), msg);
+		if (msg[0] == '@') {
+			int n;
+			
+			if (msg[1] == '@')
+				msg++;
+			else if ((n = string_to_error_index(msg + 1)) == -1) 
+				logmsg(LOG_NOTICE,
+				       _("Unknown message reference: %s\n"),
+				       msg);
+			else {
+				msg = error_msg[n].text;
+				custom = error_msg[n].custom;
+			}
+		} 
 
-                debug1(2, _("Error message: %s"), rule->error_msg);
-		msg = user_gettext(rule->i18n.locale,
-				   rule->i18n.text_domain,
-				   rule->i18n.localedir,
-				   rule->error_msg);
+		if (custom) 
+			msg = user_gettext(rule->i18n.locale,
+					   rule->i18n.text_domain,
+					   rule->i18n.localedir,
+					   msg);
+		else
+			msg = gettext(msg);
                 if (write(rule->error_fd, msg, strlen(msg)) < 0)
                         die(system_error, &req->i18n, 
                             _("Error sending diagnostic message to descriptor %d: %s"),

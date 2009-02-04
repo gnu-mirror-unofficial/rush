@@ -29,11 +29,27 @@ BEGIN {
 	print ""
 }
 
+{ if (!text) start_line = NR }
 /\\$/ { text = text substr($0,1,length($0)-1); next }
 { if (text) $0 = text $0; text = "" }
+
 $1 == "exit" {
-	gsub(/^[ \t]+exit[ \t][0-9]*/,"")
-	printf("#: %s:%d\n", FILENAME, NR)
+	gsub(/^[ \t]*exit[ \t][0-9]*[ \t]*/,"")
+	if (gsub(/^@/, "")) {
+		if (match($0, /^[^@].*/))
+			next
+	}
+	printf("#: %s:%d\n", FILENAME, start_line)
+	printf("msgid \"%s\"\n", $0)
+	printf("msgstr \"\"\n\n")
+	next
+}
+$1 == "usage-error" \
+	|| $1 == "nologin-error" \
+	|| $1 == "config-error" \
+	|| $1 == "system-error" {
+	gsub(/^[ \t]*[a-z][a-z]*-error[ \t][ \t]*/,"")
+	printf("#: %s:%d\n", FILENAME, start_line)
 	printf("msgid \"%s\"\n", $0)
 	printf("msgstr \"\"\n\n")
 }

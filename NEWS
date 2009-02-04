@@ -1,4 +1,4 @@
-GNU Rush NEWS -- history of user-visible changes. 2009-02-02
+GNU Rush NEWS -- history of user-visible changes. 2009-02-04
 Copyright (C) 2008, 2009 Sergey Poznyakoff
 See the end of file for copying conditions.
 
@@ -114,6 +114,24 @@ rule login
   group rshell
   map[^] /usr/local/etc/rush.shell : ${user} 1 2 none
   transform[0] ${program} s,^,-,
+
+* Use of predefined error messages in `exit' statement.
+
+Predefined error messages can be used in `exit' statements by
+using the syntax
+
+  @message-name
+
+E.g., the statement:
+
+  exit @nologin-message
+
+will retrieve the text of the `nologin-message' and send it to the
+remote party before exiting.
+
+If the message text must begin with a `@' sign, duplicate it:
+
+  exit @@special error message
   
 
 Version 1.5, 2009-01-14

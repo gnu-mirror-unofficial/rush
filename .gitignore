@@ -18,6 +18,4 @@ configure
 confpaths.h
 gnu
 m4
-pathdefs.make
-paths.defs
 stamp-h1

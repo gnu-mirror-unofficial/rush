@@ -46,6 +46,7 @@
 #include <c-ctype.h>
 #include <argcv.h>
 #include <inttostr.h>
+#include "argmatch.h"
 
 #include <defines.h>
 #include <librush.h>
@@ -224,7 +225,6 @@ struct rush_request {
 extern char *rush_config_file;
 extern int lint_option;
 extern unsigned sleep_time;
-extern char *error_msg[];
 extern struct rush_rule *rule_head, *rule_tail;
 extern unsigned debug_level;
 extern int debug_option;
@@ -287,6 +287,9 @@ int parse_limits(limits_record_t *plrec, char *str, char **endp);
 int set_user_limits(const char *name, struct limits_rec *lrec);
 
 void parse_config(void);
+
+void set_error_msg(enum error_type type, char *text);
+int string_to_error_index(const char *name);
 
 transform_t compile_transform_expr (const char *expr);
 char *transform_string (struct transform *tf, const char *input);

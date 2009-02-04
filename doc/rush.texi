@@ -1342,6 +1342,28 @@ exit \
     \r\nIf you think this is wrong, ask <foo@@bar.com> for assistance.\r\n
 @end smallexample
 
+  If @var{message} begins with a @samp{@@} sign, the remaining
+characters are treated as the name of a predefined error message
+(@pxref{Error Messages}).  The corresponding message text is retrieved
+and used instead of @var{message}.  For example:
+
+@smallexample
+  exit @@nologin-message
+@end smallexample
+
+  If the characters after @samp{@@} do not correspond to any
+predefefined error message name, an error of type @samp{config-error}
+is signalled and @command{rush} exits.
+
+  If you need to begin your exit message with a @samp{@@} sign,
+duplicate it, as in this example:
+
+@smallexample
+  exit @@@@Special error message
+@end smallexample
+
+  This example will produce @samp{@@Special error message}.
+  
 @cindex trap rule
 Exit actions are useful for writing @dfn{trap rules}, i.e. the rules that
 are intended to trap incorrect or prohibited command lines and to return
