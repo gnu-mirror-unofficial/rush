@@ -180,8 +180,10 @@ virtual memory, CPU time, etc.
 the server (e.g. by using using SSH protocol), the shell binary,
 @command{rush}, is executed.  GNU Rush must be called with exactly two
 arguments: the @option{-c} command line option and a command line to
-be executed on the host machine.  If wrong arguments are supplied, the
-shell aborts.
+be executed on the host machine@footnote{Starting from version 1.6, it
+is possible to use GNU Rush for interactive shell
+sessions. @xref{Interactive}, for more information about it.}.  If
+wrong arguments are supplied, the shell aborts.
 
 @cindex request
   The third argument to @command{rush} supplies a command line to be
@@ -341,7 +343,7 @@ Any of these tests can be disabled using the
 
   A @dfn{statement} consists of a keyword and optional argument,
 separated by any amount of whitespace.  Depending on the keyword, the
-statement may treat its argument as a single or as multiple values.
+statement may treat its argument as a single value or as multiple values.
 For example, the @code{command} instruction takes a single 
 value as its argument, so parsing the statement
 
@@ -408,7 +410,7 @@ usage-error Contact your system administrator
 @end menu
 
 @node Quoted Strings
-@subsection Notes on quoted strings
+@subsection Notes on Quoted Strings
 @cindex quoted strings
 
   The syntax of GNU Rush configuration file was designed so as to
@@ -488,7 +490,7 @@ default tag, which is constructed by concatenating @samp{#} character
 and the ordinal number of rule in the configuration file, in decimal
 notation.  Rule numbering begins from @samp{1}.
 
-The following sub-sections describe the statements that can be used
+The following sub-sections describe statements that can be used
 within a @code{rule}.
 
 @menu
@@ -598,10 +600,10 @@ sign between the condition keyword and expression.  For example:
 
 @table @code
 @item command ^scp
-True, if command line begins with @samp{scp}.
+True, if the command line begins with @samp{scp}.
 
 @item command ! ^scp
-True if command line does not begin with @samp{scp}.
+True if the command line does not begin with @samp{scp}.
 @end table
 
 @node Transformations
@@ -652,9 +654,9 @@ command name itself as @samp{^}.  There is a subtle difference between
 the program that @command{rush} will execute at the end of the
 matching rule, whereas the notation @samp{0} refers to the 0th
 argument that will be passed to that program (@samp{argv[0]}).  Most
-of the time the two values coincide.  Unless a rule modifies @samp{^},
-@samp{0}th word will be used as the program name.  There may, however,
-be some cases when you need to explicitly set @samp{^}.  @xref{Interactive},
+of the time the two values coincide.  Unless the rule modifies @samp{^},
+@samp{0}th word will be used as the program name.  There exist some
+cases when you need to explicitly set @samp{^}.  @xref{Interactive},
 for a possible use of this feature.
 
 @anchor{patterns}
@@ -697,7 +699,7 @@ allowed values of @var{N})
 @end menu
 
 @node set
-@subsubsection set
+@subsubsection Set
 @kwindex set
   The @samp{set} transformation allows to replace entire command line,
 or any of its arguments, with the given value.
@@ -730,8 +732,8 @@ In versions of GNU Rush prior to 1.6, it was common to use the
 Replace @var{n}th argument with the expansion of @var{pattern}.
 Notice, that square brackets are part of the statement syntax.
 
-@xref{indexing}, for the description of @var{n}.  @xref{patterns}, for
-the description of @var{pattern}.  E.g.:
+@xref{indexing}, for a description of @var{n}.  @xref{patterns}, for
+a description of @var{pattern}.  E.g.:
 
 @smallexample
 set[0] /bin/echo
@@ -739,7 +741,7 @@ set[0] /bin/echo
 @end deffn
 
 @node delete
-@subsubsection delete
+@subsubsection Delete
 @kwindex delete
   The @samp{delete} action deletes the given word, or range of words,
 from the command line.  It has two forms.
@@ -804,7 +806,7 @@ command, prefixed by a dash:
 transform[0] $@{^@} s,.*/,-
 @end smallexample
 
-For instance, if command name is @samp{/bin/bash}, @samp{argv[0]} will
+For instance, if the command name is @samp{/bin/bash}, @samp{argv[0]} will
 become @samp{-bash}.
 @end deffn
 
@@ -819,7 +821,7 @@ s/@var{regexp}/@var{replace}/[@var{flags}]
 
 @noindent
 where @var{regexp} is a @dfn{regular expression}, @var{replace} is a
-replacement for each file name part that matches @var{regexp}.  Both
+replacement for each part of the input that matches @var{regexp}.  Both
 @var{regexp} and @var{replace} are described in detail in
 @ref{The "s" Command, The "s" Command, The `s' Command, sed, GNU sed}.
 
@@ -896,11 +898,11 @@ rule svn
 
   This transform expression first removes all occurrences of
 @option{-r} option and its arguments from the command line, and then
-adds its own @option{-r} option and replaces @samp{svnserve} with a
-full name of the program.
+adds its own @option{-r} option and replaces @samp{svnserve} with the
+full program file name.
 
 @node map
-@subsubsection map
+@subsubsection Map
 @kwindex map
   The @samp{map} statement uses file lookup to find a new value for
 the command line word.
@@ -917,8 +919,8 @@ Argument index, as in @ref{indexing}.
 
 @item file
 Name of the @dfn{map file}.  It must begin with @samp{/} or
-@samp{~/}.  Before using, this file is checked using the procedure
-described in @ref{security checks}.
+@samp{~/}.  Before using, the file permissions and ownership are
+checked using the procedure described in @ref{security checks}.
 
 @item delim
 A string containing allowed field delimiters.
@@ -935,8 +937,8 @@ from 1.
 Number of the value field.
 
 @item default
-If supplied, this value is used if the key was not found in
-@var{file}.
+If supplied, this value is used as a replacement value, when the key
+was not found in @var{file}.
 @end table
 @end deffn
 
@@ -962,12 +964,12 @@ matches the lookup key.
 
 @item
 If such a record is found, the value of its @var{vn}th field is
-assigned to the @var{n}th word (@pxref{indexing}, for a description of
-@var{n}).
+assigned to the @var{n}th command line word (@pxref{indexing}, for a
+description of @var{n}).
 
 @item
 Otherwise, if @var{default} is supplied, it becomes the new value of the
-@var{n}the word.
+@var{n}th word.
 
 @item
 Otherwise, the @var{n}th word remains unchanged.
@@ -976,8 +978,8 @@ Otherwise, the @var{n}th word remains unchanged.
   For example, suppose that the file @file{/etc/passwd.rush} has the
 same syntax as the system @file{passwd} file (@pxref{passwd, Password
 File,,passwd(5), passwd(5) man page}).  Then, the following statement
-will replace @samp{argv[0]} with the value of @samp{shell} field for
-the current user name:
+will replace @samp{argv[0]} with the value of @samp{shell} field,
+using the current user name as a key:
 
 @smallexample
 map[0] /etc/passwd.rush : $@{user@} 1 7
@@ -1066,7 +1068,7 @@ limits T10 R20 U16 P20
 @anchor{L limit}
 If some limit cannot be set, execution of the rule aborts.  In
 particular, @samp{L} limit can be regarded as a condition, rather than
-action.  Setting limit @code{limit L@var{n}} succeeds only if no
+action.  The setting @code{limit L@var{n}} succeeds only if no
 more than @var{n} @code{rush} instances are simultaneously running for
 the same user.  This can be used to limit the number of simultaneously
 open sessions. 
@@ -1136,10 +1138,10 @@ before assignment.
 A @dfn{fall-through} rule is a special rule that does not execute the
 requested command.  When a matching fall-through rule is encountered,
 @command{rush} evaluates it and continues scanning its configuration
-for the next matching rule.  Any @code{transform} and @code{env}
+for the next matching rule.  Any transformation and @code{env}
 actions found in a fall-through rule take effect immediately, which
 means that subsequent rules will see modified command line and
-environment.  Execution of any other actions from a fall-through rule
+environment.  Execution of any other actions found in the fall-through rule
 is delayed until a usual rule is found.
 
 A fall-through rule is declared using the following statement:
@@ -1195,7 +1197,7 @@ rule default
   GNU Rush is able to operate in two modes, which we call default and
 forked.  When operating in the default mode, the process image of
 @command{rush} itself is overwritten by the command being executed.
-Thus, when it comes to the launching of the requested command,
+Thus, when it comes to launching the requested command,
 the running instance of @command{rush} ceases to exist.
 
 @cindex forked mode
@@ -1207,7 +1209,7 @@ its execution.  Once the command terminates, @command{rush} exits.
   One advantage of the forked mode is that it allows to run
 @dfn{accounting}, i.e. to note who is doing what and to keep a
 history of invocations.  The accounting, in turn, can be used to limit
-simultaneous executions of commands by the users (@dfn{logins}, in
+simultaneous executions of commands (@dfn{logins}, in
 GNU Rush terminology), as requested by @samp{L} command to @code{limit}
 statement (@pxref{L limit}).
 
@@ -1226,7 +1228,7 @@ you use @command{limit L}.
 @end deffn
 
 The notion @samp{rule contains}, used above, means that either the
-rule in question contains that statement, or it inherits it from one
+rule in question contains that statement, or inherits it from one
 of the above fall-through rules (@pxref{Fall-through}).  In fact, in
 most cases the accounting should affect all rules, therefore we
 suggest to enable it in a fall-through rule at the beginning of the
@@ -1258,11 +1260,11 @@ view the history of last logins using @code{rushlast} command
 @subsection Post-process Notification
 
   @command{Rush} can be configured to send a @dfn{notification} over
-@acronym{INET} or @acronym{UNIX} socket, after completing user
+@acronym{INET} or @acronym{UNIX} sockets, after completing user
 request.  It is done using the @code{post-socket} statement:
 
 @deffn {Rule Config} post-socket @var{url}
-Notify @acronym{URL} about completing user request.  This statement
+Notify @acronym{URL} about completing the user request.  This statement
 implies forked mode (@pxref{Accounting and Forked Mode}). 
 
 Allowed formats for @var{url} are:
@@ -1324,7 +1326,7 @@ immediately.  An exit rule is defined using the following statement:
 
 @deffn {Rule Config} exit @var{fd} @var{message}
 @deffnx {Rule Config} exit @var{message}
-Write textual message @var{message} to a file descriptor, given by
+Write textual message @var{message} to a file descriptor, given by the
 optional argument @var{fd}.  If @var{fd} is absent, @samp{2} (standard
 error) is used.
 @end deffn
@@ -1341,7 +1343,7 @@ exit \
 @end smallexample
 
 @cindex trap rule
-Exit actions are useful for writing @dfn{trap rules}, i.e. rules that
+Exit actions are useful for writing @dfn{trap rules}, i.e. the rules that
 are intended to trap incorrect or prohibited command lines and to return
 customized reply messages in such cases.  Consider the following
 rule:
@@ -1391,7 +1393,7 @@ localization file, @command{rush} uses the following parameters:
 @cindex locale name
 @item locale
 @dfn{Locale name} is a string that describes the language, territory
-and optionally, the character set, to use. It consists of the language
+and optionally, the character set to use. It consists of the language
 (ISO 639) and country (ISO 3166) codes, separated by an underscore
 character, e.g. @samp{en_US} or @samp{pl_PL}.  If a character set is
 specified, its name follows the country code and is separated from it
@@ -1445,7 +1447,8 @@ compile time and defaults to @file{@var{prefix}/share/locale}, where
 @file{/usr/local}, by default.
 
 GNU Rush is shipped with several localization files, which are installed
-by default. These files cover the following locales:
+by default. As of version @value{VERSION}, these files cover the
+following locales:
 
 @table @asis
 @item C
@@ -1479,7 +1482,7 @@ the system administrator to provide and install such files.
 @cindex localization directives
 
 The following configuration directives control localization. They
-are available for use in @code{rule} statement:
+are available for use in @code{rule} statements:
 
 @deffn {Configuration} locale @var{name}
 Sets the locale name.  To specify empty locale, use @samp{""} as
@@ -1521,7 +1524,7 @@ messages and forming a @acronym{PO} file, editing this file, compiling and
 installing it.  The discussion below describes these stages in detail.
 
 @enumerate 1
-@item Creating @samp{po} file.
+@item Creating a @samp{po} file.
 
   A @acronym{PO} (@dfn{Portable Object}) file is a plain text file,
 containing original messages and their translations for a particular
@@ -1587,7 +1590,7 @@ GNU gettext:
 @xref{msgfmt Invocation,,,gettext, GNU gettext utilities}, for a
 detailed description of the @command{msgfmt} utility.
 
-After creating the @acronym{MO} file, copy it into an appropriate
+After creating the @acronym{MO} file, copy it into appropriate
 directory.  It is important that the installed @acronym{MO} file uses
 the naming scheme described in @ref{mo-name, localization file
 naming}.
@@ -1604,9 +1607,9 @@ that file location:
 @end deffn
 
 @cindex tilde expansion
-If @var{file} begins with the tilde character, followed by
+If @var{file} begins with a tilde character, followed by
 a slash (@samp{~/}), these two characters are replaced with the
-full path name of current user home directory.
+full path name of current user's home directory.
 
 If @var{file} is a directory, that directory is searched for a file
 whose name coincides with the current user name.  If such a file is
@@ -1715,7 +1718,7 @@ integer value that controls the verbosity of @command{rush}:
 Set the debugging level to @var{num}.
 @end deffn
 
-  The greater @var{num} is, the more verbose is shell's logging.  The
+  The greater @var{num} is, the more verbose is the logging.  The
 debugging information is reported via @code{syslog} at facility
 @samp{authpriv}, priority @samp{debug}.  As of version @value{VERSION},
 the following debugging levels are supported: 
@@ -1799,7 +1802,7 @@ Default sleep time is 5 seconds.
 @section Error Messages
 @cindex error messages
 
-A set of statements configures textual messages that @command{rush}
+A set of statements configures textual messages which GNU Rush
 returns to the user if an error of some class occurs.  All of them
 take a single argument which is subject to backslash interpretation,
 as described in @ref{Exit, backslash interpretation}. 
@@ -1879,7 +1882,7 @@ rule nologin
 @end smallexample
 
 The @code{interactive} statement supplies a fake command line which
-will indicate an attempt of interactive usage.  It is common practice
+will indicate an attempt of interactive usage.  It is a common practice
 to select such a string that cannot be a valid system command.  The
 @samp{login} rule matches this command line if the user is a member
 of the group @samp{rshell}.  It uses @file{/etc/rush.shell} to select
@@ -2109,7 +2112,7 @@ Given these prerequisites, the following rule will ensure proper
 @smallexample
 rule sftp-incoming
   command ^.*/sftp-server
-  transform[0] s,.*,/bin/sftp-server,
+  set[0] /bin/sftp-server
   chroot ~
   chdir public_html
 @end smallexample
@@ -2145,7 +2148,7 @@ use the following rule:
 @smallexample
 rule cvs
   command ^cvs server
-  transform s|^|/bin/cvs
+  set[0] /bin/cvs
   chroot /var/cvs
 @end smallexample
 
@@ -2166,7 +2169,7 @@ rule svn
 @end smallexample
 
 The @code{transform} action removes any @option{-r} options the user
-might have specified and enforces a singe root directory.  A more
+might have specified and enforces a single root directory.  A more
 restrictive action can be used to improve security:
 
 @smallexample
@@ -2289,7 +2292,7 @@ syslog.
 name of the configuration file to use.
 
 @item The configuration file is parsed.  If parsing fails, the program
-exits with code 1.
+exits with the code 1.
 
 @item If the @option{-c} option is present, @command{rush} processes
 its argument as usual (@pxref{Operation}), except that the command
@@ -2426,7 +2429,7 @@ Display a concise usage summary.
 @node Rushwho
 @chapter The @code{rushwho} utility.
 @prindex rushwho
-The @command{rushwho} utility displays the list of users who are
+The @command{rushwho} utility displays a list of users who are
 currently using @command{rush}.  The utility operates
 on default Rush database, which is maintained if @command{rush}
 runs in accounting mode (@pxref{Accounting and Forked Mode}).  The following
@@ -2456,11 +2459,11 @@ Duration of the session.
 PID of the running command.
 
 @item Command
-Command being executed.
+Command line being executed.
 @end table
 
 @vrindex RUSHWHO_FORMAT
-This format is a built-in default, it can be changed either by
+This format is a built-in default.  It may be changed either by
 setting the @env{RUSHWHO_FORMAT} environment variable to the desired
 format string, or by using @option{--format} command line option.
 
@@ -2486,7 +2489,7 @@ Use @var{string} instead of the default format, described in
 @ref{Rushwho}.  @xref{Formats}, for a detailed description of the
 output format syntax.  If @var{string} begins with a @samp{@@}, then
 this character is removed from it, and the resulting string is
-regarded as a name of a file to read.  The contents of this file is
+regarded as a name of the file to read.  The contents of this file is
 the format string.  The file is read literally, except that lines
 beginning with @samp{;} are ignored (they can be used to introduce
 comments).  For example, @command{rushwho --format=@@formfile} reads
@@ -2546,6 +2549,7 @@ It is interpreted as follows:
 @item \n @tab Newline character (@acronym{ASCII} 10)
 @item \r @tab Carriage return character (@acronym{ASCII} 13)
 @item \t @tab Horizontal tabulation character (@acronym{ASCII} 9)
+@item \v @tab Vertical tabulation character (@acronym{ASCII} 11)
 @item \\ @tab A single backslash (@samp{\})
 @item \" @tab A double-quote.
 @end multitable
@@ -2565,10 +2569,9 @@ a particular piece of information from the database record.
 Each format specification starts with an opening brace and ends with
 a closing brace.  The first word after the brace is the name of the
 format specification.  The rest of words are @dfn{positional arguments}
-followed by @dfn{keyword arguments}.  Both are optional.  Keyword
-arguments must follow the positional arguments.  A keyword argument
-begins with a colon.
-For example:
+followed by @dfn{keyword arguments}.  Both are optional.  When
+specified, keyword arguments must follow positional ones.  A keyword
+argument begins with a colon.  For example:
 
 @table @code
 @item (time)
@@ -2713,11 +2716,11 @@ still running.
 Duration of the session.
 
 @item Command
-Command being executed.
+Command line being executed.
 @end table
 
 @vrindex RUSHLAST_FORMAT
-This format is a built-in default, it can be changed either by
+This format is a built-in default.  It may be changed either by
 setting the @env{RUSHLAST_FORMAT} environment variable to the desired
 format string, or by using @option{--format} command line option
 (@pxref{Rushlast Options}).
@@ -2795,7 +2798,7 @@ Display a concise usage summary.
 @cindex accounting database
   Rush accounting database is stored in the directory
 @file{@var{localstatedir}/rush}, where @var{localstatedir} stands for
-the name of the local state directory, set on compile time.  By
+the name of the local state directory, defined at compile time.  By
 default, it is @file{@var{prefix}/var}, where @var{prefix} is the
 installation prefix, which defaults to @file{/usr/local}.  Thus, the
 default database directory is @file{/usr/local/var/rush}.  You can
@@ -2816,9 +2819,19 @@ grows the first day or two after enabling accounting mode, and from then on
 its size remains without changes.  If you set up log file rotation,
 e.g. by using @command{logrotate} (@pxref{logrotate,,logrotate,logrotate(8),
 logrotate man page}), or a similar tool, it is safe to rotate
-@file{wtmp} without notifying @command{rush}. @FIXME{This could
-interfere with the functionality of @command{radwho}.  Verify it}.
-It is usually not necessary to rotate @file{utmp}, though.
+@file{wtmp} without notifying @command{rush}.  The only requirement is
+to truncate @file{utmp} to zero size after rotating @file{wtmp}, as
+shown in the following @file{logrotate.conf} snippet:
+
+@smallexample
+/var/run/rush/wtmp @{
+    monthly
+    create 0640 root svusers
+    postrotate
+      cat /dev/null > /var/run/rush/utmp
+    endscript
+@}
+@end smallexample
 
   The following sections contain a detailed description of the
 structure of these two files.  You may skip them, if you are not
