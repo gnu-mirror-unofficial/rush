@@ -631,7 +631,7 @@ run_transforms(struct rush_rule *rule, struct rush_request *req)
 			       arg_no, arg_end);
 			if (arg_no == 0 || arg_end == 0)
 				die(config_error,
-				    &req->i18n, _("cannot delete argv[0]"));
+				    &req->i18n, _("Deleting argv[0] is prohibited"));
 			for (i = arg_no; i <= arg_end; i++) 
 				free(req->argv[i]);
 			i = arg_end - arg_no + 1;
