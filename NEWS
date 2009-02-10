@@ -9,7 +9,7 @@ Version 1.5.90 (Git)
 
 * Patterns in `transform' statement
 
-The syntax of the `transform' statement has been extended to
+Syntax of the `transform' statement has been extended to
 allow for specifying source string for transformation:
 
  transform STRING REGEX
@@ -34,11 +34,11 @@ defined:
 
 Thus, for example:
 
-  transform[0] s,.*/,/bin,
+  transform[0] s,.*/,/bin/,
   
 is equivalent to:
 
-  transform[0] $0 s,.*/,/bin,
+  transform[0] $0 s,.*/,/bin/,
 		      
 * The `map' statement.
 
@@ -67,7 +67,7 @@ In indexed form, it replaces the given argument:
 
   set[0] /bin/scp
 
-The argument to `set' may contain meta-variables (see "Patterns in
+Argument to `set' may contain meta-variables (see "Patterns in
 `transform' statement").
   
 * The `delete' statement.
@@ -113,15 +113,11 @@ rule login
   command \*shell\*
   group rshell
   map[^] /usr/local/etc/rush.shell : ${user} 1 2 none
-  transform[0] ${program} s,^,-,
+  transform[0] ${program} s,^.*/,-r,
 
 * Use of predefined error messages in `exit' statement.
 
-Predefined error messages can be used in `exit' statements by
-using the syntax
-
-  @message-name
-
+Predefined error messages can be used in `exit' statements.
 E.g., the statement:
 
   exit @nologin-message

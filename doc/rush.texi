@@ -427,7 +427,7 @@ statement@footnote{@xref{match}, for information about
 
 @noindent
 Here, the argument is @samp{^/sources/[^ ]+\.git$}.  Note, that you
-may not quote it, because quotation marks would be considered part of
+must not quote it, because quotation marks would be considered part of
 the argument.
 
 There are, however, statements that take several arguments.  In these
