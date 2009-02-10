@@ -1,16 +1,16 @@
-GNU Rush NEWS -- history of user-visible changes. 2009-02-04
+GNU Rush NEWS -- history of user-visible changes. 2009-02-10
 Copyright (C) 2008, 2009 Sergey Poznyakoff
 See the end of file for copying conditions.
 
 Please send bug reports to <bug-rush@gnu.org.ua>
 
 
-Version 1.5.90 (Git)
+Version 1.6, 2009-02-10
 
 * Patterns in `transform' statement
 
-Syntax of the `transform' statement has been extended to
-allow for specifying source string for transformation:
+The syntax of the `transform' statement has been extended to
+allow for specifying transformation argument string:
 
  transform STRING REGEX
 or
@@ -48,17 +48,17 @@ This statement sets a command line argument using a map file.
 
 Each line in a map file FILE contains fields, separated by delimiter
 DELIM. The `map' statement looks for the record whose Kth field has
-the value of KEY. If such a record is found, the Nth argument
-is replaced with the value of its Vth field. Othervise, if DEFAULT is
+the value of KEY. If such a record is found, its Vth field becomes a
+new value of the Nth command line argument. Othervise, if DEFAULT is
 given, it is used as a new value. Otherwise, the argument retains its
 old value.
 
-The KEY may contain meta-variables described above (see "Patterns in
+KEY may contain meta-variables described above (see "Patterns in
 `transform' statement").
 
 * The `set' statement.
 
-The `set' statement replaces the command line with the new value:
+The `set' statement replaces entire command line with the new value:
 
 rule foo
   set /bin/scp -t /upload
@@ -67,7 +67,7 @@ In indexed form, it replaces the given argument:
 
   set[0] /bin/scp
 
-Argument to `set' may contain meta-variables (see "Patterns in
+The argument to `set' may contain meta-variables (see "Patterns in
 `transform' statement").
   
 * The `delete' statement.
@@ -75,22 +75,21 @@ Argument to `set' may contain meta-variables (see "Patterns in
 This statement deletes the given argument, or range of arguments, from
 the command line. It has two forms:
 
-1. Delete the argument N:
+1. Delete the Nth argument:
 
   delete[N]
 
-2. Delete arguments from N to M, inclusive:
+2. Delete all arguments between indexes N and M, inclusive:
 
   delete N M
 
 * Modifying program name
 
-To modify the program name (as opposed to argv[0]), use ^ index, e.g.:
+To modify the program name (as opposed to argv[0]), use ^ pseudo-index, e.g.:
 
   set[^] /bin/scp
 
-By default (unless [^] form is used) argv[0] will be used as the
-program name.
+By default (unless [^] form is used) argv[0] is used as the program name.
 
 * Negative argument indexes
 
