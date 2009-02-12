@@ -26,6 +26,7 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 #include <sys/wait.h>
 #include <sys/resource.h>
 #include <syslog.h>
@@ -67,6 +68,10 @@
 # define getmaxfd() getdtablesize()
 #else
 # define getmaxfd() 256
+#endif
+
+#ifndef LOG_AUTHPRIV
+# define LOG_AUTHPRIV LOG_AUTH
 #endif
 
 #define ISWS(c) ((c) == ' ' || (c) == '\t')

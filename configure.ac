@@ -39,6 +39,18 @@ AC_C_CONST
 AC_TYPE_UID_T
 AC_TYPE_MODE_T
 AC_TYPE_SIZE_T
+AC_CHECK_TYPE(socklen_t, , AC_DEFINE(socklen_t, int, [Define to int if <sys/types.h> does not]),
+[
+#if HAVE_SYS_TYPES_H
+# include <sys/types.h>
+#endif
+#ifdef HAVE_SYS_SOCKET_H
+# include <sys/socket.h>
+#endif
+#ifdef HAVE_SOCKET_H
+# include <socket.h>
+#endif
+])
 
 # Checks for library functions.
 AC_FUNC_GETGROUPS
