@@ -52,7 +52,7 @@ Documentation License''.
 this GNU Manual, like GNU software.  Copies published by the Free
 Software Foundation raise funds for GNU development.''
 @end copying
-
+                                   
 @titlepage
 @title GNU Rush -- a restricted user shell
 @subtitle version @value{VERSION}, @value{UPDATED}

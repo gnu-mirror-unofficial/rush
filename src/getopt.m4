@@ -134,7 +134,7 @@ dnl Start an action associated with the declared option. Must follow OPTION
 dnl statement, with optional ALIAS statements in between.
 dnl
 define([<BEGIN>],[<
-ifelse([<DOCSTRING>],,,[<
+ifelse(DOCSTRING,,,[<
 divert(3)
 	{ "translit(dnl
 ifelse(SHORT_TAG,,LONG_TAG,[<SHORT_TAG[<>]ifelse(LONG_TAG,,,; LONG_TAG)>]),
@@ -170,13 +170,13 @@ dnl  default     Code for the default branch
 dnl
 define([<GETOPT>],[<
  {
-  int c;
+  int optchar;
 
 ifelse([<$#>],3,opterr = 0;)
-  while ((c = getopt_long($1, $2, "SHORT_OPTS",
-                          long_options, NULL)) != EOF)
+  while ((optchar = getopt_long($1, $2, "SHORT_OPTS",
+                                long_options, NULL)) != EOF)
     {
-      switch (c)
+      switch (optchar)
         {
         default:
 	ifelse([<$#>],3,$3,[<exit(1)>]);

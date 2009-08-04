@@ -14,6 +14,9 @@
    You should have received a copy of the GNU General Public License
    along with GNU Rush.  If not, see <http://www.gnu.org/licenses/>. */
 
+static int numeric_option;
+define([<OPTSETUP>],[<numeric_option = 0>])
+
 OPTIONS_BEGIN(gnu, "rushlast",
               [<rushlast - show listing of last Rush logins.>],
 	      [<[user [user...]]>])
@@ -21,24 +24,28 @@ OPTIONS_BEGIN(gnu, "rushlast",
 OPTION(format,F,STRING,
        [<Use STRING instead of the default format.>])
 BEGIN
+	OPTSETUP;
 	format = optarg;
 END
 
 OPTION(file,f,DIR,
        [<Look for database files in DIR.>])
 BEGIN
+	OPTSETUP;
 	base_name = optarg;
 END
 
 OPTION(forward,,,
        [<Show entries in chronological order.>])
 BEGIN
+	OPTSETUP;
 	forward = 1;
 END
 
 OPTION(no-header,H,,
        [<Do not display header line.>])
 BEGIN
+	OPTSETUP;
 	display_header = 0;
 END
 
@@ -46,9 +53,28 @@ OPTION(count,n,NUMBER,
        [<Show at most NUM records.>])
 BEGIN
 	char *p;
+	OPTSETUP;
 	count = strtoul(optarg, &p, 10);
         if (*p) 
 		error(1, 0, _("invalid number (%s)"), optarg);
+END
+
+OPTION(,0,,)
+ALIAS(,1)
+ALIAS(,2)
+ALIAS(,3)
+ALIAS(,4)
+ALIAS(,5)
+ALIAS(,6)
+ALIAS(,7)
+ALIAS(,8)
+ALIAS(,9)
+BEGIN
+	if (!numeric_option) {
+		count = 0;
+		numeric_option = 1;
+	}
+	count = count * 10 + optchar - '0';
 END
 
 OPTIONS_END
@@ -56,22 +82,6 @@ OPTIONS_END
 void
 get_options(int argc, char *argv[])
 {
-	GETOPT(argc, argv,[<
-        if (c_isdigit(optopt)) {
-		char *p;
-		count = strtoul(argv[optind-1] + 1, &p, 10);
-                if (*p) 		
-			error(1, 0, _("invalid number (%s)"),
-                              argv[optind-1]);
-                if (optind < argc) 
-                        continue;
-                else
-                        break;
-        }
-        if (argv[optind-1][1] == '-') 
-		error(1, 0, _("unrecognized option `%s'"),
-		      argv[optind-1]);
-	else
-                error(1, 0, _("invalid option -- %c"), optopt)>]);
+	GETOPT(argc, argv);
 }
 
