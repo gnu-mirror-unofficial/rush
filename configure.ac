@@ -32,7 +32,7 @@ AC_PROG_RANLIB
 # Checks for header files.
 AC_HEADER_STDC
 AC_HEADER_TIME
-AC_CHECK_HEADERS([stdlib.h string.h syslog.h unistd.h])
+AC_CHECK_HEADERS([stdlib.h string.h socket.h sys/socket.h syslog.h unistd.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST
