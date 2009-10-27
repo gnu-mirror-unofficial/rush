@@ -62,8 +62,11 @@ Software Foundation raise funds for GNU development.''
 @insertcopying
 @end titlepage
 
+@ifnothtml
 @page
 @summarycontents
+@end ifnothtml
+
 @page
 @contents
 
