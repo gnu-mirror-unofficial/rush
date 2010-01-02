@@ -1,5 +1,5 @@
 /* This file is part of GNU Rush.
-   Copyright (C) 2006, 2007, 2008, 2009 Sergey Poznyakoff.
+   Copyright (C) 2006, 2007, 2008, 2009, 2010 Sergey Poznyakoff.
    (using my implementation for the GNU tar).
 
    GNU Rush is free software; you can redistribute it and/or modify

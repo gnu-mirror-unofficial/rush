@@ -1,5 +1,5 @@
 # Texi2html configuration for GNU Rush documentation. -*- perl -*-
-# Copyright (C) 2009 Sergey Poznyakoff
+# Copyright (C) 2009, 2010 Sergey Poznyakoff
 #
 # GNU Rush is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by

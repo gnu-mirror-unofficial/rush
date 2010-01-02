@@ -1,5 +1,5 @@
 dnl This file is part of GNU Rush.
-dnl Copyright (C) 2007, 2008, 2009 Sergey Poznyakoff.
+dnl Copyright (C) 2007, 2008, 2009, 2010 Sergey Poznyakoff.
 dnl 
 dnl GNU Rush is free software; you can redistribute it and/or modify
 dnl it under the terms of the GNU General Public License as published by
