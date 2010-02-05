@@ -141,13 +141,13 @@ add_case_ctl_segment (struct transform *tf, enum case_ctl_type ctl)
 }
 
 static const char *
-parse_transform_expr (struct transform_list *tlist, const char *expr)
+parse_transform_expr (struct transform_list *tlist, const char *expr,
+                      int cflags)
 {
   int delim;
   int i, j, rc;
   char *str, *beg, *cur;
   const char *p;
-  int cflags = 0;
   struct transform *tf = new_transform (tlist);
 
   if (expr[0] != 's')
@@ -354,11 +354,11 @@ parse_transform_expr (struct transform_list *tlist, const char *expr)
 }
 
 transform_t 
-compile_transform_expr (const char *expr)
+compile_transform_expr (const char *expr, int cflags)
 {
   struct transform_list tlist = { NULL, NULL };
   while (*expr)
-    expr = parse_transform_expr (&tlist, expr);
+    expr = parse_transform_expr (&tlist, expr, cflags);
   return tlist.head;
 }
 

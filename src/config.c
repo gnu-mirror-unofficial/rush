@@ -654,7 +654,7 @@ _parse_transform_common(input_buf_ptr ibuf, struct rush_rule *rule,
 	case 3:
 		expr = env->argv[2];
 	}
-	node->v.trans = compile_transform_expr(expr);
+	node->v.trans = compile_transform_expr(expr, re_flags);
 	if (env->argc > 1) 
 		node->pattern = xstrdup(env->argv[0]);
 	return 0;

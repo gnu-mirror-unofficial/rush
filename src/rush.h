@@ -296,7 +296,7 @@ void parse_config(void);
 void set_error_msg(enum error_type type, char *text);
 int string_to_error_index(const char *name);
 
-transform_t compile_transform_expr (const char *expr);
+transform_t compile_transform_expr (const char *expr, int cflags);
 char *transform_string (struct transform *tf, const char *input);
 
 int post_socket_send(const struct rush_sockaddr *sockaddr,
