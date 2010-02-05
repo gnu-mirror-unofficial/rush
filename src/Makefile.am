@@ -38,18 +38,27 @@ EXTRA_DIST=rush-po.awk rushopt.opt rlopt.opt rwopt.opt getopt.m4 defconf.sed
 INCLUDES=-I$(top_srcdir)/gnu -I$(top_builddir)/gnu -I$(top_srcdir)/lib
 LDADD=../lib/librush.a ../gnu/libgnu.a @LTLIBINTL@
 
-sbinPROGRAMS_INSTALL = $(INSTALL_PROGRAM) -m 4755
+change-suid-mode:
+	@proglist='$(sbin_PROGRAMS)'; \
+	for prog in $$proglist; do \
+	  prog=$(DESTDIR)$(sbindir)/`echo $$prog | sed '$(transform)'`; \
+	  if chown 0:0 $$prog && chmod u+s $$prog; then :; else \
+	    echo "Cannot change $$prog to setuid root"; \
+	  fi;\
+	done
+
+install-exec-hook: change-suid-mode
 
 BUILT_SOURCES = defines.h rushopt.h rwopt.h rlopt.h
 CLEANFILES = defines.h
 MAINTAINER_CLEANFILES = rushopt.h rwopt.h rlopt.h
 
 defines.h: Makefile
-	p=`echo rush | sed 's/$(EXEEXT)$$//'`; \
+	$(AM_V_GEN)p=`echo rush | sed 's/$(EXEEXT)$$//'`; \
 	f=`echo "$$p" | sed 's,^.*/,,;$(transform);s/$$/$(EXEEXT)/'` ; \
-	echo "#define CANONICAL_PROGRAM_NAME \"$(sbindir)/$$f\"" | tr -s / > $@-t
-	echo "#define SYSCONFDIR \"$(sysconfdir)\"" >> $@-t 
-	echo "#define LOCALSTATEDIR \"$(localstatedir)\"" >> $@-t
+	echo "#define CANONICAL_PROGRAM_NAME \"$(sbindir)/$$f\"" | tr -s / > $@-t; \
+	echo "#define SYSCONFDIR \"$(sysconfdir)\"" >> $@-t; \
+	echo "#define LOCALSTATEDIR \"$(localstatedir)\"" >> $@-t; \
 	if test -n "$(RUSH_DEFAULT_CONFIG)" && \
            test -f "$(RUSH_DEFAULT_CONFIG)"; then \
            echo "#define RUSH_DEFAULT_CONFIG \\" >> $@-t; \
@@ -60,4 +69,4 @@ defines.h: Makefile
 SUFFIXES=.opt .c .h
 
 .opt.h:
-	m4 -s $(srcdir)/getopt.m4 $< | sed '1d' > $@
+	$(AM_V_GEN)m4 -s $(srcdir)/getopt.m4 $< | sed '1d' > $@

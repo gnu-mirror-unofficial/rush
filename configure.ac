@@ -14,12 +14,15 @@
 # You should have received a copy of the GNU General Public License
 # along with GNU Rush.  If not, see <http://www.gnu.org/licenses/>.
 
-AC_PREREQ(2.61)
+AC_PREREQ(2.63)
 AC_INIT([GNU rush], [1.6], [bug-rush@gnu.org])
 AC_CONFIG_SRCDIR([src/rush.c])
 AC_CONFIG_HEADER([config.h])
 AC_CONFIG_AUX_DIR([build-aux])
-AM_INIT_AUTOMAKE([1.9 gnits tar-ustar std-options])
+AM_INIT_AUTOMAKE([1.11.1 gnits tar-ustar std-options])
+
+# Enable silent rules by default:
+AM_SILENT_RULES([yes])
 
 # Checks for programs.
 AC_PROG_CC
