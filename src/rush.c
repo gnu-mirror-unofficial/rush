@@ -835,14 +835,11 @@ run_rule(struct rush_rule *rule, struct rush_request *req)
         if (rule->fall_through)
                 return;
 
-	if (req->acct) {
-		mode_t um = umask(022);
-		if (rushdb_open(RUSH_DB, 1) != rushdb_result_ok) 
-			die(system_error, &req->i18n, 
-			    _("cannot open database %s: %s"),
-			    RUSH_DB, rushdb_error_string);
-		umask(um);
-	}
+	if (req->acct &&
+	    rushdb_open(RUSH_DB, 1) != rushdb_result_ok) 
+		die(system_error, &req->i18n, 
+		    _("cannot open database %s: %s"),
+		    RUSH_DB, rushdb_error_string);
 	
 	if (req->chroot_dir && chroot(req->chroot_dir)) 
 		die(system_error, &req->i18n, _("cannot chroot to %s: %s"),

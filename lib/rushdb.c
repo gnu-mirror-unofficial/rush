@@ -33,6 +33,10 @@
 
 #include "librush.h"
 
+mode_t rushdb_umask = 022;
+mode_t rushdb_dir_mode = 0777;
+mode_t rushdb_file_mode = 0666;
+
 char *rushdb_error_string;
 
 static void format_error(const char *fmt, ...) RUSH_PRINTFLIKE(1,2);
@@ -59,8 +63,8 @@ mkname(const char *dir, const char *file)
 	return s;
 }
 
-enum rushdb_result
-rushdb_open(const char *dbdir, int rw)
+static enum rushdb_result
+rushdb_open_internal(const char *dbdir, int rw)
 {
 	char *fname;
 	int rc;
@@ -70,7 +74,7 @@ rushdb_open(const char *dbdir, int rw)
 		if (errno == ENOENT) {
 			if (!rw)
 				return rushdb_result_eof;
-			if (mkdir(dbdir, 0700)) {
+			if (mkdir(dbdir, rushdb_dir_mode)) {
 				format_error(_("cannot create directory %s: %s"),
 					     dbdir, strerror(errno));
 				return rushdb_result_fail;
@@ -114,6 +118,15 @@ rushdb_open(const char *dbdir, int rw)
 	free(fname);
 	
 	return rushdb_result_ok;
+}
+
+enum rushdb_result
+rushdb_open(const char *dbdir, int rw)
+{
+	mode_t um = umask(rushdb_umask);
+	enum rushdb_result res = rushdb_open_internal(dbdir, rw);
+	umask(um);
+	return res;
 }
 
 int
@@ -779,7 +792,7 @@ rushdb_print_header(rushdb_format_t form)
 			break;
 			
 		case FDATA_STRING:
-			outbytes += output_string("",
+			outbytes += output_string(form->v.string,
 						  strlen(form->v.string),
 						  ALIGN_LEFT);
 			break;

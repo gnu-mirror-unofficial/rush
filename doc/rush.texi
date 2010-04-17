@@ -2858,6 +2858,28 @@ shown in the following @file{logrotate.conf} snippet:
 @}
 @end smallexample
 
+  Accounting files are owned by @samp{root} and normally have permissions
+@samp{600}.  You may change the default permissions using the
+following configuration file statements:
+
+@deffn {Rule Config} acct-umask @var{mask}
+Set umask used when accessing accounting database files.  Default
+value is @samp{022}.
+@end deffn
+
+@deffn {Rule Config} acct-dir-mode @var{mode}
+Set mode bits for the accounting directory.  The @var{mode} argument
+is the mode in octal.
+@end deffn
+
+@deffn {Rule Config} acct-file-mode @var{mode}
+Set mode bits for @file{wtmp} and @file{utmp} files.
+@end deffn
+
+  Notice, that these statements affect file and directory modes only
+when the corresponding file or directory is created.  @command{Rush}
+will not change modes of the existing files.
+
   The following sections contain a detailed description of the
 structure of these two files.  You may skip them, if you are not
 interested in technical details.

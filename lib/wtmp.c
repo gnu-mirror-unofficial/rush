@@ -31,14 +31,13 @@
 enum rush_wtmp_dir rush_wtmp_dir = rush_wtmp_forward;
 static int wtmp_fd = -1;
 static size_t wtmp_recsize = 0;
-int rush_wtmp_mode = 0660;
 
 int
 rush_wtmp_open(const char *name, int rw)
 {
 	int fd;
 	
-	fd = open(name, rw ? O_RDWR|O_CREAT : O_RDONLY, rush_wtmp_mode);
+	fd = open(name, rw ? O_RDWR|O_CREAT : O_RDONLY, rushdb_file_mode);
 	if (fd == -1)
 		return -1;
 	wtmp_fd = fd;

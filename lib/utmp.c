@@ -36,7 +36,7 @@ rush_utmp_open(const char *name, int rw)
 {
 	int fd;
 	
-	fd = open(name, rw ? O_RDWR|O_CREAT : O_RDONLY, rush_wtmp_mode);
+	fd = open(name, rw ? O_RDWR|O_CREAT : O_RDONLY, rushdb_file_mode);
 	if (fd == -1) 
 		return -1;
 	utmp_fd = fd;

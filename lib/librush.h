@@ -68,7 +68,9 @@ enum rushdb_result {
 	rushdb_result_fail
 };
 
-extern int rush_wtmp_mode;
+extern mode_t rushdb_umask;
+extern mode_t rushdb_dir_mode;
+extern mode_t rushdb_file_mode;
 
 enum rush_wtmp_dir {
 	rush_wtmp_forward,

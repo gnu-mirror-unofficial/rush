@@ -56,6 +56,18 @@ trimslash(char *s)
 	return len;
 }
 
+
+static int
+parse_file_mode(const char *val, mode_t *mode)
+{
+	char *q;
+	unsigned int n = strtoul(val, &q, 8);
+	if (*q || (n & ~0777))
+		return 1;
+	*mode = n;
+	return 0;
+}
+		
 struct input_buf {
 	char *buf;
 	size_t off;
@@ -585,16 +597,7 @@ static int
 _parse_umask(input_buf_ptr ibuf, struct rush_rule *rule,
 	     struct stmt_env *env)
 {
-	char *q;
-	unsigned int n = strtoul(env->val, &q, 8);
-	if (*q || (n & ~0777)) {
-		logmsg(LOG_NOTICE,
-		       _("%s:%d: invalid umask: %s"),
-		       ibuf->file, ibuf->line, env->val);
-		return 1;
-	} else
-		rule->mask = n;
-	return 0;
+	return parse_file_mode(env->val, &rule->mask);
 }
 
 static int
@@ -845,6 +848,27 @@ _parse_acct(input_buf_ptr ibuf, struct rush_rule *rule,
 	}
 	rule->acct = yes ? rush_true : rush_false;
 	return 0;
+}
+
+static int
+_parse_acct_file_mode(input_buf_ptr ibuf, struct rush_rule *rule,
+		      struct stmt_env *env)
+{
+	return parse_file_mode(env->val, &rushdb_file_mode);
+}
+
+static int
+_parse_acct_dir_mode(input_buf_ptr ibuf, struct rush_rule *rule,
+		     struct stmt_env *env)
+{
+	return parse_file_mode(env->val, &rushdb_dir_mode);
+}
+
+static int
+_parse_acct_umask(input_buf_ptr ibuf, struct rush_rule *rule,
+		  struct stmt_env *env)
+{
+	return parse_file_mode(env->val, &rushdb_dir_mode);
 }
 
 
@@ -1102,6 +1126,7 @@ _parse_include(input_buf_ptr ibuf, struct rush_rule *rule,
 	struct stat st;
 	
 	name = expand_tilde(env->val, rush_pw->pw_dir);
+
 	if (trimslash(name) == 0) {
 		logmsg(LOG_NOTICE,
 		       _("%s:%d: invalid include file name"),
@@ -1130,7 +1155,6 @@ _parse_include(input_buf_ptr ibuf, struct rush_rule *rule,
 		free(name);
 		name = file;
 	} 
-
 	rc = init_input_buf(&env->ret_buf, name);
 	free(name);
 	return rc;
@@ -1343,6 +1367,9 @@ struct token toktab[] = {
 	{ KW("regexp"),           TOK_ARGN, _parse_re_flags },
 	{ KW("include-security"), TOK_ARGN, _parse_include_security },
 	{ KW("interactive"),      TOK_ARG, _parse_interactive },
+	{ KW("acct-file-mode"),   TOK_ARG, _parse_acct_file_mode },
+	{ KW("acct-dir-mode"),    TOK_ARG, _parse_acct_dir_mode },
+	{ KW("acct-umask"),       TOK_ARG, _parse_acct_umask },
 	{ NULL }
 #undef KW
 };
