@@ -335,7 +335,7 @@ char *
 make_file_name(const char *dir, const char *name)
 {
 	size_t dlen = strlen(dir);
-	size_t len = dlen + strlen(name + 1);
+	size_t len = dlen + strlen(name) + 1;
 	char *res = xmalloc(len + 1);
 	strcpy(res, dir);
 	if (dlen > 0 && res[dlen-1] != '/')
