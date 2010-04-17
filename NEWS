@@ -5,11 +5,23 @@ See the end of file for copying conditions.
 Please send bug reports to <bug-rush@gnu.org.ua>
 
 
+Version 1.6.90 (Git)
+
 * New configuration statements `acct-umask', `acct-dir-mode', `acct-file-mode'
 
 These statements set the value of umask used when accessing accounting
 database files, and permissions for the accounting directory and
 database files, correspondingly.
+
+* Default regex flags affect the `transfer' statement.
+
+* New translations
+
+Vietnamese, by Clytie Siddall.
+
+* Bugfixes
+** Fix memory allocation in make_file_name.
+** Fix handling of numeric options in `rushlast'.
 
 
 Version 1.6, 2009-02-10
