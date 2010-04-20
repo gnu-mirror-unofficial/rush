@@ -322,8 +322,6 @@ run_tests(struct rush_rule *rule, struct rush_request *req)
 struct rush_rule *
 match_rule(struct rush_rule *rule, struct rush_request *req)
 {
-        if (!rule)
-                rule = rule_head;
         for (; rule; rule = rule->next) {
                 if (run_tests(rule, req) == 0)
                         break;
@@ -836,7 +834,7 @@ run_rule(struct rush_rule *rule, struct rush_request *req)
         if (rule->fall_through)
                 return;
 
-	if (req->acct &&
+	if (req->acct == rush_true &&
 	    rushdb_open(RUSH_DB, 1) != rushdb_result_ok) 
 		die(system_error, &req->i18n, 
 		    _("cannot open database %s: %s"),
@@ -955,19 +953,19 @@ main(int argc, char **argv)
                 die(system_error, NULL,
                     _("argcv_get(%s) failed: %s"),
                     req.cmdline, strerror(rc));
-        
-        for (rule = NULL; ; rule = rule->next) {
+
+	for (rule = rule_head; rule; rule = rule->next) {
                 rule = match_rule(rule, &req);
                 if (!rule)
-                        die(usage_error, &req.i18n, 
-                            _("no matching rule for \"%s\", user %s"),
-                            req.cmdline, req.pw->pw_name);
+                        break;
                 if (debug_level) 
                         logmsg(LOG_NOTICE,
                                _("Serving request \"%s\" for %s by rule %s"),
                                command, req.pw->pw_name, rule->tag);
                 run_rule(rule, &req);
-        } 
-        
+        }
+	die(usage_error, &req.i18n, 
+	    _("no matching rule for \"%s\", user %s"),
+	    req.cmdline, req.pw->pw_name);        
         return 0;
 }
