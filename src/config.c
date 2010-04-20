@@ -1355,7 +1355,7 @@ struct token toktab[] = {
 	{ KW("text-domain"),      TOK_DFL, _parse_text_domain },
 	{ KW("locale-dir"),       TOK_DFL, _parse_locale_dir },
 	{ KW("locale"),           TOK_DFL, _parse_locale },
-	{ KW("include"),          TOK_DFL|TOK_NEWBUF, _parse_include },
+	{ KW("include"),          TOK_ARG|TOK_NEWBUF, _parse_include },
 	{ KW("fall-through"),     TOK_RUL, _parse_fall_through },
 	{ KW("exit"),             TOK_RUL, _parse_exit },
 	{ KW("debug"),            TOK_ARG, _parse_debug },
