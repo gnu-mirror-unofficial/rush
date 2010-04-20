@@ -585,6 +585,7 @@ run_transforms(struct rush_rule *rule, struct rush_request *req)
                         break;
 
 		case transform_setcmd:
+			GET_TGT_VAL();
 			if (args_transformed) {
                                 rebuild_cmdline(req);
                                 args_transformed = 0;
