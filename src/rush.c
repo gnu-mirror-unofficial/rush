@@ -250,18 +250,21 @@ test_request_gid(struct test_node *node, struct rush_request *req)
 }
 
 int
-groupcmp(char *gname, struct passwd *pw)
+groupcmp(char *gname, struct passwd *pw, int princ)
 {
         struct group *grp;
         grp = getgrnam(gname);
         if (grp) {
-                char **p;
                 if (pw->pw_gid == grp->gr_gid)
                         return 0;
-                for (p = grp->gr_mem; *p; p++) {
-                        if (strcmp(*p, pw->pw_name) == 0)
-                                return 0;
-                }
+		if (!princ) {
+			char **p;
+
+			for (p = grp->gr_mem; *p; p++) {
+				if (strcmp(*p, pw->pw_name) == 0)
+					return 0;
+			}
+		}
         }
         return 1;
 }
@@ -272,7 +275,18 @@ test_request_group(struct test_node *node, struct rush_request *req)
         char **p;
         
         for (p = node->v.strv; *p; p++) 
-                if (groupcmp(*p, req->pw) == 0)
+                if (groupcmp(*p, req->pw, 0) == 0)
+                        return 0;
+        return 1;
+}
+
+int
+test_request_main_group(struct test_node *node, struct rush_request *req)
+{
+        char **p;
+        
+        for (p = node->v.strv; *p; p++) 
+                if (groupcmp(*p, req->pw, 1) == 0)
                         return 0;
         return 1;
 }
@@ -295,7 +309,8 @@ int (*test_request[])(struct test_node *, struct rush_request *) = {
         test_request_uid,
         test_request_gid,
         test_request_user,
-        test_request_group
+        test_request_group,
+	test_request_main_group	
 };
 
 int

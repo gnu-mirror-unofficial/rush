@@ -134,7 +134,8 @@ enum test_type {
 	test_uid,
 	test_gid,
 	test_user,
-	test_group
+	test_group,
+	test_main_group
 };
 
 struct test_numeric_node {

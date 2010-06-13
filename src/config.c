@@ -594,6 +594,15 @@ _parse_group(input_buf_ptr ibuf, struct rush_rule *rule,
 }
 
 static int
+_parse_main_group(input_buf_ptr ibuf, struct rush_rule *rule,
+		  struct stmt_env *env)
+{
+	struct test_node *node = new_test_node(rule, test_main_group);
+	parse_neg_strv(ibuf, node, env);
+	return 0;
+}
+
+static int
 _parse_umask(input_buf_ptr ibuf, struct rush_rule *rule,
 	     struct stmt_env *env)
 {
@@ -1334,6 +1343,7 @@ struct token toktab[] = {
 	{ KW("gid"),              TOK_DFL, _parse_gid },
 	{ KW("user"),             TOK_DFLN, _parse_user },
 	{ KW("group"),            TOK_DFLN, _parse_group },
+	{ KW("main-group"),       TOK_DFLN, _parse_main_group },
 	{ KW("transform"),        TOK_DFL|TOK_SED, _parse_transform },
 	{ KW("transform"),        TOK_DFL|TOK_IND|TOK_SED|TOK_CRT,
 	  _parse_transform_ar },
