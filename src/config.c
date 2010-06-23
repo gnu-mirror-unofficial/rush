@@ -67,7 +67,50 @@ parse_file_mode(const char *val, mode_t *mode)
 	*mode = n;
 	return 0;
 }
+
+static int
+parsegid(char *val, gid_t *pgid)
+{
+	struct group *grp;
+
+	if (isdigit(val[0])) {
+		char *p;
+		unsigned long n = strtoul(val, &p, 10);
 		
+		if (*p == 0) {
+			*pgid = n;
+			return 0;
+		}
+	}
+		
+	grp = getgrnam(val);
+	if (!grp)
+		return 1;
+	*pgid = grp->gr_gid;
+	return 0;
+}
+
+static int
+parseuid(char *val, uid_t *puid)
+{
+	struct passwd *pwd;
+
+	if (isdigit(val[0])) {
+		char *p;
+		unsigned long n = strtoul(val, &p, 10);
+		
+		if (*p == 0) {
+			*puid = n;
+			return 0;
+		}
+	}
+	pwd = getpwnam(val);
+	if (!pwd)
+		return 1;
+	*puid = pwd->pw_uid;
+	return 0;
+}
+
 struct input_buf {
 	char *buf;
 	size_t off;
@@ -256,6 +299,7 @@ new_rush_rule()
 	struct rush_rule *p = xzalloc(sizeof(*p));
 	LIST_APPEND(p, rule_head, rule_tail);
 	p->mask = NO_UMASK;
+	p->gid = NO_GID;
 	p->fork = rush_undefined;
 	p->acct = rush_undefined;
 	return p;
@@ -362,6 +406,10 @@ parse_cmp_op (enum cmp_op *op, char **pstr)
 		if (*++str == '=')
 			str++;
 		*op = cmp_eq;
+	} else if (*str == '!') {
+		if (*++str == '=')
+			str++;
+		*op = cmp_ne;
 	} else if (*str == '>') {
 		if (*++str == '=') {
 			str++;
@@ -393,19 +441,13 @@ _parse_negation(struct test_node *node, char *val)
 	return val;
 }
 
-int
-parse_numtest(input_buf_ptr ibuf, struct test_numeric_node *numtest,
-	      char *val)
+static int
+numstrtonum(input_buf_ptr ibuf, char *val,
+	    struct test_numeric_node *node)
 {
 	char *q;
 	
-	if (parse_cmp_op(&numtest->op, &val)) {
-		logmsg(LOG_NOTICE,
-		       _("%s:%d: invalid opcode"),
-		       ibuf->file, ibuf->line);
-		return 1;
-	}
-	numtest->val = strtoul(val, &q, 10);
+	node->val = strtoul(val, &q, 10);
 	if (*q) {
 		logmsg(LOG_NOTICE,
 		       _("%s:%d: invalid number: %s"),
@@ -413,6 +455,21 @@ parse_numtest(input_buf_ptr ibuf, struct test_numeric_node *numtest,
 		return 1;
 	}
 	return 0;
+}
+
+int
+parse_numtest(input_buf_ptr ibuf, struct test_numeric_node *numtest,
+	      char *val, int (*valtonum)(input_buf_ptr, char *,
+					 struct test_numeric_node *))
+{
+	if (parse_cmp_op(&numtest->op, &val)
+	    && val[strcspn(val, " \t")]) {
+		logmsg(LOG_NOTICE,
+		       _("%s:%d: invalid opcode"),
+		       ibuf->file, ibuf->line);
+		return 1;
+	}
+	return valtonum(ibuf, val, numtest);
 }
 
 struct stmt_env {
@@ -554,7 +611,23 @@ _parse_argc(input_buf_ptr ibuf, struct rush_rule *rule,
 {
 	struct test_node *node = new_test_node(rule, test_argc);
 	char *val = _parse_negation(node, env->val);
-	return parse_numtest(ibuf, &node->v.num, val);
+	return parse_numtest(ibuf, &node->v.num, val, numstrtonum);
+}
+
+static int
+uidtonum(input_buf_ptr ibuf, char *str,
+	 struct test_numeric_node *node)
+{
+	uid_t uid;
+	
+	if (parseuid(str, &uid)) {
+		logmsg(LOG_NOTICE,
+		       _("%s:%d: no such user: %s"),
+		       ibuf->file, ibuf->line, str);
+		return 1;
+	}
+	node->val = uid;
+	return 0;
 }
 
 static int
@@ -563,7 +636,23 @@ _parse_uid(input_buf_ptr ibuf, struct rush_rule *rule,
 {
 	struct test_node *node = new_test_node(rule, test_uid);
 	char *val = _parse_negation(node, env->val);
-	return parse_numtest(ibuf, &node->v.num, val);
+	return parse_numtest(ibuf, &node->v.num, val, uidtonum);
+}
+
+static int
+gidtonum(input_buf_ptr ibuf, char *str,
+	 struct test_numeric_node *node)
+{
+	gid_t gid;
+	
+	if (parsegid(str, &gid)) {
+		logmsg(LOG_NOTICE,
+		       _("%s:%d: no such group: %s"),
+		       ibuf->file, ibuf->line, str);
+		return 1;
+	}
+	node->val = gid;
+	return 0;
 }
 
 static int
@@ -572,7 +661,7 @@ _parse_gid(input_buf_ptr ibuf, struct rush_rule *rule,
 {
 	struct test_node *node = new_test_node(rule, test_gid);
 	char *val = _parse_negation(node, env->val);
-	return parse_numtest(ibuf, &node->v.num, val);
+	return parse_numtest(ibuf, &node->v.num, val, gidtonum);
 }
 
 static int
@@ -589,15 +678,6 @@ _parse_group(input_buf_ptr ibuf, struct rush_rule *rule,
 	     struct stmt_env *env)
 {
 	struct test_node *node = new_test_node(rule, test_group);
-	parse_neg_strv(ibuf, node, env);
-	return 0;
-}
-
-static int
-_parse_main_group(input_buf_ptr ibuf, struct rush_rule *rule,
-		  struct stmt_env *env)
-{
-	struct test_node *node = new_test_node(rule, test_main_group);
 	parse_neg_strv(ibuf, node, env);
 	return 0;
 }
@@ -1315,6 +1395,19 @@ _parse_set_ar(input_buf_ptr ibuf, struct rush_rule *rule,
 	return 0;
 }
 
+static int
+_parse_newgroup(input_buf_ptr ibuf, struct rush_rule *rule,
+		struct stmt_env *env)
+{
+	if (parsegid(env->val, &rule->gid)) {
+		logmsg(LOG_NOTICE,
+		       _("%s:%d: no such group: %s"),
+		       ibuf->file, ibuf->line, env->val);
+		return 1;
+	}
+	return 0;
+}
+
 
 #define TOK_NONE   0x00   /* No flags */
 #define TOK_ARG    0x01   /* Token requires an argument */
@@ -1343,7 +1436,6 @@ struct token toktab[] = {
 	{ KW("gid"),              TOK_DFL, _parse_gid },
 	{ KW("user"),             TOK_DFLN, _parse_user },
 	{ KW("group"),            TOK_DFLN, _parse_group },
-	{ KW("main-group"),       TOK_DFLN, _parse_main_group },
 	{ KW("transform"),        TOK_DFL|TOK_SED, _parse_transform },
 	{ KW("transform"),        TOK_DFL|TOK_IND|TOK_SED|TOK_CRT,
 	  _parse_transform_ar },
@@ -1380,6 +1472,8 @@ struct token toktab[] = {
 	{ KW("acct-file-mode"),   TOK_ARG, _parse_acct_file_mode },
 	{ KW("acct-dir-mode"),    TOK_ARG, _parse_acct_dir_mode },
 	{ KW("acct-umask"),       TOK_ARG, _parse_acct_umask },
+	{ KW("newgroup"),         TOK_DFL, _parse_newgroup },
+	{ KW("newgrp"),           TOK_DFL, _parse_newgroup },
 	{ NULL }
 #undef KW
 };

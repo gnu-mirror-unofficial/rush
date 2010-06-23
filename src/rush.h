@@ -134,8 +134,7 @@ enum test_type {
 	test_uid,
 	test_gid,
 	test_user,
-	test_group,
-	test_main_group
+	test_group
 };
 
 struct test_numeric_node {
@@ -201,6 +200,7 @@ struct rush_rule {
 	mode_t mask;                 /* umask */
 	char *chroot_dir;            /* chroot directory */ 
 	char *home_dir;              /* home directory */
+	gid_t gid;                   /* primary group ID */
 	limits_record_t limits;      /* resource limits */
 
 	enum rush_three_state fork;  /* Fork a subprocess */
@@ -219,6 +219,7 @@ struct rush_request {
 	unsigned umask;        
 	char *chroot_dir;      
         char *home_dir;
+	gid_t gid;
 	enum rush_three_state fork;
 	enum rush_three_state acct;
 	const struct rush_sockaddr *post_sockaddr;
@@ -227,6 +228,7 @@ struct rush_request {
 
 #define PROGFILE(req) ((req)->prog ? (req)->prog : (req)->argv[0])
 #define NO_UMASK ((mode_t)-1)
+#define NO_GID ((gid_t)-1)
 
 extern char *rush_config_file;
 extern int lint_option;

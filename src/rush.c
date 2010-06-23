@@ -250,20 +250,19 @@ test_request_gid(struct test_node *node, struct rush_request *req)
 }
 
 int
-groupcmp(char *gname, struct passwd *pw, int princ)
+groupcmp(char *gname, struct passwd *pw)
 {
         struct group *grp;
         grp = getgrnam(gname);
         if (grp) {
-                if (pw->pw_gid == grp->gr_gid)
-                        return 0;
-		if (!princ) {
-			char **p;
+		char **p;
 
-			for (p = grp->gr_mem; *p; p++) {
-				if (strcmp(*p, pw->pw_name) == 0)
-					return 0;
-			}
+		if (pw->pw_gid == grp->gr_gid)
+                        return 0;
+
+		for (p = grp->gr_mem; *p; p++) {
+			if (strcmp(*p, pw->pw_name) == 0)
+				return 0;
 		}
         }
         return 1;
@@ -275,18 +274,7 @@ test_request_group(struct test_node *node, struct rush_request *req)
         char **p;
         
         for (p = node->v.strv; *p; p++) 
-                if (groupcmp(*p, req->pw, 0) == 0)
-                        return 0;
-        return 1;
-}
-
-int
-test_request_main_group(struct test_node *node, struct rush_request *req)
-{
-        char **p;
-        
-        for (p = node->v.strv; *p; p++) 
-                if (groupcmp(*p, req->pw, 1) == 0)
+                if (groupcmp(*p, req->pw) == 0)
                         return 0;
         return 1;
 }
@@ -309,8 +297,7 @@ int (*test_request[])(struct test_node *, struct rush_request *) = {
         test_request_uid,
         test_request_gid,
         test_request_user,
-        test_request_group,
-	test_request_main_group	
+        test_request_group
 };
 
 int
@@ -830,6 +817,11 @@ run_rule(struct rush_rule *rule, struct rush_request *req)
         if (req->home_dir) 
                 debug1(2, _("Home dir: %s"), req->home_dir);
 
+	if (rule->gid != NO_GID) {
+		req->gid = rule->gid;
+		debug1(2, _("GID: %lu"), req->gid);
+	}
+	
 	if (rule->post_sockaddr.len)
 		req->post_sockaddr = &rule->post_sockaddr;
 	
@@ -871,6 +863,10 @@ run_rule(struct rush_rule *rule, struct rush_request *req)
 	if (req->fork == rush_true) 
 		fork_process(rule, req);
 
+	if (req->gid != NO_GID && setgid(req->gid))
+                die(system_error, &req->i18n, _("cannot enforce gid %lu: %s"),
+                    (unsigned long) req->gid, strerror(errno));
+	
         if (setuid(req->pw->pw_uid))
                 die(system_error, &req->i18n, _("cannot enforce uid %lu: %s"),
                     (unsigned long) req->pw->pw_uid, strerror(errno));
@@ -961,6 +957,7 @@ main(int argc, char **argv)
 	req.umask = 022;
 	req.chroot_dir = NULL;
         req.home_dir = NULL;
+	req.gid = NO_GID;
 	req.fork = rush_undefined;
 	req.acct = rush_undefined;
         rc = argcv_get(req.cmdline, NULL, NULL, &req.argc, &req.argv);

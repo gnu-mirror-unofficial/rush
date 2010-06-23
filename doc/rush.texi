@@ -566,18 +566,31 @@ argc < 3
 @end smallexample
 @end deffn
 
-@deffn {Rule Config} uid @var{op} @var{num}
-Compare current @acronym{UID} to @var{num}.
-The comparison operator is given by @var{op}, which can be one 
+@deffn {Rule Config} uid [@var{op}] @var{user-id}
+Compare current @acronym{UID} to @var{user-id}.  The latter may be
+either a numeric UID or a name of an existing user.
+
+The comparison operator is given by optional @var{op}, which can be one 
 of the following: @samp{=} (@samp{==}), @samp{!=}, @samp{<},
-@samp{<=}, @samp{>}, @samp{>=}.
+@samp{<=}, @samp{>}, @samp{>=}.  If @var{op} is not given, equality
+(@samp{==}) is assumed.
+
+Examples:
+
+@smallexample
+uid smith
+@end smallexample
+
 @end deffn
 
-@deffn {Rule Config} gid @var{op} @var{num}
-Compare current @acronym{GID} to @var{num}.
+@deffn {Rule Config} gid @var{op} @var{group-id}
+Compare current @acronym{GID} to @var{group-id}, which is either a
+numeric value or a name of an existing group.
+
 The comparison operator is given by @var{op}, which can be one
 of the following: @samp{=} (@samp{==}), @samp{!=}, @samp{<},
-@samp{<=}, @samp{>}, @samp{>=}.
+@samp{<=}, @samp{>}, @samp{>=}.  If @var{op} is not given, equality
+(@samp{==}) is assumed.
 @end deffn
 
 @deffn {Rule Config} user @var{names}
@@ -1001,6 +1014,12 @@ System actions provide an interface to the operating system.
 @deffn {Rule Config} umask @var{mask}
 Set the umask.  The @var{mask} must be an octal value not greater than
 @samp{0777}.  The default umask is @samp{022}.
+@end deffn
+
+@deffn {Rule Config} newgrp @var{group-id}
+@deffnx {Rule Config} newgroup @var{group-id}
+Changes the current group ID to @var{group-id}, which is either a
+numeric value or a name of an existing group.
 @end deffn
 
 @deffn {Rule Config} chroot @var{dir}
