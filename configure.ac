@@ -15,11 +15,11 @@
 # along with GNU Rush.  If not, see <http://www.gnu.org/licenses/>.
 
 AC_PREREQ(2.63)
-AC_INIT([GNU rush], [1.6.91], [bug-rush@gnu.org])
+AC_INIT([GNU rush], [1.7], [bug-rush@gnu.org])
 AC_CONFIG_SRCDIR([src/rush.c])
 AC_CONFIG_HEADER([config.h])
 AC_CONFIG_AUX_DIR([build-aux])
-AM_INIT_AUTOMAKE([1.11.1 gnits tar-ustar std-options])
+AM_INIT_AUTOMAKE([1.11.1 gnits tar-ustar dist-bzip2 dist-xz std-options])
 
 # Enable silent rules by default:
 AM_SILENT_RULES([yes])
