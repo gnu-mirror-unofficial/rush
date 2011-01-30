@@ -1,5 +1,5 @@
 /* This file is part of GNU Rush.                  
-   Copyright (C) 2008, 2009, 2010 Sergey Poznyakoff
+   Copyright (C) 2008, 2009, 2010, 2011 Sergey Poznyakoff
 
    GNU Rush is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -51,7 +51,7 @@ post_socket_send(const struct rush_sockaddr *sockaddr,
 		return 1;
 	}
 
-	fp = fdopen(fd, "r+");
+	fp = fdopen(fd, "a+");
 	/* Communication takes place in accordance with TCPMUX
 	   protocol (RFC 1078).  The rule tag is used as service
 	   name. */
