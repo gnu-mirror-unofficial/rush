@@ -7,13 +7,11 @@ dirname
 error
 fprintftime
 getline
-getopt
+getopt-gnu
 gettext-h
 gitlog-to-changelog
 inttostr
-malloc
 obstack
-realloc
 regex
 strerror
 vasprintf
