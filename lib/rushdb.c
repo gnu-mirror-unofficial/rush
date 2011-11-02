@@ -308,14 +308,15 @@ output_tab(int column, int tabstop)
 }
 
 /*FIXME: ignores key */
-
 static int
 output_duration(time_t t, int width, struct format_key *key)
 {
         unsigned d,h,m,s;
 	unsigned outbytes;
 	char dbuf[INT_BUFSIZE_BOUND(unsigned)+1];
-
+	char *dptr = NULL;
+	unsigned fullwidth, dlen;
+	
 	d = t / 86400;
 	t %= 86400;
 
@@ -327,26 +328,76 @@ output_duration(time_t t, int width, struct format_key *key)
 	} else
 		h = 0;
 	
-	outbytes = 0;
-	if (d) 
-		outbytes += printf("%*.*s+", width, width,
-				   uinttostr(d, dbuf));
-	
-	if (outbytes < width) {
-		unsigned rest = width - outbytes;
-		if (rest >= 2)
-			outbytes += printf("%02u", d);
-		rest = width - outbytes;
-		if (rest >= 3)
-			outbytes += printf(":%02u", m);
-		rest = width - outbytes;
-		if (rest >= 3)
-			outbytes += printf(":%02u", s);
-		rest = width - outbytes;
-		if (rest)
-			printf("%*.*s", rest, rest, "");
+	fullwidth = 8;
+	if (d) {
+		dptr = uinttostr(d, dbuf);
+		dlen = strlen(dptr);
+		fullwidth += dlen + 1;
 	}
-	return width;
+
+	if (d) {
+		if (width >= fullwidth)
+			outbytes = printf("%*s+%02u:%02u:%02u",
+					  width - fullwidth, dptr, h, m, s);
+		else if (width >= fullwidth - 3)
+			outbytes = printf("%*sd%02uh%02u",
+					  width - (dlen + 5),
+					   dptr, h, m);
+		else if (width >= fullwidth - 5)
+			outbytes = printf("%*sd%02uh",
+					  width - (dlen + 3),
+					  dptr, h, m, s);
+		else if (width >= dlen + 1)
+			outbytes = printf("%*sd",
+					  width - 1, dptr);
+		else 
+			while (width--) {
+				putchar('>');
+				outbytes++;
+			}
+	} else {
+		if (width >= 8)
+			outbytes = printf("%*s%02u:%02u:%02u",
+					  width - 8, "", h, m, s);
+		else if (width >= 5) {
+			if (h)
+				outbytes = printf("%*s%02uh%02u",
+						  width - 5, "", h, m);
+			else
+				outbytes = printf("%*s%02u:%02u",
+						  width - 5, "", m, s);
+		} else if (h) {
+			dptr = uinttostr(h, dbuf);
+			dlen = strlen(dptr);
+			if (width >= dlen + 1)
+				outbytes = printf("%*sh",
+						  width - 1, dptr);
+			else
+				while (width--) {
+					putchar('>');
+					outbytes++;
+				}
+		} else {
+			dptr = uinttostr(s, dbuf);
+			dlen = strlen(dptr);
+			if (width >= dlen)
+				outbytes = printf("%*s", width, dptr);
+			else {
+				dptr = uinttostr(m, dbuf);
+				dlen = strlen(dptr);
+				if (width >= dlen + 1)
+					outbytes = printf("%*sm",
+							  width - 1, dptr);
+				else
+					while (width--) {
+						putchar('>');
+						outbytes++;
+					}
+			}
+		}
+	}
+
+	return outbytes;
 }
 
 static int

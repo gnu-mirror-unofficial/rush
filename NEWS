@@ -21,7 +21,7 @@ e.g.:
   uid 1300
   uid smith
   uid < smith
-  git != 500
+  gid != 500
 
 * The `newgrp' command
 

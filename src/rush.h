@@ -288,7 +288,7 @@ extern char *rush_interactive_shell;
 	} while(0)
 
 void die(enum error_type type, struct rush_i18n *i18n, const char *fmt, ...)
-	 ATTRIBUTE_NORETURN RUSH_PRINTFLIKE(3,4);
+	 RUSH_NORETURN RUSH_PRINTFLIKE(3,4);
 void logmsg(int prio, const char *fmt, ...)  RUSH_PRINTFLIKE(2,3);
 
 int parse_limits(limits_record_t *plrec, char *str, char **endp);

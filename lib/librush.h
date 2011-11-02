@@ -29,6 +29,10 @@
 # define RUSH_PRINTFLIKE(fmt,narg) __attribute__ ((__format__ (__printf__, fmt, narg)))
 #endif
 
+#ifndef RUSH_NORETURN
+# define RUSH_NORETURN __attribute__ ((noreturn))
+#endif
+
 
 extern const char *program_name;
 

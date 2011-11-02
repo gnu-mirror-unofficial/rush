@@ -2952,7 +2952,7 @@ represents the time when the user session finished.  If the session is
 still running, this field is filled with zeros.
 
 @item unused
-The three pointers at the end of the structure are used internally bu
+The three pointers at the end of the structure are used internally by
 @command{rush}.  On disk, these fields are always filled with zeros.
 @end table
 
