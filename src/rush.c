@@ -732,12 +732,78 @@ fork_process(struct rush_rule *rule, struct rush_request *req)
 		post_socket_send(req->post_sockaddr, rule, req);
 	exit(0);
 }
+
+static int
+membergid(gid_t gid, size_t gc, gid_t *gv)
+{
+	int i;
+	for (i = 0; i < gc; i++)
+		if (gv[i] == gid)
+			return 1;
+	return 0;
+}
+
+static void
+get_user_groups(struct rush_request *req, size_t *pgidc, gid_t **pgidv)
+{
+	size_t gidc = 0, n = 0;
+	gid_t *gidv = NULL;
+	struct group *gr;
+	
+	n = 32;
+	gidv = xcalloc(n, sizeof(gidv[0]));
+
+	gidv[0] = req->gid == NO_GID ? req->pw->pw_gid : req->gid;
+	gidc = 1;
+
+	setgrent();
+	while (gr = getgrent()) {
+		char **p;
+		for (p = gr->gr_mem; *p; p++)
+			if (strcmp(*p, req->pw->pw_name) == 0) {
+				if (n == gidc) {
+					n += 32;
+					gidv = xrealloc(gidv,
+							n * sizeof(gidv[0]));
+				}
+				if (!membergid(gr->gr_gid, gidc, gidv))
+					gidv[gidc++] = gr->gr_gid;
+			}
+	}
+	endgrent();
+	*pgidc = gidc;
+	*pgidv = gidv;
+}
+
+static void
+setowner(struct rush_request *req)
+{
+	size_t gidc;
+	gid_t *gidv;
+	
+	get_user_groups(req, &gidc, &gidv);
+	if (setgroups(gidc, gidv) < 0)
+		die(system_error, &req->i18n,
+		    "setgroups: %s", strerror(errno));
+	if (setgid(gidv[0]))
+		die(system_error, &req->i18n, _("cannot enforce gid %lu: %s"),
+                    (unsigned long) gidv[0], strerror(errno));
+	free(gidv);
+
+        if (setuid(req->pw->pw_uid))
+                die(system_error, &req->i18n, _("cannot enforce uid %lu: %s"),
+                    (unsigned long) req->pw->pw_uid, strerror(errno));
+
+	if (req->pw->pw_uid && setuid(0) == 0) 
+		die(system_error, &req->i18n,
+		    _("seteuid(0) succeeded when it should not"));
+}
 
 void
 run_rule(struct rush_rule *rule, struct rush_request *req)
 {
         char **new_env;
-        
+		
         debug3(2, _("Rule %s at %s:%d matched"),
 	       rule->tag, rule->file, rule->line);
 
@@ -855,25 +921,14 @@ run_rule(struct rush_rule *rule, struct rush_request *req)
                 die(system_error, &req->i18n, _("cannot change to dir %s: %s"),
                     req->home_dir, strerror(errno));
 
-        debug2(2, _("Executing %s, %s"),
-	       PROGFILE(req), req->cmdline);
+        debug2(2, _("Executing %s, %s"), PROGFILE(req), req->cmdline);
 	if (lint_option)
 		exit(0);
 
 	if (req->fork == rush_true) 
 		fork_process(rule, req);
 
-	if (req->gid != NO_GID && setgid(req->gid))
-                die(system_error, &req->i18n, _("cannot enforce gid %lu: %s"),
-                    (unsigned long) req->gid, strerror(errno));
-	
-        if (setuid(req->pw->pw_uid))
-                die(system_error, &req->i18n, _("cannot enforce uid %lu: %s"),
-                    (unsigned long) req->pw->pw_uid, strerror(errno));
-
-	if (req->pw->pw_uid && setuid(0) == 0) 
-		die(system_error, &req->i18n,
-		    _("seteuid(0) succeeded when it should not"));
+	setowner (req);
 	
         umask(req->umask);
 
