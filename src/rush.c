@@ -863,25 +863,13 @@ run_rule(struct rush_rule *rule, struct rush_request *req)
 
         run_transforms(rule, req);
 
-        if (rule->home_dir) {
-                free(req->home_dir);
-                req->home_dir = expand_tilde(rule->home_dir, req->pw->pw_dir);
-        }
-        
         if (rule->chroot_dir) {
                 char *dir = expand_tilde(rule->chroot_dir,
                                                req->pw->pw_dir);
                 debug1(2, _("Chroot dir: %s"), dir);
 		free(req->chroot_dir);
 		req->chroot_dir = dir;
-                if (req->home_dir && is_prefix(dir, req->home_dir)) {
-                        char *new_dir = req->home_dir + strlen(dir);
-                        memmove(req->home_dir, new_dir, strlen(new_dir) + 1);
-                }
         }
-
-        if (req->home_dir) 
-                debug1(2, _("Home dir: %s"), req->home_dir);
 
 	if (rule->gid != NO_GID) {
 		req->gid = rule->gid;
@@ -913,13 +901,31 @@ run_rule(struct rush_rule *rule, struct rush_request *req)
 		    _("cannot open database %s: %s"),
 		    RUSH_DB, rushdb_error_string);
 	
-	if (req->chroot_dir && chroot(req->chroot_dir)) 
-		die(system_error, &req->i18n, _("cannot chroot to %s: %s"),
+	if (req->chroot_dir) {
+		uid_t uid;
+		struct passwd *pw;
+		
+		if (chroot(req->chroot_dir)) 
+			die(system_error, &req->i18n,
+			    _("cannot chroot to %s: %s"),
 		    req->chroot_dir, strerror(errno));
+		uid = req->pw->pw_uid;
+		pw = getpwuid(uid);
+		if (!pw)
+			die(nologin_error, NULL,
+			    _("invalid uid %lu"), (unsigned long) uid);
+		req->pw = pw;
+	}
 
-        if (req->home_dir && chdir(req->home_dir)) 
-                die(system_error, &req->i18n, _("cannot change to dir %s: %s"),
+        if (rule->home_dir) {
+                free(req->home_dir);
+                req->home_dir = expand_tilde(rule->home_dir, req->pw->pw_dir);
+		debug1(2, _("Home dir: %s"), req->home_dir);
+		if (chdir(req->home_dir)) 
+			die(system_error, &req->i18n,
+			    _("cannot change to dir %s: %s"),
                     req->home_dir, strerror(errno));
+	}
 
         debug2(2, _("Executing %s, %s"), PROGFILE(req), req->cmdline);
 	if (lint_option)
