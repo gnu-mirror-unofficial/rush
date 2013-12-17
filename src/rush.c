@@ -502,11 +502,20 @@ void
 reparse_cmdline(struct rush_request *req)
 {
         int rc;
-        
+        struct wordsplit ws;
+	
         argcv_free(req->argc, req->argv);
-        if ((rc = argcv_get(req->cmdline, NULL, NULL, &req->argc, &req->argv)))
-                die(system_error, &req->i18n, _("argcv_get(%s) failed: %s"),
-                    req->cmdline, strerror(rc));
+	if (wordsplit(req->cmdline, &ws, WRDSF_DEFFLAGS))
+		die(system_error, &req->i18n, _("wordsplit(%s) failed: %s"),
+                    req->cmdline, wordsplit_strerror(&ws));
+	req->argc = ws.ws_wordc;
+	req->argv = ws.ws_wordv;
+
+	ws.ws_wordc = 0;
+	ws.ws_wordv = NULL;
+
+	wordsplit_free(&ws);
+
 	free(req->prog);
 	req->prog = NULL;
 }
@@ -514,12 +523,8 @@ reparse_cmdline(struct rush_request *req)
 void
 rebuild_cmdline(struct rush_request *req)
 {
-        int rc;
         free(req->cmdline);
-        rc = argcv_string(req->argc, req->argv, &req->cmdline);
-        if (rc)
-                die(system_error, &req->i18n,
-		    _("argcv_string failed: %s"), strerror(rc));
+        req->cmdline = argcv_string(req->argc, req->argv);
 }
 
 static int
@@ -957,6 +962,7 @@ main(int argc, char **argv)
         uid_t uid;
         struct rush_rule *rule;
         struct rush_request req;
+	struct wordsplit ws;
 
 	rush_set_program_name(argv[0]);
 	rush_i18n_init();
@@ -1021,12 +1027,18 @@ main(int argc, char **argv)
 	req.gid = NO_GID;
 	req.fork = rush_undefined;
 	req.acct = rush_undefined;
-        rc = argcv_get(req.cmdline, NULL, NULL, &req.argc, &req.argv);
-        if (rc)
-                die(system_error, NULL,
-                    _("argcv_get(%s) failed: %s"),
-                    req.cmdline, strerror(rc));
 
+	if (wordsplit(req.cmdline, &ws, WRDSF_DEFFLAGS))
+                die(system_error, NULL,
+                    _("wordsplit(%s) failed: %s"),
+                    req.cmdline, wordsplit_strerror(&ws));
+	req.argc = ws.ws_wordc;
+	req.argv = ws.ws_wordv;
+	ws.ws_wordc = 0;
+	ws.ws_wordv = NULL;
+
+	wordsplit_free(&ws);
+	
 	for (rule = rule_head; rule; rule = rule->next) {
                 rule = match_rule(rule, &req);
                 if (!rule)

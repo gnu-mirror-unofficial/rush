@@ -45,12 +45,12 @@
 #include <xalloc.h>
 #include <regex.h>
 #include <c-ctype.h>
-#include <argcv.h>
 #include <inttostr.h>
 #include "argmatch.h"
 
 #include <defines.h>
 #include <librush.h>
+#include <wordsplit.h>
 
 #ifndef SYSCONFDIR
 # define SYSCONFDIR "/usr/local/etc"

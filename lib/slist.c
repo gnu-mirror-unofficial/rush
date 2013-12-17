@@ -38,7 +38,8 @@ new_line_seg(const char *p, size_t len)
 {
 	struct line_list *lp = xmalloc(sizeof(*lp) + len);
 	lp->next = NULL;
-	memcpy(lp->line, p, len);
+	if (p)
+		memcpy(lp->line, p, len);
 	lp->size = len;
 	return lp;
 }
@@ -49,6 +50,15 @@ slist_append(slist_t slist, const char *p, size_t len)
 	struct line_list *lp = new_line_seg(p, len);
 	LIST_APPEND(lp, slist->head, slist->tail);
 	slist->size += len;
+}
+
+char *
+slist_alloc(slist_t slist, size_t len)
+{
+	struct line_list *lp = new_line_seg(NULL, len);
+	LIST_APPEND(lp, slist->head, slist->tail);
+	slist->size += len;
+	return lp->line;
 }
 
 char *

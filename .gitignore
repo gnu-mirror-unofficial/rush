@@ -1,7 +1,9 @@
 *.tar.*
 *~
+*.rej
+*.orig
 .bootstrap
-.emacs.desktop
+.emacs*
 ABOUT-NLS
 ChangeLog
 INSTALL
@@ -17,5 +19,6 @@ config.status
 configure
 confpaths.h
 gnu
+gnulib
 m4
 stamp-h1

@@ -18,7 +18,6 @@ noinst_LIBRARIES=librush.a
 
 librush_a_SOURCES=\
  argcv.c\
- argcv.h\
  i18n.c\
  progname.c\
  readfmt.c\
@@ -26,6 +25,8 @@ librush_a_SOURCES=\
  slist.c\
  utmp.c\
  version.c\
+ wordsplit.c\
+ wordsplit.h\
  wtmp.c
 
 noinst_HEADERS=librush.h

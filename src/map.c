@@ -229,27 +229,33 @@ map_string(struct rush_map *map, struct rush_request *req)
 
 	key = meta_expand_string(map->key, mapdef, req);
 	while (getline(&buf, &size, fp) != -1) {
-		int fldc;
-		char **fldv;
 		int rc;
 		size_t len;
-		
+		struct wordsplit ws;
+
 		line++;
 		
 		len = strlen(buf);
 		while (len > 0 && buf[len-1] == '\n')
 			buf[--len] = 0;
-		rc = argcv_get_np(buf, len, map->delim, NULL,
-				  0, &fldc, &fldv, NULL);
-		if (rc)
+
+		ws.ws_delim = map->delim;
+		if (wordsplit(buf, &ws,
+			      WRDSF_NOVAR | WRDSF_NOCMD | WRDSF_DELIM))
 			die(system_error, &req->i18n,
 			    _("%s:%lu: failed to parse line: %s"),
-			    file, (unsigned long)line, strerror(rc));
-		if (map->key_field <= fldc && map->val_field <= fldc
-		    && strcmp(fldv[map->key_field - 1], key) == 0) {
-			ret = xstrdup(fldv[map->val_field - 1]);
+			    file, (unsigned long)line,
+			    wordsplit_strerror(&ws));
+			
+		if (map->key_field <= ws.ws_wordc &&
+		    map->val_field <= ws.ws_wordc &&
+		    strcmp(ws.ws_wordv[map->key_field - 1], key) == 0)
+			ret = xstrdup(ws.ws_wordv[map->val_field - 1]);
+
+		wordsplit_free(&ws);
+		
+		if (ret)
 			break;
-		}
 	}
 	fclose(fp);
 	free(key);

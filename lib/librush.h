@@ -128,6 +128,7 @@ void slist_append(slist_t slist, const char *p, size_t len);
 char *slist_reduce(slist_t slist, char **pbuf, size_t *psize);
 slist_t slist_create(void);
 void slist_free(slist_t slist);
+char *slist_alloc(slist_t slist, size_t len);
 
 
 void version(const char *progname);
@@ -149,3 +150,7 @@ void rush_i18n_init(void);
 const char *user_gettext(const char *locale, const char *domain,
 			 const char *dir,
 			 const char *msg);
+
+void argcv_free(int argc, char **argv);
+char *argcv_string(int argc, char **argv);
+

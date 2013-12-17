@@ -1588,20 +1588,28 @@ parse_input_buf(input_buf_ptr ibuf)
 
 		if (tok->flags & TOK_ARGN) {
 			int rc;
-			int flags = ARGCV_DEFFLAGS;
+			int flags = WRDSF_DEFFLAGS|WRDSF_COMMENT;
+			struct wordsplit ws;
+
 			if (tok->flags & TOK_SED)
-				flags |= ARGCV_SED_EXPR;
-			
-			rc = argcv_get_np(val, strlen(val), " ", "#",
-					  flags, &env.argc, &env.argv,
-					  NULL);
-			if (rc) {
+				flags |= WRDSF_SED_EXPR;
+
+			ws.ws_comment = "#";
+			if (wordsplit(val, &ws, flags)) {
 				logmsg(LOG_NOTICE,
 				       _("%s:%d: failed to parse value: %s"),
-				       ibuf->file, ibuf->line, strerror (rc));
+				       ibuf->file, ibuf->line,
+				       wordsplit_strerror(&ws));
 				err = 1;
 				continue;
-			}
+			}				
+			
+			env.argc = ws.ws_wordc;
+			env.argv = ws.ws_wordv;
+			ws.ws_wordc = 0;
+			ws.ws_wordv = NULL;
+
+			wordsplit_free(&ws);
 		}
 		
 		if (tok->flags & TOK_RUL) {
