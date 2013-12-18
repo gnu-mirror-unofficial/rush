@@ -1,5 +1,5 @@
 # This file is part of GNU Rush.
-# Copyright (C) 2008, 2009, 2010 Sergey Poznyakoff
+# Copyright (C) 2008, 2009, 2010, 2013 Sergey Poznyakoff
 #
 # GNU Rush is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -14,11 +14,12 @@
 # You should have received a copy of the GNU General Public License
 # along with GNU Rush.  If not, see <http://www.gnu.org/licenses/>.
 
+SUBDIRS=imprimatur
+
 info_TEXINFOS=rush.texi
 rush_TEXINFOS=\
  fdl.texi\
- strftime.texi\
- rendition.texi
+ strftime.texi
 
 EXTRA_DIST = \
  gendocs_template
@@ -26,73 +27,21 @@ EXTRA_DIST = \
 clean-local:
 	rm -rf manual
 
+AM_MAKEINFOFLAGS=@IMPRIMATUR_MAKEINFOFLAGS@
+imprimatur_INPUT=$(info_TEXINFOS) $(rush_TEXINFOS)
+include imprimatur/imprimatur.mk
+CHECK_DOCS=$(top_srcdir)/@IMPRIMATUR_MODULE_DIR@/check-docs.sh
+
 # Checking
-check-format:
-	@if test -n "`cat $(info_TEXINFOS) $(rush_TEXINFOS) | tr -d -c '\t'`"; then \
-		echo "Sources contain tabs; run untabify"; \
-		false; \
-	fi
-
-check-refs:
-	@for file in $(info_TEXINFOS) $(rush_TEXINFOS); \
-	do \
-	  sed -e = $$file | \
-           sed -n 'N;/@FIXME-.*ref/{s/\(^[0-9][0-9]*\).*@FIXME-.*ref{\([^}]*\)}.*/'$$file':\1: \2/gp}'; \
-	done > $@-t; \
-	if [ -s $@-t ]; then \
-	  echo "Unresolved cross-references:"; \
-	  cat $@-t;\
-	  rm $@-t; \
-	else \
-	  rm -f $@-t; \
-	fi
-
-check-fixmes:
-	@for file in $(info_TEXINFOS); \
-	do \
-	  sed -e = $$file | \
-           sed -n 'N;/@FIXME{/{s/\(^[0-9][0-9]*\).*@FIXME{\([^}]*\).*/'$$file':\1: \2/gp}'; \
-	done > $@-t; \
-	if [ -s $@-t ]; then \
-	  echo "Unresolved FIXMEs:"; \
-	  cat $@-t; \
-	  rm $@-t; \
-	  false; \
-	else \
-          rm -f $@-t; \
-	fi
-
-check-writeme:
-	@grep -Hn @WRITEME $(info_TEXINFOS) $(mailfromd_TEXINFOS) > $@-t; \
-	if [ -s $@-t ]; then \
-	  echo "Empty nodes:"; \
-	  cat $@-t; \
-	  rm $@-t; \
-	  false;\
-	else \
-          rm $@-t; \
-	fi
-
-check-unrevised:
-	@grep -Hn @UNREVISED $(info_TEXINFOS) $(rush_TEXINFOS) > $@-t; \
-	if [ -s $@-t ]; then \
-	  echo "Unrevised nodes:"; \
-	  cat $@-t; \
-	  rm $@-t; \
-	  false;\
-	else \
-          rm $@-t; \
-	fi
-
-all-check-docs: check-format check-refs check-fixmes check-writeme check-unrevised
+check-format: imprimatur-format imprimatur-check-sentence-spacing
+check-refs: imprimatur-refs
+check-fixmes: imprimatur-fixmes
+check-writeme: imprimatur-writemes
+check-unrevised: imprimatur-unrevised
+all-check-docs: imprimatur-basic-checks
 
 check-docs: 
 	$(MAKE) -k all-check-docs
-
-# The rendering level is one of PUBLISH, DISTRIB or PROOF.
-# Just call `make RENDITION=PROOF [target]' if you want PROOF rendition.
-
-MAKEINFOFLAGS=-D$(RENDITION)
 
 GENDOCS=gendocs.sh 
 
@@ -103,8 +52,9 @@ TEXI2DVI=texi2dvi -t '@set $(RENDITION)' -E
 .PHONY: manual
 manual:
 	TEXINPUTS=$(srcdir):$(top_srcdir)/build-aux:$(TEXINPUTS) \
-	 MAKEINFO="$(MAKEINFO) $(MAKEINFOFLAGS)" \
+	 MAKEINFO="$(MAKEINFO) $(AM_MAKEINFOFLAGS) $(MAKEINFOFLAGS)" \
 	 TEXI2DVI="$(TEXI2DVI) -t @finalout" \
+         TEXI2HTML="texi2html $(AM_MAKEINFOFLAGS)" \
 	 $(GENDOCS) --texi2html $(PACKAGE) '$(PACKAGE_NAME) manual'
 
 manual.tar.bz2: manual

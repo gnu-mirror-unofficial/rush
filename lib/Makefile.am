@@ -30,4 +30,4 @@ librush_a_SOURCES=\
  wtmp.c
 
 noinst_HEADERS=librush.h
-INCLUDES=-I$(top_srcdir)/gnu -I$(top_builddir)/gnu
+AM_CPPFLAGS=-I$(top_srcdir)/gnu -I$(top_builddir)/gnu

@@ -38,7 +38,7 @@ Published by the Free Software Foundation,
 51 Franklin Street, Fifth Floor,
 Boston, MA 02110-1301 USA 
 
-Copyright @copyright{} 2008, 2009, 2010 Sergey Poznyakoff
+Copyright @copyright{} 2008, 2009, 2010, 2013 Sergey Poznyakoff
 
 Permission is granted to copy, distribute and/or modify this document
 under the terms of the GNU Free Documentation License, Version 1.3 or
@@ -185,7 +185,7 @@ the server (e.g. by using using SSH protocol), the shell binary,
 arguments: the @option{-c} command line option and a command line to
 be executed on the host machine@footnote{Starting from version 1.6, it
 is possible to use GNU Rush for interactive shell
-sessions. @xref{Interactive}, for more information about it.}.  If
+sessions.  @xref{Interactive}, for more information about it.}.  If
 wrong arguments are supplied, the shell aborts.
 
 @cindex request
@@ -299,7 +299,7 @@ file @file{INSTALL} in the GNU Rush source directory for more information}.
 errors occurred in parsing are reported using @code{syslog} facility
 @samp{authpriv} and priority @samp{notice}.  When run in @samp{test}
 mode, all diagnostics is displayed on standard error
-output. @xref{Test Mode}, for a detailed description of ways to debug
+output.  @xref{Test Mode}, for a detailed description of ways to debug
 and test your configurations.
 
 @anchor{security checks}
@@ -602,7 +602,7 @@ String comparisons are case-sensitive.
 @deffn {Rule Config} group @var{names}
 Argument is a whitespace-separated list of group names.  This condition
 yields true, if the the name of any group the user is a member of
-matches one of listed names. String comparisons are case-sensitive.
+matches one of listed names.  String comparisons are case-sensitive.
 
 For example, to match users from groups @samp{admin} and @samp{root}:
 
@@ -776,7 +776,7 @@ delete 1 $
 @end smallexample
 @end deffn
 
-Neither form can be used to delete the command name, i.e. @samp{[0]}
+Neither form can be used to delete the command name, i.e.  @samp{[0]}
 or @samp{[^]}. 
 
 @node transform
@@ -874,7 +874,7 @@ the interaction is defined to be: ignore matches before the
 @end table
 
 Any delimiter can be used in lieue of @samp{/}, the only requirement being
-that it be used consistently throughout the expression. For example,
+that it be used consistently throughout the expression.  For example,
 the following two expressions are equivalent:
 
 @smallexample
@@ -1437,9 +1437,9 @@ localization file, @command{rush} uses the following parameters:
 @cindex locale name
 @item locale
 @dfn{Locale name} is a string that describes the language, territory
-and optionally, the character set to use. It consists of the language
+and optionally, the character set to use.  It consists of the language
 (ISO 639) and country (ISO 3166) codes, separated by an underscore
-character, e.g. @samp{en_US} or @samp{pl_PL}.  If a character set is
+character, e.g.  @samp{en_US} or @samp{pl_PL}.  If a character set is
 specified, its name follows the country code and is separated from it
 by a @samp{@@} character.
 
@@ -1484,14 +1484,14 @@ These are messages sent to the remote party by @code{exit} rules
 @end table
 
 These messages use different domain names (and may use different
-locale directories). The diagnostics and error messages use textual
-domain @samp{rush}. The corresponding locale directory is defined at
+locale directories).  The diagnostics and error messages use textual
+domain @samp{rush}.  The corresponding locale directory is defined at
 compile time and defaults to @file{@var{prefix}/share/locale}, where
 @var{prefix} stands for the installation prefix, which is
 @file{/usr/local}, by default.
 
 GNU Rush is shipped with several localization files, which are installed
-by default. As of version @value{VERSION}, these files cover the
+by default.  As of version @value{VERSION}, these files cover the
 following locales:
 
 @table @asis
@@ -1525,7 +1525,7 @@ the system administrator to provide and install such files.
 @subsubsection Localization Directives
 @cindex localization directives
 
-The following configuration directives control localization. They
+The following configuration directives control localization.  They
 are available for use in @code{rule} statements:
 
 @deffn {Configuration} locale @var{name}
@@ -1554,7 +1554,7 @@ rule l10n
 @end smallexample
 
 Different users may have different localization
-preferences. @xref{per-user l10n}, for a description of how to
+preferences.  @xref{per-user l10n}, for a description of how to
 implement this.
   
 @node Writing Your Localization
@@ -2435,7 +2435,7 @@ Configuration}, for more information.
 @item -t
 @itemx --test
 @itemx --lint
-Run in test mode. An optional argument may be used with this option
+Run in test mode.  An optional argument may be used with this option
 to specify alternative configuration file name, e.g.:
 
 @smallexample
@@ -2911,7 +2911,7 @@ interested in technical details.
 @node wtmp
 @section The @file{wtmp} file
 @cindex @file{wtmp}
-  The @file{wtmp} file consists of variable-size entries. It is
+  The @file{wtmp} file consists of variable-size entries.  It is
 designed so that it can easily be read in both directions.
 
   Each record begins with a fixed-size header, which is followed by
@@ -2997,7 +2997,7 @@ needed in order to find the bug:
 @item A detailed description of the bug.
 @item Conditions under which the bug appears.
 @item It is often helpful to send the contents of @file{config.log}
-file along with your bug report. This file is created after running
+file along with your bug report.  This file is created after running
 @command{./configure} in the GNU Rush source root directory.
 @end itemize
 

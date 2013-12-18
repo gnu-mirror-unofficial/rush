@@ -1,5 +1,5 @@
 # This file is part of GNU Rush.                  -*- Autoconf -*-
-# Copyright (C) 2008, 2009, 2010, 2011 Sergey Poznyakoff
+# Copyright (C) 2008, 2009, 2010, 2011, 2013 Sergey Poznyakoff
 #
 # GNU Rush is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -70,24 +70,9 @@ gl_INIT
 # Gettext.
 AM_ICONV
 AM_GNU_GETTEXT([external], [need-formatstring-macros])
-AM_GNU_GETTEXT_VERSION([0.17])
+AM_GNU_GETTEXT_VERSION([0.18])
 
-# Doc hints.
-# Select a rendition level:
-#  DISTRIB for stable releases (at most one dot in the version number)
-#  and maintenance releases (two dots, patchlevel < 50)
-#  PROOF for alpha releases.
-#  PUBLISH can only be required manually when running make in doc/
-AC_SUBST(RENDITION)
-case `echo $VERSION|sed  's/[[^.]]//g'` in
-""|".")  RENDITION=DISTRIB;;
-"..")  if test `echo $VERSION | sed  's/.*\.//'` -lt 50; then
-	 RENDITION=DISTRIB
-       else
-         RENDITION=PROOF
-       fi;;
-*)     RENDITION=PROOF;;
-esac
+IMPRIMATUR_INIT(doc/imprimatur)
 
 AC_ARG_WITH([default-config],
             AC_HELP_STRING([--with-default-config=FILE],

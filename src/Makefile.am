@@ -1,5 +1,5 @@
 # This file is part of GNU Rush.
-# Copyright (C) 2008, 2009, 2010 Sergey Poznyakoff
+# Copyright (C) 2008, 2009, 2010, 2013 Sergey Poznyakoff
 #
 # GNU Rush is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -35,7 +35,7 @@ rushwho_SOURCES=rushwho.c rwopt.h
 rushlast.c: rlopt.h
 rushwho.c: rwopt.h
 EXTRA_DIST=rush-po.awk rushopt.opt rlopt.opt rwopt.opt getopt.m4 defconf.sed
-INCLUDES=-I$(top_srcdir)/gnu -I$(top_builddir)/gnu -I$(top_srcdir)/lib
+AM_CPPFLAGS=-I$(top_srcdir)/gnu -I$(top_builddir)/gnu -I$(top_srcdir)/lib
 LDADD=../lib/librush.a ../gnu/libgnu.a @LTLIBINTL@
 
 change-suid-mode:

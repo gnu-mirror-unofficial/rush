@@ -1,5 +1,5 @@
 # This file is part of GNU Rush.
-# Copyright (C) 2008, 2009, 2010 Sergey Poznyakoff
+# Copyright (C) 2008, 2009, 2010, 2013 Sergey Poznyakoff
 #
 # GNU Rush is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-ACLOCAL_AMFLAGS = -I m4 
+ACLOCAL_AMFLAGS = -I m4 -I doc/imprimatur
 SUBDIRS=gnu lib src etc doc po
 
 # We never remove files from the configuration directory
