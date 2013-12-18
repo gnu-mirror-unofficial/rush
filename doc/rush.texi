@@ -1703,10 +1703,11 @@ writable directory.
 @end table
 
 Each of the above keywords may be prefixed by @samp{no}, which
-reverses its meaning.  Each keyword adds or removes a particular test
-to the existing check list, which is initialized as described in
-@ref{security checks}.  Thus, the foll owning statement results in all
-checks, except for the file ownership:
+reverses its meaning.  The special keyword @samp{none} is synonymous
+to @samp{noall}, i.e. it disables all checks.  Each keyword adds or
+removes a particular test to the existing check list, which is
+initialized as described in @ref{security checks}.  Thus, the foll
+owning statement results in all checks, except for the file ownership:
 
 @smallexample
 include-security noowner

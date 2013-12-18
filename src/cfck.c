@@ -163,7 +163,10 @@ cfck_keyword(const char *name)
 		*kw = tolower(*kw);
 	kw = str;
 	
-	if (strlen(kw) > 2 && strncmp(kw, "no", 2) == 0) {
+	if (strcmp(kw, "none") == 0) {
+		negate = 1;
+		kw = "all";
+	} else if (strlen(kw) > 2 && strncmp(kw, "no", 2) == 0) {
 		negate = 1;
 		kw += 2;
 	}
