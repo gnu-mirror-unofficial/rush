@@ -1,5 +1,5 @@
 # This file is part of GNU Rush.
-# Copyright (C) 2009, 2010 Sergey Poznyakoff
+# Copyright (C) 2009-2010, 2014 Sergey Poznyakoff
 # Distributed under the terms of the GNU General Public License, either
 # version 3, or (at your option) any later version. See file COPYING
 # for the text of the license.
