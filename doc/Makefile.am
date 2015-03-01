@@ -40,12 +40,13 @@ check-writeme: imprimatur-writemes
 check-unrevised: imprimatur-unrevised
 all-check-docs: imprimatur-basic-checks
 
-check-docs: 
+check-docs:
 	$(MAKE) -k all-check-docs
 
-GENDOCS=gendocs.sh 
+GENDOCS=$(srcdir)/gendocs.sh
+EXTRA_DIST += gendocs.sh
 
-TEXI2DVI=texi2dvi -t '@set $(RENDITION)' -E
+TEXI2DVI=texi2dvi -t '@set $(RENDITION)' -I $(top_srcdir)/doc/imprimatur
 
 # Make sure you set TEXINPUTS.
 # TEXINPUTS=/usr/share/texmf/pdftex/plain/misc/ is ok for most distributions
@@ -54,8 +55,7 @@ manual:
 	TEXINPUTS=$(srcdir):$(top_srcdir)/build-aux:$(TEXINPUTS) \
 	 MAKEINFO="$(MAKEINFO) $(AM_MAKEINFOFLAGS) $(MAKEINFOFLAGS)" \
 	 TEXI2DVI="$(TEXI2DVI) -t @finalout" \
-         TEXI2HTML="texi2html $(AM_MAKEINFOFLAGS)" \
-	 $(GENDOCS) --texi2html $(PACKAGE) '$(PACKAGE_NAME) manual'
+	 $(GENDOCS) --no-copy-images $(PACKAGE) '$(PACKAGE_NAME) manual'
 
 manual.tar.bz2: manual
 	tar cfj manual.tar.bz2 manual
