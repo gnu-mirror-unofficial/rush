@@ -43,7 +43,7 @@ all-check-docs: imprimatur-basic-checks
 check-docs:
 	$(MAKE) -k all-check-docs
 
-GENDOCS=$(srcdir)/gendocs.sh
+GENDOCS=$(srcdir)/gendocs.sh --no-copy-images --html '--init-file=$(abs_srcdir)/html.init'
 EXTRA_DIST += gendocs.sh
 
 TEXI2DVI=texi2dvi -t '@set $(RENDITION)' -I $(top_srcdir)/doc/imprimatur
@@ -55,7 +55,7 @@ manual:
 	TEXINPUTS=$(srcdir):$(top_srcdir)/build-aux:$(TEXINPUTS) \
 	 MAKEINFO="$(MAKEINFO) $(AM_MAKEINFOFLAGS) $(MAKEINFOFLAGS)" \
 	 TEXI2DVI="$(TEXI2DVI) -t @finalout" \
-	 $(GENDOCS) --no-copy-images $(PACKAGE) '$(PACKAGE_NAME) manual'
+	 $(GENDOCS) $(PACKAGE) '$(PACKAGE_NAME) manual'
 
 manual.tar.bz2: manual
 	tar cfj manual.tar.bz2 manual
