@@ -2,6 +2,7 @@
 *.rej
 *.tar.*
 *~
+*.diff
 .bootstrap
 .emacs*
 ABOUT-NLS
@@ -9,6 +10,7 @@ ChangeLog
 INSTALL
 Makefile
 Makefile.in
+TAGS
 aclocal.m4
 autom4te.cache
 build-aux
@@ -19,6 +21,5 @@ config.status
 configure
 confpaths.h
 gnu
-gnulib
 m4
 stamp-h1

@@ -1,5 +1,5 @@
 dnl This file is part of GNU Rush.
-dnl Copyright (C) 2007-2010, 2013-2014 Sergey Poznyakoff.
+dnl Copyright (C) 2007-2010, 2013-2014, 2016 Sergey Poznyakoff.
 dnl 
 dnl GNU Rush is free software; you can redistribute it and/or modify
 dnl it under the terms of the GNU General Public License as published by
@@ -244,8 +244,10 @@ print_help(void)
 {
   unsigned i;
   
-  printf ("%s %s [%s]... %s\n", _("Usage:"), [<$2>], _("[<OPTION>]"),
-	  gettext (args_doc)); 
+  printf ("%s %s [%s]...", _("Usage:"), [<$2>], _("[<OPTION>]"));
+  if (args_doc[0])
+	  printf(" %s", gettext(args_doc));
+  printf("\n");
   if (doc[0])
     print_option_descr(gettext (doc), 0, RMARGIN);
   putchar ('\n');
@@ -311,121 +313,222 @@ dnl **************************************************************************
   printf (_("Report bugs to %s.\n"), program_bug_address);
 }
 
+static int
+cmpidx_short(const void *a, const void *b)
+{
+	struct opthelp const **opta = (struct opthelp const **)a;
+	struct opthelp const **optb = (struct opthelp const **)b;
+
+	return (*opta)->opt[1] - (*optb)->opt[1];
+}
+  
+static int
+cmpidx_long(const void *a, const void *b)
+{
+	struct opthelp const **ap = (struct opthelp const **)a;
+	struct opthelp const **bp = (struct opthelp const **)b;
+	char const *opta, *optb;
+	size_t lena, lenb;
+
+	if ((*ap)->opt[1] == '-')
+		opta = (*ap)->opt;
+	else
+		opta = (*ap)->opt + 4;
+	lena = strcspn(opta, ",");
+  
+	if ((*bp)->opt[1] == '-')
+		optb = (*bp)->opt;
+	else
+		optb = (*bp)->opt + 4;
+	lenb = strcspn(optb, ",");
+	return strncmp(opta, optb, lena > lenb ? lenb : lena);
+}
+
 void
 print_usage(void)
 {
-  unsigned i;
-  int f = 0;
-  unsigned n;
-  char buf[RMARGIN+1];
-
-#define FLUSH                      dnl
-  do                               dnl         
-    {                              dnl         
-	  buf[n] = 0;              dnl        
-	  printf ("%s\n", buf);    dnl        
-	  n = USAGECOLUMN;         dnl        
-	  memset (buf, ' ', n);    dnl        
-    }                              dnl                                
-  while (0)
-#define ADDC(c) dnl
-  do { if (n == RMARGIN) FLUSH; buf[n++] = c; } while (0)
-
-  n = snprintf (buf, sizeof buf, "%s %s ", _("Usage:"), [<$2>]);
-
-  /* Print a list of short options without arguments. */
-  for (i = 0; i < sizeof (opthelp) / sizeof (opthelp[0]); i++)
-    {
-      if (opthelp[i].opt && opthelp[i].descr && opthelp[i].opt[1] != '-'
-	  && opthelp[i].arg == NULL)
-	{
-	  if (f == 0)
-	    {
-	      ADDC('[');
-	      ADDC('-');
-	      f = 1;
-	    }
-	  ADDC(opthelp[i].opt[1]);
-	}
-    }
-  if (f)
-    ADDC(']');
-
-  /* Print a list of short options with arguments. */
-  for (i = 0; i < sizeof (opthelp) / sizeof (opthelp[0]); i++)
-    {
-      if (opthelp[i].opt && opthelp[i].descr && opthelp[i].opt[1] != '-'
-	  && opthelp[i].arg)
-	{
-	  size_t len = 5 
-	                + strlen (opthelp[i].arg)
-			   + (opthelp[i].is_optional ? 2 : 1);
-	  if (n + len > RMARGIN) FLUSH;
-	  buf[n++] = ' '; 
-	  buf[n++] = '['; 
-	  buf[n++] = '-';
-	  buf[n++] = opthelp[i].opt[1];
-	  if (opthelp[i].is_optional)
-	    {
-	      buf[n++] = '[';
-	      strcpy (&buf[n], opthelp[i].arg);
-	      n += strlen (opthelp[i].arg);
-	      buf[n++] = ']';
-	    }
-	  else
-	    {
-	      buf[n++] = ' ';
-	      strcpy (&buf[n], opthelp[i].arg);
-	      n += strlen (opthelp[i].arg);
-	    }
-	  buf[n++] = ']';
-	}
-    }
-
-  /* Print a list of long options */
-  for (i = 0; i < sizeof (opthelp) / sizeof (opthelp[0]); i++)
-    {
-      if (opthelp[i].opt && opthelp[i].descr)
-	{
-	  size_t len;
-	  const char *longopt;
-
-	  if (opthelp[i].opt[1] == '-')
-	    longopt = opthelp[i].opt;
-	  else if (opthelp[i].opt[2] == ',')
-	    longopt = opthelp[i].opt + 4;
-	  else
-	    continue;
-
-	  len = 3 + strlen (longopt)
-	          + (opthelp[i].arg ? 1 + strlen (opthelp[i].arg)
-		      + (opthelp[i].is_optional ? 2 : 0) : 0);
-	  if (n + len > RMARGIN) FLUSH;
-	  buf[n++] = ' '; 
-	  buf[n++] = '['; 
-	  strcpy (&buf[n], longopt);
-	  n += strlen (longopt);
-	  if (opthelp[i].arg)
-	    {
-	      buf[n++] = '=';
-	      if (opthelp[i].is_optional)
-		{
-		  buf[n++] = '[';
-		  strcpy (&buf[n], opthelp[i].arg);
-		  n += strlen (opthelp[i].arg);
-		  buf[n++] = ']';
-		}
-	      else
-		{
-		  strcpy (&buf[n], opthelp[i].arg);
-		  n += strlen (opthelp[i].arg);
-		}
-	    }
-	  buf[n++] = ']';
-	}
-    }
-  FLUSH;
+	unsigned i;
+	unsigned n;
+	char *buf;
+	size_t bufsize;
+	unsigned nidx;
+	struct opthelp **optidx;
+	size_t optcount = sizeof(opthelp) / sizeof(opthelp[0]);
   
+#define FLUSH do {				dnl
+		buf[n] = 0;			dnl
+		printf("%s\n", buf);		dnl
+		n = USAGECOLUMN;		dnl
+		memset(buf, ' ', n);		dnl
+	}  while (0)
+#define ADDC(c) do { if (n == RMARGIN) FLUSH; buf[n++] = c; } while (0)
+
+	optidx = calloc(optcount, sizeof(optidx[0]));
+	if (!optidx)
+		abort();
+	bufsize = RMARGIN + 1;
+	buf = malloc(bufsize);
+	if (!buf)
+		abort();
+	
+	n = snprintf(buf, bufsize, "%s %s ", _("Usage:"), [<$2>]);
+	
+	/* Print a list of short options without arguments. */
+	for (i = nidx = 0; i < optcount; i++)
+		if (opthelp[i].opt &&
+		    opthelp[i].descr &&
+		    opthelp[i].opt[1] != '-' &&
+		    opthelp[i].arg == NULL)
+			optidx[nidx++] = opthelp + i;
+
+	if (nidx) {
+		qsort(optidx, nidx, sizeof(optidx[0]), cmpidx_short);
+
+		ADDC('[');
+		ADDC('-');
+		for (i = 0; i < nidx; i++) {
+			ADDC(optidx[i]->opt[1]);
+		}
+		ADDC(']');
+	}
+
+	/* Print a list of short options with arguments. */
+	for (i = nidx = 0; i < optcount; i++) {
+		if (opthelp[i].opt &&
+		    opthelp[i].descr &&
+		    opthelp[i].opt[1] != '-' &&
+		    opthelp[i].arg)
+			optidx[nidx++] = opthelp + i;
+	}
+
+	if (nidx) {
+		qsort(optidx, nidx, sizeof(optidx[0]), cmpidx_short);
+    
+		for (i = 0; i < nidx; i++) {
+			struct opthelp *opt = optidx[i];
+			size_t len = 5 + strlen(opt->arg)
+				       + (opt->is_optional ? 2 : 1);
+      
+			if (n + len > RMARGIN)
+				FLUSH;
+			buf[n++] = ' ';
+			buf[n++] = '[';
+			buf[n++] = '-';
+			buf[n++] = opt->opt[1];
+			if (opt->is_optional) {
+				buf[n++] = '[';
+				strcpy(&buf[n], opt->arg);
+				n += strlen(opt->arg);
+				buf[n++] = ']';
+			} else {
+				buf[n++] = ' ';
+				strcpy(&buf[n], opt->arg);
+				n += strlen(opt->arg);
+			}
+			buf[n++] = ']';
+		}
+	}
+  
+	/* Print a list of long options */
+	for (i = nidx = 0; i < optcount; i++) {
+		if (opthelp[i].opt && opthelp[i].descr
+		    && (opthelp[i].opt[1] == '-' || opthelp[i].opt[2] == ','))
+			optidx[nidx++] = opthelp + i;
+	}
+
+	if (nidx) {
+		qsort(optidx, nidx, sizeof(optidx[0]), cmpidx_long);
+	
+		for (i = 0; i < nidx; i++) {
+			struct opthelp *opt = optidx[i];
+			size_t len;
+			const char *longopt;
+	  
+			if (opt->opt[1] == '-')
+				longopt = opt->opt;
+			else if (opt->opt[2] == ',')
+				longopt = opt->opt + 4;
+			else
+				continue;
+
+			len = 3 + strlen(longopt)
+				+ (opt->arg ? 1 + strlen(opt->arg)
+				+ (opt->is_optional ? 2 : 0) : 0);
+			if (n + len > RMARGIN) {
+				FLUSH;
+				/* Make sure we have enough buffer space if
+                                   the string cannot be split */
+				if (n + len > bufsize) {
+					bufsize = n + len;
+					buf = realloc(buf, bufsize);
+					if (!buf)
+						abort();
+				}
+			}
+			buf[n++] = ' ';
+			buf[n++] = '[';
+			strcpy(&buf[n], longopt);
+			n += strlen(longopt);
+			if (opt->arg) {
+				buf[n++] = '=';
+				if (opt->is_optional) {
+					buf[n++] = '[';
+					strcpy(&buf[n], opt->arg);
+					n += strlen(opt->arg);
+					buf[n++] = ']';
+				} else {
+					strcpy(&buf[n], opt->arg);
+					n += strlen(opt->arg);
+				}
+			}
+			buf[n++] = ']';
+		}
+	}
+
+	/* Print argument list */
+	if (args_doc[0]) {
+		char const *docstr = gettext(args_doc);
+		size_t len = strlen(docstr) + 1;
+		if (n + len <= RMARGIN) {
+			buf[n++] = ' ';
+			strcpy(buf + n, docstr);
+			n += len;
+		} else {
+			struct wordsplit ws;
+
+			if (wordsplit(docstr, &ws, 
+				      WRDSF_SHOWERR |
+				      WRDSF_NOVAR |
+				      WRDSF_NOCMD |
+				      WRDSF_QUOTE |
+				      WRDSF_SQUEEZE_DELIMS))
+				abort();
+
+			for (i = 0; i < ws.ws_wordc; i++) {
+				len = strlen(ws.ws_wordv[i]) + 1;
+				if (n + len > RMARGIN) {
+					FLUSH;
+					/* Make sure we have enough buffer
+					   space if the string cannot be
+					   split */
+					if (n + len > bufsize) {
+						bufsize = n + len;
+						buf = realloc(buf, bufsize);
+						if (!buf)
+							abort();
+					}
+				}
+				buf[n++] = ' ';
+				strcpy(buf + n, ws.ws_wordv[i]);
+				n += len;
+			}
+		}	
+	}
+	
+	FLUSH;
+
+	free(optidx);
+	free(buf);
 }
 
 const char version_etc_copyright[] =

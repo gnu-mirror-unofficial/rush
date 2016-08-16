@@ -1,0 +1,153 @@
+.\" This file is part of GNU Rush.
+.\" Copyright (C) 2016 Sergey Poznyakoff
+.\"
+.\" GNU Rush is free software; you can redistribute it and/or modify
+.\" it under the terms of the GNU General Public License as published by
+.\" the Free Software Foundation; either version 3, or (at your option)
+.\" any later version.
+.\"
+.\" GNU Rush is distributed in the hope that it will be useful,
+.\" but WITHOUT ANY WARRANTY; without even the implied warranty of
+.\" MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+.\" GNU General Public License for more details.
+.\"
+.\" You should have received a copy of the GNU General Public License
+.\" along with GNU Rush.  If not, see <http://www.gnu.org/licenses/>.
+.TH RUSH 1 "August 16, 2016" "RUSH" "Rush User Reference"
+.SH NAME
+rush \- restricted user shell
+.SH SYNOPSIS
+\fBrush\fR\
+ [\fB\-ht\fR]\
+ [\fB\-C\fR \fICHECK\fR]\
+ [\fB\-c\fR \fICOMMAND\fR]\
+ [\fB\-d\fR \fINUMBER\fR]\
+ [\fB\-u\fR \fIUSER\fR]\
+ [\fB\-\-debug\fR \fINUMBER\fR]\
+ [\fB\-\-help\fR]\
+ [\fB\-\-show\-default\fR]\
+ [\fB\-\-usage\fR]\
+ [\fB\-\-version\fR]\
+ [\fIFILE\fR] 
+.SH NOTE
+This manpage is a short description of GNU \fBrush\fR.  For a detailed
+discussion, including examples and usage recommendations, refer to the
+manual \fBGNU Rush -- a restricted user shell\fR, available in texinfo
+format.  If the \fBinfo\fR reader and the rush documentation are
+properly installed on your system, the command
+.PP
+.RS +4
+.B info rush
+.RE
+.PP
+should give you access to the complete manual.
+.PP
+You can also view the manual using the info mode in
+.BR emacs (1),
+or find it in various formats online at
+.PP
+.RS +4
+.B http://www.gnu.org.ua/software/rush/manual
+.RE
+.PP
+If any discrepancies occur between this manpage and the
+\fBManual\fR, the later shall be considered the authoritative
+source.
+.SH DESCRIPTION
+GNU \fBrush\fR is a restricted user shell, designed for sites that provide
+limited remote access to their resources, such as svn or git
+repositories, scp, or the like.
+.PP
+Upon startup \fBrush\fR analyzes its command line and examines the set
+of configuration rules to determine what kind of access the user is to
+be granted.
+.SH OPTIONS
+.TP
+\fB\-d\fR, \fB\-\-debug=\fINUMBER\fR
+Set debugging level.  The greater is the \fINUMBER\fR, the more
+verbose is the logging.  The debugging information is reported via
+.BR syslog (3)
+using
+.BR authpriv,
+priority
+.BR debug .
+Maximum meaningful value for \fINUMBER\fR is \fB3\fR.
+.TP
+\fB\-t\fR, \fB\-\-test\fR, \fB\-\-lint
+Run in test mode.  When this option is given, the following occurs:
+.RS
+.nr step 1 1
+.IP \n[step].
+All diagnostic messages are redirected to standard error, instead of
+syslog.
+.IP \n+[step].
+If a single non-option argument is present, it is taken as a
+name of the configuration file to use.
+.IP \n+[step].
+The configuration file is parsed.  If parsing fails, the program
+exits with the code 1.
+.IP \n+[step].
+If the \fB\-c\fR option is present, \fBrush\fR processes
+its argument as usual, except that the command itself is not executed.
+.RE
+.TP
+\fB\-u\fR, \fB\-\-user=\fINAME\fR
+Supplies user name for use with \fB\-\-test\fR.
+.TP
+\fB\-c\fR \fICOMMAND\fR
+Execute \fICOMMAND\fR.
+.TP
+\fB\-C\fR, \fB\-\-security\-check=\fICHECK\fR
+Add or remove configuration security check.  The argument is one of
+the following:
+.RS
+.TP
+.B all
+Enable all checks.
+.TP
+.B owner
+Check if the file is owned by root.
+.TP
+.BR iwgrp ", " groupwritablefile
+Check if the file is not group writable.
+.TP
+.BR iwoth ", " worldwritablefile
+Check if the file is not world writable.
+.TP
+.BR dir_iwgrp ", " groupwritabledir
+Check if the directory where the file resides is not group writable.
+.TP
+.BR dir_iwoth ", " worldwritabledir
+Check if the directory where the file resides is not world writable.
+.TP
+.BR link
+Check if the file is not a symbolic link to a file residing in a group
+or world writable directory.
+.RE
+.TP
+.B \-\-show\-default
+Show default configuration.      
+.SH SEE ALSO
+.BR rush.rc (5),
+.BR rushlast (1),
+.BR rushwho (1).
+.SH AUTHORS
+Sergey Poznyakoff
+.SH "BUG REPORTS"
+Report bugs to <bug-rush@gnu.org.ua>.
+.SH COPYRIGHT
+Copyright \(co 2016 Sergey Poznyakoff
+.br
+.na
+License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
+.br
+.ad
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
+.\" Local variables:
+.\" eval: (add-hook 'write-file-hooks 'time-stamp)
+.\" time-stamp-start: ".TH [A-Z_][A-Z0-9_.\\-]* [0-9] \""
+.\" time-stamp-format: "%:B %:d, %:y"
+.\" time-stamp-end: "\""
+.\" time-stamp-line-limit: 20
+.\" end:

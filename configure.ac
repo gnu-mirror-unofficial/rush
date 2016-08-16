@@ -1,5 +1,5 @@
 # This file is part of GNU Rush.                  -*- Autoconf -*-
-# Copyright (C) 2008-2011, 2013-2014 Sergey Poznyakoff
+# Copyright (C) 2008-2011, 2013-2016 Sergey Poznyakoff
 #
 # GNU Rush is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -15,7 +15,7 @@
 # along with GNU Rush.  If not, see <http://www.gnu.org/licenses/>.
 
 AC_PREREQ(2.63)
-AC_INIT([GNU rush], [1.7.90], [bug-rush@gnu.org])
+AC_INIT([GNU rush], [1.7.91], [bug-rush@gnu.org])
 AC_CONFIG_SRCDIR([src/rush.c])
 AC_CONFIG_HEADER([config.h])
 AC_CONFIG_AUX_DIR([build-aux])

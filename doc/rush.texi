@@ -2,7 +2,7 @@
 @smallbook
 @c %**start of header
 @setfilename rush.info
-@settitle GNU Rush -- a restricted user shell.
+@settitle GNU Rush -- a restricted user shell
 @c %**end of header
 @setchapternewpage odd
 
@@ -486,7 +486,7 @@ is used to label this rule.  @command{Rush} uses this tag in its diagnostic
 messages.  For rules without explicit @var{tag}, @command{Rush} supplies a
 default tag, which is constructed by concatenating @samp{#} character
 and the ordinal number of rule in the configuration file, in decimal
-notation.  Rule numbering begins from @samp{1}.
+notation.  Rule numbering starts from @samp{1}.
 
 The following sub-sections describe statements that can be used
 within a @code{rule}.
@@ -1021,7 +1021,7 @@ numeric value or a name of an existing group.
 @cindex tilde expansion
 Change the root directory to that specified in @var{dir}.  This
 directory will be used for file names beginning with @samp{/}.
-A tilde (@samp{~}) in the beginning of @var{dir} is replaced with
+A tilde (@samp{~}) at the start of @var{dir} is replaced with
 the user's home directory.
 @end deffn
 
@@ -1126,11 +1126,11 @@ Retain the environment variable @var{name}.
 Define environment variable @var{name} to have given @var{value}.
 
 @item @var{name}+=@var{value}
-Retain variable @var{name} and append @var{value} to its existing
-value.  If no such variable is present in the environment, it is
-created and @var{value} is assigned to it.  However, if @var{value}
-begins with a punctuation character, this character is removed from it
-before the assignment.  This is convenient for using this construct with
+Retain variable @var{name} and append @var{value} to its value.  If no
+such variable is present in the environment, it is created and
+@var{value} is assigned to it.  However, if @var{value} starts with a
+punctuation character, this character is removed from it before the
+assignment.  This is convenient for using this construct with 
 environment variables like @env{PATH}, e.g.:
 
 @smallexample
@@ -1142,11 +1142,11 @@ to it.  Otherwise, it will be created and @samp{/sbin} will be
 assigned to it.
 
 @item @var{name}=+@var{value}
-Retain variable @var{name} and prepend @var{value} to its existing
-value.  If no such variable is present in the environment, it is
-created and @var{value} is assigned to it.  However, if @var{value}
-ends with a punctuation character, this character is removed from it
-before assignment. 
+Retain variable @var{name} and prepend @var{value} to its value.  If
+no such variable is present in the environment, it is created and
+@var{value} is assigned to it.  However, if @var{value} ends with a
+punctuation character, this character is removed from it before
+assignment.
 @end table
 
 @node Fall-through
@@ -1156,7 +1156,7 @@ A @dfn{fall-through} rule is a special rule that does not execute the
 requested command.  When a matching fall-through rule is encountered,
 @command{rush} evaluates it and continues scanning its configuration
 for the next matching rule.  Any transformation and @code{env}
-actions found in a fall-through rule take effect immediately, which
+actions found in the fall-through rule take effect immediately, which
 means that subsequent rules will see modified command line and
 environment.  Execution of any other actions found in the fall-through rule
 is delayed until a usual rule is found.
@@ -1646,7 +1646,7 @@ that file location:
 @end deffn
 
 @cindex tilde expansion
-If @var{file} begins with a tilde character, followed by
+If @var{file} starts with a tilde character, followed by
 a slash (@samp{~/}), these two characters are replaced with the
 full path name of current user's home directory.
 

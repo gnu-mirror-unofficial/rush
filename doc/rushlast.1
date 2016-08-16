@@ -1,0 +1,237 @@
+.\" This file is part of GNU Rush.
+.\" Copyright (C) 2016 Sergey Poznyakoff
+.\"
+.\" GNU Rush is free software; you can redistribute it and/or modify
+.\" it under the terms of the GNU General Public License as published by
+.\" the Free Software Foundation; either version 3, or (at your option)
+.\" any later version.
+.\"
+.\" GNU Rush is distributed in the hope that it will be useful,
+.\" but WITHOUT ANY WARRANTY; without even the implied warranty of
+.\" MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+.\" GNU General Public License for more details.
+.\"
+.\" You should have received a copy of the GNU General Public License
+.\" along with GNU Rush.  If not, see <http://www.gnu.org/licenses/>.
+.TH RUSHLAST 1 "August 16, 2016" "RUSHLAST" "Rush User Reference"
+.SH NAME
+rushlast \- show listing of last Rush logins
+.SH SYNOPSIS
+\fBrushlast\fR\
+ [\fB\-Hh\fR]\
+ [\fB\-F\fR \fISTRING\fR]\
+ [\fB\-f\fR \fIDIR\fR]\
+ [\fB\-n\fR \fINUMBER\fR]\
+ [\fB\-\-file=\fIDIR\fR]\
+ [\fB\-\-format=\fISTRING\fR]\
+ [\fB\-\-forward\fR]\
+ [\fB\-\-help\fR]\
+ [\fB\-\-no\-header\fR]\
+ [\fB\-\-number=\fINUMBER\fR]\
+ [\fB\-\-usage\fR]\
+ [\fB\-\-version\fR]\
+ [\fIUSER\fR...]
+.SH NOTE
+This manpage is a short description of \fBrushlast\fR.  For a detailed
+discussion, including examples and usage recommendations, refer to the
+manual \fBGNU Rush -- a restricted user shell\fR, available in texinfo
+format.  If the \fBinfo\fR reader and the rush documentation are
+properly installed on your system, the command
+.PP
+.RS +4
+.B info rushlast
+.RE
+.PP
+should give you access to the complete manual.
+.PP
+You can also view the manual using the info mode in
+.BR emacs (1),
+or find it in various formats online at
+.PP
+.RS +4
+.B http://www.gnu.org.ua/software/rush/manual
+.RE
+.PP
+If any discrepancies occur between this manpage and the
+\fBManual\fR, the later shall be considered the authoritative
+source.
+.SH DESCRIPTION
+Searches back through the GNU Rush database and displays a list of all
+user sessions since the database was created.
+.PP
+The utility operates on the default accounting database,
+which is maintained only if
+.BR rush (1)
+runs in accounting mode.
+.SH OPTIONS
+.TP
+\fB\-F\fR, \fB\-\-format=\fISTRING\fR
+Use \fISTRING\fR instead of the default format.  Use \fISTRING\fR
+instead of the default format.  See the section \fBFORMAT\fR, for a
+detailed discussion of the format syntax.  If the \fISTRING\fR begins
+with a \fB@\fR, then this character is removed from it, and the
+resulting string is regarded as a name of the file to read.  The file
+is read literally, except that lines beginning with a semicolon are ignored. 
+.TP
+\fB\-f\fR, \fB\-\-file=\fIDIR\fR
+Look for database files in \fIDIR\fR.
+.TP
+\fB\-\-forward\fR
+Show entries in chronological order.
+.TP
+\fB\-H\fR, \fB\-\-no\-header\fR
+Do not display header line.
+.TP
+\fB\-n\fR, \fB\-\-count=\fINUMBER\fR
+Show at most \fINUMBER\fR records.
+.PP
+Other options
+.TP
+\fB-h\fR, \fB\-\-help\fR
+Give this help list.
+.TP
+\fB\-\-usage\fR
+Give a short usage message.
+.TP
+\fB\-\-version\fR
+Print program version.
+.SH FORMATS
+The format string supplied with the \fB\-F\fR (\fB\-\-format\fR)
+option controls the output of every record from the GNU Rush
+accounting database.  It consists of the collowing classes of
+objects:
+.TP
+.I Ordinary characters
+These are copied to the output verbatim.
+.TP
+.I Escapes
+An escape is a backslash, followed by a single character.  It is
+interpreted according to the following table:
+.sp
+.nf
+.ta 8n 20n
+.ul
+	Sequence	Replaced with
+	\\a	Audible bell character (ASCII 7)
+	\\b	Backspace character (ASCII 8)
+	\\e	Escape character (ASCII 27)
+	\\f	Form-feed character (ASCII 12)
+	\\n	Newline character (ASCII 10)
+	\\r	Carriage return character (ASCII 13)
+	\\t	Horizontal tabulation character (ASCII 9)
+	\\v	Vertical tabulation character (ASCII 11)
+	\\\\	A single backslash
+	\\\(dq	A double-quote.
+.fi
+.sp
+Any escape not listed in the table above results in its second
+character being output.
+.TP
+.I Quoted strings
+Strings are delimited by single or double quotes.  Within a string
+escape sequences are interpreted as described above.
+.TP
+.I Format specifications
+Format specification can be regarded as a kind of function, which outputs
+a particular piece of information from the database record.
+Syntactically, format specification starts with an opening brace and ends with
+a closing brace.  The first word after the brace is the name of the
+specification.  The rest of words are \fIpositional arguments\fR
+followed by \fIkeyword arguments\fR.  Both are optional.  A keyword
+argument begins with a colon.
+.PP 
+The available format specifications are:
+.TP
+\fB(newline\fR [\fICOUNT\fR]\fB)\fR
+Causes the newline character to be output.  If the optional \fIcount\fR
+is supplied, that many newlines will be printed
+.TP
+\fB(tab\fR [\fICOUNT\fR]\fB)\fR
+Advance to the next tab stop in the output stream.  If optional \fICOUNT\fR
+is present, then skip that many tab stops.  Each tab stop is eight
+characters long.
+.PP
+The following specifications output particular fields of a database
+record.  They all take two positional arguments: \fIWIDTH\fR and
+\fITITLE\fR.
+.PP
+The first argument, \fIWIDTH\fR sets the maximum output
+length for this specification.  If the number of characters actually output
+is less than the width, they will be padded with whitespace either to
+the left or to the right, depending on the presence of the \fB:right\fR
+keyword argument.  If the number of characters is greater than
+\fIWIDTH\fR, they will be truncated to fit.  If \fIWIDTH\fR is
+not given, the exact data are output as is.
+.PP
+The second argument, \fITITLE\fR, gives the title of this column for
+the heading line.  By default no title is output.
+.PP
+Every field specification accepts at least two keyword arguments.
+The keyword \fB:right\fR may be used to request alignment to the right
+for the data.  This keyword is ignored if \fIWIDTH\fR is not given.
+.PP
+The keyword \fB:empty\fR followed by a string causes the program
+to output that string if the resulting value for this specification
+would otherwise be empty.
+.TP
+\fB(user \fIWIDTH\fR \fITITLE\fR [\fB:empty\fR \fIREPL\fR][\fB:right\fR]\fB)\fR
+Print the user login name.
+.TP
+\fB(start\-time \fIWIDTH\fR \fITITLE\fR [\fB:empty\fR \fIREPL\fR][\fB:right\fR][\fB:format\fI \fIDATE-FORMAT\fR]\fB)\fR
+Date and time when the session started.
+
+The \fB:format\fR keyword introduces the
+.BR strftime (3)
+format string to be used when converting the date for printing.  The
+default value is \fB"%a %H:%M"\fR.
+.TP
+\fB(stop\-time \fIWIDTH\fR \fITITLE\fR [\fB:empty\fR \fIREPL\fR][\fB:right\fR][\fB:format\fI \fIDATE-FORMAT\fR]\fB)\fR
+Time when the command finished.  If it is still running, the word
+.B running
+is output.
+.TP
+\fB(duration \fIWIDTH\fR \fITITLE\fR [\fB:empty\fR \fIREPL\fR][\fB:right\fR]\fB)\fR
+Total time of the session duration.
+.TP
+\fB(rule \fIWIDTH\fR \fITITLE\fR [\fB:right\fR]\fB)\fR
+The tag of the rule that was used to serve the user.  
+.TP
+\fB(command \fIWIDTH\fR \fITITLE\fR [\fB:empty\fR \fIREPL\fR][\fB:right\fR]\fB)\fR
+Command line being executed.
+.TP
+\fB(pid \fIWIDTH\fR \fITITLE\fR [\fB:right\fR]\fB)\fR
+PID of the process.
+.PP
+The default format is:
+.PP
+.EX
+(user 10 Login)" "
+(rule 8 Rule)" "
+(start-time 0 Start)" "
+(stop-time 0 Stop)" "
+(duration 7 Time)" "
+(command 32 Command)
+.EE
+.SH SEE ALSO
+.BR rush (1),
+.BR rushwho (1).
+.SH AUTHORS
+Sergey Poznyakoff
+.SH "BUG REPORTS"
+Report bugs to <bug-rush@gnu.org.ua>.
+.SH COPYRIGHT
+Copyright \(co 2016 Sergey Poznyakoff
+.br
+.na
+License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
+.br
+.ad
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
+.\" Local variables:
+.\" eval: (add-hook 'write-file-hooks 'time-stamp)
+.\" time-stamp-start: ".TH [A-Z_][A-Z0-9_.\\-]* [0-9] \""
+.\" time-stamp-format: "%:B %:d, %:y"
+.\" time-stamp-end: "\""
+.\" time-stamp-line-limit: 20
+.\" end:

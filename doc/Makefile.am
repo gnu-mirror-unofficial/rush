@@ -24,6 +24,12 @@ rush_TEXINFOS=\
 EXTRA_DIST = \
  gendocs_template
 
+dist_man_MANS=\
+ rush.1\
+ rushlast.1\
+ rushwho.1\
+ rush.rc.5
+
 clean-local:
 	rm -rf manual
 
