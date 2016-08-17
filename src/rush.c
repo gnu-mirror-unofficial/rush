@@ -522,7 +522,7 @@ get_arg_no(int index, struct rush_request *req)
 static void
 assign_string(char **pstr, char *val)
 {
-	debug2(2, _("Transform: \"%s\" -> \"%s\""), *pstr ? *pstr : "", val);
+	debug(2, _("Transform: \"%s\" -> \"%s\""), *pstr ? *pstr : "", val);
 	free(*pstr);
 	*pstr = val;
 }
@@ -541,13 +541,13 @@ run_transforms(struct rush_rule *rule, struct rush_request *req)
 		arg_no = 0;						\
 		target = &req->prog;					\
 		val = PROGFILE(req);					\
-		debug1(2, _("Modifying program name (%s)"), val);	\
+		debug(2, _("Modifying program name (%s)"), val);	\
 	} else {							\
 		arg_no = get_arg_no(node->arg_no, req);			\
 		target = &req->argv[arg_no];				\
 		val = *target;						\
 		args_transformed = 1;					\
-		debug1(2, _("Modifying argv[%d]"), arg_no);		\
+		debug(2, _("Modifying argv[%d]"), arg_no);		\
 	} 								\
 	if (node->pattern) {						\
 		val = rush_expand_string(node->pattern, req);		\
@@ -560,11 +560,11 @@ run_transforms(struct rush_rule *rule, struct rush_request *req)
                                 rebuild_cmdline(req);
                                 args_transformed = 0;
                         }
-                        debug(2, _("Transforming command line"));
+                        debug(2, "%s", _("Transforming command line"));
                         p = transform_string(node->v.trans, req->cmdline);
                         free(req->cmdline);
                         req->cmdline = p;
-                        debug1(2, _("Command line: %s"), req->cmdline);
+                        debug(2, _("Command line: %s"), req->cmdline);
                         reparse_cmdline(req);
                         break;
 
@@ -574,10 +574,10 @@ run_transforms(struct rush_rule *rule, struct rush_request *req)
                                 rebuild_cmdline(req);
                                 args_transformed = 0;
                         }
-                        debug(2, _("Setting command line"));
+                        debug(2, "%s", _("Setting command line"));
                         free(req->cmdline);
                         req->cmdline = xstrdup(val);
-                        debug1(2, _("Command line: %s"), req->cmdline);
+                        debug(2, _("Command line: %s"), req->cmdline);
                         reparse_cmdline(req);
                         break;
 			
@@ -589,14 +589,14 @@ run_transforms(struct rush_rule *rule, struct rush_request *req)
 
 		case transform_map:
 			GET_TGT_VAL();
-			debug6(2,
-			       _("Transformation map: %s, %s, %s, %u, %u, %s"),
-			       node->v.map.file,
-			       node->v.map.delim,
-			       node->v.map.key,
-			       node->v.map.key_field,
-			       node->v.map.val_field,
-			       node->v.map.defval);
+			debug(2,
+			      _("Transformation map: %s, %s, %s, %u, %u, %s"),
+			      node->v.map.file,
+			      node->v.map.delim,
+			      node->v.map.key,
+			      node->v.map.key_field,
+			      node->v.map.val_field,
+			      node->v.map.defval);
                         p = map_string(&node->v.map, req);
 			if (p) 
 				assign_string(target, p);
@@ -612,8 +612,8 @@ run_transforms(struct rush_rule *rule, struct rush_request *req)
 				arg_end = arg_no;
 				arg_no = x;
 			}
-			debug2(2, _("Deleting arguments %d-%d"),
-			       arg_no, arg_end);
+			debug(2, _("Deleting arguments %d-%d"),
+			      arg_no, arg_end);
 			if (arg_no == 0 || arg_end == 0)
 				die(config_error,
 				    &req->i18n, _("Deleting argv[0] is prohibited"));
@@ -699,12 +699,12 @@ fork_process(struct rush_rule *rule, struct rush_request *req)
 
 	if (req->acct == rush_true)
 		acct_on(rule, req, pid);
-	debug1(2, _("Forked process %lu"), (unsigned long) pid);
+	debug(2, _("Forked process %lu"), (unsigned long) pid);
 	waitpid(pid, &status, 0);
 	if (WIFEXITED(status)) {
 		status = WEXITSTATUS(status);
-		debug2(2, _("%s: subprocess exited with code %d"),
-		       rule->tag, status);
+		debug(2, _("%s: subprocess exited with code %d"),
+		      rule->tag, status);
 	} else if (WIFSIGNALED(status)) {
 		logmsg(LOG_NOTICE, _("%s: subprocess terminated on signal %d"),
 		       rule->tag, WTERMSIG(status));
@@ -788,8 +788,8 @@ run_rule(struct rush_rule *rule, struct rush_request *req)
 {
         char **new_env;
 		
-        debug3(2, _("Rule %s at %s:%d matched"),
-	       rule->tag, rule->file, rule->line);
+        debug(2, _("Rule %s at %s:%d matched"),
+	      rule->tag, rule->file, rule->line);
 
         new_env = env_setup(rule->env);
         if (__debug_p(2)) {
@@ -811,7 +811,7 @@ run_rule(struct rush_rule *rule, struct rush_request *req)
 		const char *msg = rule->error_msg;
 		int custom = 1;
 		
-                debug1(2, _("Error message: %s"), msg);
+                debug(2, _("Error message: %s"), msg);
 		if (msg[0] == '@') {
 			int n;
 			
@@ -850,14 +850,14 @@ run_rule(struct rush_rule *rule, struct rush_request *req)
         if (rule->chroot_dir) {
                 char *dir = expand_tilde(rule->chroot_dir,
                                                req->pw->pw_dir);
-                debug1(2, _("Chroot dir: %s"), dir);
+                debug(2, _("Chroot dir: %s"), dir);
 		free(req->chroot_dir);
 		req->chroot_dir = dir;
         }
 
 	if (rule->gid != NO_GID) {
 		req->gid = rule->gid;
-		debug1(2, _("GID: %lu"), (unsigned long) req->gid);
+		debug(2, _("GID: %lu"), (unsigned long) req->gid);
 	}
 	
 	if (rule->post_sockaddr.len)
@@ -905,7 +905,7 @@ run_rule(struct rush_rule *rule, struct rush_request *req)
         if (rule->home_dir) {
                 free(req->home_dir);
                 req->home_dir = expand_tilde(rule->home_dir, req->pw->pw_dir);
-		debug1(2, _("Home dir: %s"), req->home_dir);
+		debug(2, _("Home dir: %s"), req->home_dir);
 		if (chdir(req->home_dir)) 
 			die(system_error, &req->i18n,
 			    _("cannot change to dir %s: %s"),
@@ -927,7 +927,7 @@ run_rule(struct rush_rule *rule, struct rush_request *req)
 		rebuild_cmdline(req);
 	}
 	
-        debug2(2, _("Executing %s, %s"), PROGFILE(req), req->cmdline);
+        debug(2, _("Executing %s, %s"), PROGFILE(req), req->cmdline);
 	if (lint_option)
 		exit(0);
 
@@ -991,8 +991,8 @@ main(int argc, char **argv)
                 die(system_error, NULL,
 		    _("invalid uid %lu"), (unsigned long) uid);
 
-        debug2(2, _("user %s, uid %lu"), rush_pw->pw_name,
-               (unsigned long) rush_pw->pw_uid);
+        debug(2, _("user %s, uid %lu"), rush_pw->pw_name,
+	      (unsigned long) rush_pw->pw_uid);
 
         parse_config();
 

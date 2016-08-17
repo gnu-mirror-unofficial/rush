@@ -241,51 +241,11 @@ extern struct passwd *rush_pw;
 
 #define __debug_p(x) ((x) <= debug_level)
 
-#define debug(lev,msg)					\
-	do {						\
-		if (__debug_p(lev))			\
-			logmsg(LOG_DEBUG, "%s", msg);	\
+#define debug(lev,fmt,...)					\
+	do {							\
+		if (__debug_p(lev))				\
+			logmsg(LOG_DEBUG, fmt, __VA_ARGS__);	\
 	} while(0)	
-#define debug1(lev,fmt,x1)				\
-	do {						\
-		if (__debug_p(lev))			\
-			logmsg(LOG_DEBUG, fmt, x1);	\
-	} while(0)
-#define debug2(lev,fmt,x1,x2)				\
-	do {						\
-		if (__debug_p(lev))			\
-			logmsg(LOG_DEBUG, fmt, x1, x2);	\
-	} while(0)
-#define debug3(lev,fmt,x1,x2,x3)		        \
-	do {						\
-		if (__debug_p(lev))			\
-			logmsg(LOG_DEBUG, fmt, x1, x2,	\
-			       x3);			\
-	} while(0)
-#define debug4(lev,fmt,x1,x2,x3,x4)		        \
-	do {						\
-		if (__debug_p(lev))			\
-			logmsg(LOG_DEBUG, fmt, x1, x2,	\
-			       x3, x4);			\
-	} while(0)
-#define debug5(lev,fmt,x1,x2,x3,x4,x5)		        \
-	do {						\
-		if (__debug_p(lev))			\
-			logmsg(LOG_DEBUG, fmt, x1, x2,	\
-			       x3, x4, x5);		\
-	} while(0)
-#define debug6(lev,fmt,x1,x2,x3,x4,x5,x6)	        \
-	do {						\
-		if (__debug_p(lev))			\
-			logmsg(LOG_DEBUG, fmt, x1, x2,	\
-			       x3, x4, x5, x6);		\
-	} while(0)
-#define debug7(lev,fmt,x1,x2,x3,x4,x5,x6,x7)	        \
-	do {						\
-		if (__debug_p(lev))			\
-			logmsg(LOG_DEBUG, fmt, x1, x2,	\
-			       x3, x4, x5, x6, x7);	\
-	} while(0)
 
 void die(enum error_type type, struct rush_i18n *i18n, const char *fmt, ...)
 	 RUSH_NORETURN RUSH_PRINTFLIKE(3,4);

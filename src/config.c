@@ -134,7 +134,7 @@ init_input_buf(input_buf_ptr *ibufptr, const char *file)
 	if (stat(file, &st)) {
 #ifdef RUSH_DEFAULT_CONFIG			
 		if (errno == ENOENT) {
-			debug1(1, _("Ignoring non-existing file %s"), file);
+			debug(1, _("Ignoring non-existing file %s"), file);
 			return 1;
 		}
 #endif
@@ -248,13 +248,13 @@ read_line(input_buf_ptr *ibufptr, char **pbuf, size_t *psize)
 			return p;
 		else {
 			input_buf_ptr next = (*ibufptr)->next;
-			debug1(3, _("Finished parsing %s"), (*ibufptr)->file);
+			debug(3, _("Finished parsing %s"), (*ibufptr)->file);
 			free_input_buf(ibufptr);
 			*ibufptr = next;
 			if (next)
-				debug2(3,
-				       _("Resuming parsing %s from line %d"),
-				       next->file, next->line);
+				debug(3,
+				      _("Resuming parsing %s from line %d"),
+				      next->file, next->line);
 		}
 	} while (*ibufptr);
 	return NULL;
@@ -798,7 +798,7 @@ _parse_debug(input_buf_ptr ibuf, struct rush_rule *rule,
 {
 	if (!debug_option) {
 		debug_level = strtoul(env->val, NULL, 0);
-		debug1(0, _("debug level set to %d"), debug_level);
+		debug(0, _("debug level set to %d"), debug_level);
 	}
 	return 0;
 }
@@ -1226,8 +1226,8 @@ _parse_include(input_buf_ptr ibuf, struct rush_rule *rule,
 
 	if (stat(name, &st)) {
 		if (errno == ENOENT) {
-			debug1(1, _("Ignoring non-existing include file %s"),
-			       name);
+			debug(1, _("Ignoring non-existing include file %s"),
+			      name);
 			free(name);
 			env->ret_buf = NULL;
 			return 0;
@@ -1503,7 +1503,7 @@ parse_input_buf(input_buf_ptr ibuf)
 	struct rush_rule *rule = NULL;
 	unsigned rule_num = 0;
 
-	debug1(3, _("Parsing %s"), ibuf->file);
+	debug(3, _("Parsing %s"), ibuf->file);
 	while (read_line(&ibuf, &buf, &size)) {
 		char *kw, *val;
 		char *p;
@@ -1515,7 +1515,7 @@ parse_input_buf(input_buf_ptr ibuf)
 		memset(&env, 0, sizeof env);
 
 		p = skipws(buf);
-		debug3(3, "%s:%d: %s", ibuf->file, ibuf->line, p);
+		debug(3, "%s:%d: %s", ibuf->file, ibuf->line, p);
 		if (p[0] == 0 || p[0] == '#')
 			continue;
 		kw = p;
@@ -1625,7 +1625,7 @@ parse_input_buf(input_buf_ptr ibuf)
 		if (rc == 0 && tok->flags & TOK_NEWBUF && env.ret_buf) {
 			env.ret_buf->next = ibuf;
 			ibuf = env.ret_buf;
-			debug1(3, _("Parsing %s"), ibuf->file);
+			debug(3, _("Parsing %s"), ibuf->file);
 		}
 		if (tok->flags & TOK_ARGN) 
 			argcv_free(env.argc, env.argv);
