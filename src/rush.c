@@ -498,12 +498,7 @@ reparse_cmdline(struct rush_request *req)
 	if (wordsplit(req->cmdline, &ws, WRDSF_DEFFLAGS))
 		die(system_error, &req->i18n, _("wordsplit(%s) failed: %s"),
                     req->cmdline, wordsplit_strerror(&ws));
-	req->argc = ws.ws_wordc;
-	req->argv = ws.ws_wordv;
-
-	ws.ws_wordc = 0;
-	ws.ws_wordv = NULL;
-
+	wordsplit_getwords(&ws, &req->argc, &req->argv);
 	wordsplit_free(&ws);
 
 	free(req->prog);
@@ -1034,10 +1029,7 @@ main(int argc, char **argv)
 		die(system_error, NULL,
 		    _("wordsplit(%s) failed: %s"),
 		    req.cmdline, wordsplit_strerror(&ws));
-	req.argc = ws.ws_wordc;
-	req.argv = ws.ws_wordv;
-	ws.ws_wordc = 0;
-	ws.ws_wordv = NULL;
+	wordsplit_getwords(&ws, &req.argc, &req.argv);
 	wordsplit_free(&ws);
 	
         req.pw = rush_pw;

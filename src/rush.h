@@ -212,7 +212,7 @@ struct rush_rule {
 
 struct rush_request {
         char *cmdline;         /* Command line */
-        int argc;              /* Number of elements in argv */
+        size_t argc;           /* Number of elements in argv */
         char **argv;           /* Command line in parsed form */
 	int interactive;       /* Request for interactive shell */
 	char *prog;            /* Program file name, if different
