@@ -535,7 +535,7 @@ const char version_etc_copyright[] =
   /* Do *not* mark this string for translation.  %s is a copyright
      symbol suitable for this locale, and %d is the copyright
      year.  */
-  "Copyright %s 2008-2013 Sergey Poznyakoff";
+  "Copyright %s 2008-2016 Sergey Poznyakoff";
 
 void
 print_version_only(const char *program_version, FILE *stream)
