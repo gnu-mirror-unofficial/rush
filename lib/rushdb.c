@@ -346,7 +346,7 @@ output_duration(time_t t, int width, struct format_key *key)
 		else if (width >= fullwidth - 5)
 			outbytes = printf("%*sd%02uh",
 					  width - (dlen + 3),
-					  dptr, h, m, s);
+					  dptr, h);
 		else if (width >= dlen + 1)
 			outbytes = printf("%*sd",
 					  width - 1, dptr);
