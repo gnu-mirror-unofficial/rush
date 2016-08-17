@@ -119,36 +119,23 @@ check_config_permissions(const char *filename, struct stat *st)
 }
 
 
-const char *chk_args[] = {
-	"all",
-	"owner",
-	"iwgrp",
-	"groupwritablefile", 
-	"iwoth",
-	"worldwritablefile", 
-	"link",
-	"dir_iwgrp",
-	"groupwritabledir", 
-	"dir_iwoth",
-	"worldwritabledir",
-	NULL
+static struct check_kw {
+	int bits;
+	char const *keyword;
+} chk_args[] = {
+	{ RUSH_CHK_ALL,       "all" },
+	{ RUSH_CHK_OWNER,     "owner" },
+	{ RUSH_CHK_IWGRP,     "iwgrp" },
+	{ RUSH_CHK_IWGRP,     "groupwritablefile" }, 
+	{ RUSH_CHK_IWOTH,     "iwoth" },
+	{ RUSH_CHK_IWOTH,     "worldwritablefile" }, 
+	{ RUSH_CHK_LINK,      "link" },
+	{ RUSH_CHK_DIR_IWGRP, "dir_iwgrp" },
+	{ RUSH_CHK_DIR_IWGRP, "groupwritabledir" },  
+	{ RUSH_CHK_DIR_IWOTH, "dir_iwoth" },
+	{ RUSH_CHK_DIR_IWOTH, "worldwritabledir" },
+	{ 0, NULL }
 };
-
-int chk_vals[] = {
-	RUSH_CHK_ALL,
-	RUSH_CHK_OWNER,
-	RUSH_CHK_IWGRP,
-	RUSH_CHK_IWGRP,
-	RUSH_CHK_IWOTH,
-	RUSH_CHK_IWOTH,
-	RUSH_CHK_LINK,
-	RUSH_CHK_DIR_IWGRP,
-	RUSH_CHK_DIR_IWGRP,
-	RUSH_CHK_DIR_IWOTH,
-	RUSH_CHK_DIR_IWOTH,
-};
-
-ARGMATCH_VERIFY(chk_args, chk_vals);
 
 int
 cfck_keyword(const char *name)
@@ -156,8 +143,8 @@ cfck_keyword(const char *name)
 	int negate = 0;
 	char *str;
 	char *kw;
-	ptrdiff_t d;
-
+	int i;
+	
 	str = xstrdup(name);
 	for (kw = str; *kw; kw++)
 		*kw = tolower(*kw);
@@ -171,15 +158,16 @@ cfck_keyword(const char *name)
 		kw += 2;
 	}
 
-	d = ARGMATCH(kw, chk_args, chk_vals);
-	free(str);
-	if (d < 0)
+	for (i = 0; chk_args[i].keyword; i++)
+		if (strcmp(chk_args[i].keyword, kw) == 0)
+			break;
+	if (chk_args[i].keyword == NULL)
 		return -1;
 	
 	if (negate)
-		config_file_checks &= ~chk_vals[d];
+		config_file_checks &= ~chk_args[i].bits;
 	else
-		config_file_checks |= chk_vals[d];
+		config_file_checks |= chk_args[i].bits;
 	return 0;
 }
 	

@@ -63,24 +63,18 @@ int
 string_to_error_index(const char *name)
 {
 	static const char *error_msg_name[] = {
-		"usage-error",
-		"nologin-error",
-		"config-error",
-		"system-error",
+		[usage_error]   = "usage-error",
+		[nologin_error] = "nologin-error",
+		[config_error]  = "config-error",
+		[system_error]  = "system-error",
 		NULL
 	};
-	static int error_msg_index[] = {
-		usage_error,
-		nologin_error,
-		config_error,
-		system_error
-	};
-	ARGMATCH_VERIFY(error_msg_name, error_msg_index);
+	int i;
 
-	ptrdiff_t d = ARGMATCH(name, error_msg_name, error_msg_index);
-	if (d < 0)
-		return -1;
-	return error_msg_index[d];
+	for (i = 0; error_msg_name[i]; i++)
+		if (strcmp(error_msg_name[i], name) == 0)
+			return i;
+	return -1;
 }
 	
 

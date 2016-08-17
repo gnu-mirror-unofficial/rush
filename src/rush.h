@@ -46,7 +46,6 @@
 #include <regex.h>
 #include <c-ctype.h>
 #include <inttostr.h>
-#include "argmatch.h"
 
 #include <defines.h>
 #include <librush.h>

@@ -1,7 +1,6 @@
 # List of gnulib modules needed for GNU Rush.
 # A module name per line. Empty lines and comments are ignored.
 
-argmatch
 c-ctype
 dirname
 error

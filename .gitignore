@@ -1,8 +1,8 @@
+*.diff
 *.orig
 *.rej
 *.tar.*
 *~
-*.diff
 .bootstrap
 .emacs*
 ABOUT-NLS
