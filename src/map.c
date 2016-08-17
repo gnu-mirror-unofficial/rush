@@ -229,7 +229,6 @@ map_string(struct rush_map *map, struct rush_request *req)
 
 	key = meta_expand_string(map->key, mapdef, req);
 	while (getline(&buf, &size, fp) != -1) {
-		int rc;
 		size_t len;
 		struct wordsplit ws;
 

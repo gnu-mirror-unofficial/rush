@@ -1271,10 +1271,9 @@ static int
 _parse_interactive(input_buf_ptr ibuf, struct rush_rule *rule,
 		   struct stmt_env *env)
 {
-	rush_interactive_shell = xstrdup(env->val);
+	rule->interactive = 1;
 	return 0;
 }
-
 /*
            0     1    2    3     4       5
    map[N] FILE DELIM KEY FIELD FIELD [DEFAULT]
@@ -1468,7 +1467,7 @@ struct token toktab[] = {
 	{ KW("system-error"),     TOK_ARG, _parse_system_error },
 	{ KW("regexp"),           TOK_ARGN, _parse_re_flags },
 	{ KW("include-security"), TOK_ARGN, _parse_include_security },
-	{ KW("interactive"),      TOK_ARG, _parse_interactive },
+	{ KW("interactive"),      TOK_RUL, _parse_interactive }, 
 	{ KW("acct-file-mode"),   TOK_ARG, _parse_acct_file_mode },
 	{ KW("acct-dir-mode"),    TOK_ARG, _parse_acct_dir_mode },
 	{ KW("acct-umask"),       TOK_ARG, _parse_acct_umask },
@@ -1587,7 +1586,6 @@ parse_input_buf(input_buf_ptr ibuf)
 		}
 
 		if (tok->flags & TOK_ARGN) {
-			int rc;
 			int flags = WRDSF_DEFFLAGS|WRDSF_COMMENT;
 			struct wordsplit ws;
 

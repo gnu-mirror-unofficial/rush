@@ -134,7 +134,7 @@ enum test_type {
 	test_uid,
 	test_gid,
 	test_user,
-	test_group
+	test_group,
 };
 
 struct test_numeric_node {
@@ -177,6 +177,7 @@ struct rush_rule {
 
 	char *tag;
 	int fall_through;
+	int interactive;
 	
 	/* Source location */
 	const char *file;                 /* Configuration file name */
@@ -213,6 +214,7 @@ struct rush_request {
         char *cmdline;         /* Command line */
         int argc;              /* Number of elements in argv */
         char **argv;           /* Command line in parsed form */
+	int interactive;       /* Request for interactive shell */
 	char *prog;            /* Program file name, if different
 				  from argv[0] */
         struct passwd *pw;     /* User passwd entry */
@@ -237,7 +239,6 @@ extern struct rush_rule *rule_head, *rule_tail;
 extern unsigned debug_level;
 extern int debug_option;
 extern struct passwd *rush_pw;
-extern char *rush_interactive_shell;
 
 #define __debug_p(x) ((x) <= debug_level)
 

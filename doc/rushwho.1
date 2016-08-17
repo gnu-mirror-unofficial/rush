@@ -13,7 +13,7 @@
 .\"
 .\" You should have received a copy of the GNU General Public License
 .\" along with GNU Rush.  If not, see <http://www.gnu.org/licenses/>.
-.TH RUSHWHO 1 "August 16, 2016" "RUSHWHO" "Rush User Reference"
+.TH RUSHWHO 1 "August 17, 2016" "RUSHWHO" "Rush User Reference"
 .SH NAME
 rushwho \- show who is logged on by rush(1)
 .SH SYNOPSIS
@@ -84,6 +84,24 @@ Give a short usage message.
 .TP
 \fB\-\-version\fR
 Print program version.
+.SH ENVIRONMENT
+.TP
+.B RUSHWHO_FORMAT
+When set, supplies a format string to use instead of the built-in
+format.  If the value begins with a
+.B @
+sign, rest of characters is treated as the name of file to read the
+format from, similarly to the \fB\-\-format\fR option, which see.
+.sp
+The precedence rule for format selection is:
+.RS
+.nr step 1 1
+.IP \n[step].
+The \fB\-\-format\fR option.
+.IP \n+[step].
+The \fBRUSHWHO_FORMAT\fR environment variable.
+.IP \n+[step].
+Built-in format.
 .SH FORMAT
 The format string supplied with the \fB\-F\fR (\fB\-\-format\fR)
 option controls the output of every record from the GNU Rush

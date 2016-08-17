@@ -201,34 +201,6 @@ a system error occurs.   The default is:
 A system error occurred while attempting to execute command.
 .EX
 .RE
-.SH INTERACTIVE ACCESS
-Although such usage is not recommended, GNU rush does provide a
-possibility to grant interactive access to some users.
-.PP
-To do so, declare a string that will indicate interactive usage.
-.TP
-\fBinteractive\fR \fISTRING\fR
-If this statement is present in the configuration file, the invocation
-of \fBrush\fR without command line arguments (interactive usage)
-becomes equivalent to \fBrush -c \fISTRING\fR.  Thus, it can be caught
-by an appropriate rule.  E.g.
-.PP
-.EX
-# Declare interactive usage identifier
-interactive //shell//
-
-# The rule for interactive shell
-rule login
-  command //shell//
-  group rshell
-  map[^] /etc/rush.shell : ${user} 1 2
-  transform[0] ${program} s,^,-r,
-
-# A catch-all rule for invalid usage  
-rule nologin
-  command //shell//
-  exit You don't have interactive access to this machine.
-.EE
 .SH RULES
 Statements are grouped into \fIrules\fR.  A rule begins with the
 following construct
@@ -518,12 +490,37 @@ E.g.:
 .RS
 .EX
 rule default
-  umask 002
-  env - HOME USERNAME PATH
-  fall-through
+    umask 002
+    env - HOME USERNAME PATH
+    fall-through
 .EE
 .RE
 .RE
+.SS Interactive Access
+.TP
+.B interactive
+Marks the rule it appears in as interactive.
+.PP
+When
+.B rush
+is invoked without \fB\-c\fR option (interactive usage), it will
+consider only rules marked with \fBinteractive\fR keywords.  This
+allows for providing interactive shell access.
+.PP
+The default interactive rule terminates by invoking
+.BR /bin/sh .
+.PP
+The command name argument (\fBargv[0]\fR) is set to the basename of
+the program being executed prefixed with a dash.
+.PP
+Example:
+.PP
+.EX
+rule login
+    interactive
+    group shell
+    set[0] /bin/bash
+.EE 
 .SS Accounting and Forked Mode
 GNU Rush is able to operate in two modes, called \fIdefault\fR and
 \fIforked\fR.  When operating in the default mode, the process image of
@@ -576,8 +573,8 @@ configuration file, e.g.:
 
 .EX
 rule default
-  acct on
-  fall-through 
+    acct on
+    fall-through 
 .EE
 .SS Notification
 .TP

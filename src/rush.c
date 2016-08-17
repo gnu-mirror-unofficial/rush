@@ -25,7 +25,6 @@ unsigned debug_level;
 int debug_option;
 struct rush_rule *rule_head, *rule_tail;
 struct passwd *rush_pw;
-char *rush_interactive_shell;
 
 #define STDOUT_FILENO 1
 #define STDERR_FILENO 2
@@ -291,13 +290,13 @@ test_request_user(struct test_node *node, struct rush_request *req)
 }
 
 int (*test_request[])(struct test_node *, struct rush_request *) = {
-        test_request_cmdline,
-        test_request_arg,
-        test_request_argc,
-        test_request_uid,
-        test_request_gid,
-        test_request_user,
-        test_request_group
+        [test_cmdline]     = test_request_cmdline,
+        [test_arg]         = test_request_arg,
+        [test_argc]        = test_request_argc,
+        [test_uid]         = test_request_uid,
+        [test_gid]         = test_request_gid,
+        [test_user]        = test_request_user,
+        [test_group]       = test_request_group,
 };
 
 int
@@ -312,6 +311,7 @@ run_tests(struct rush_rule *rule, struct rush_request *req)
 			    &req->i18n,
                             _("%s:%d: INTERNAL ERROR: node type out of range"),
                             __FILE__, __LINE__);
+
                 res = test_request[node->type](node, req);
                 if (node->negate)
                         res = !res;
@@ -319,16 +319,6 @@ run_tests(struct rush_rule *rule, struct rush_request *req)
                         return 1;
         }
         return 0;
-}
-
-struct rush_rule *
-match_rule(struct rush_rule *rule, struct rush_request *req)
-{
-        for (; rule; rule = rule->next) {
-                if (run_tests(rule, req) == 0)
-                        break;
-        }
-        return rule;
 }
 
 char *
@@ -420,6 +410,7 @@ env_concat(char *name, size_t namelen, char *a, char *b)
         } else /* if (a == NULL) */ {
                 if (c_ispunct(b[0]))
                         b++;
+		len = strlen(b);
                 res = xmalloc(namelen + 1 + len + 1);
                 strcpy(res + namelen + 1, b);
         }
@@ -501,7 +492,6 @@ env_setup(char **env)
 void
 reparse_cmdline(struct rush_request *req)
 {
-        int rc;
         struct wordsplit ws;
 	
         argcv_free(req->argc, req->argv);
@@ -762,7 +752,7 @@ get_user_groups(struct rush_request *req, size_t *pgidc, gid_t **pgidv)
 	gidc = 1;
 
 	setgrent();
-	while (gr = getgrent()) {
+	while ((gr = getgrent())) {
 		char **p;
 		for (p = gr->gr_mem; *p; p++)
 			if (strcmp(*p, req->pw->pw_name) == 0) {
@@ -878,7 +868,7 @@ run_rule(struct rush_rule *rule, struct rush_request *req)
 
 	if (rule->gid != NO_GID) {
 		req->gid = rule->gid;
-		debug1(2, _("GID: %lu"), req->gid);
+		debug1(2, _("GID: %lu"), (unsigned long) req->gid);
 	}
 	
 	if (rule->post_sockaddr.len)
@@ -917,7 +907,8 @@ run_rule(struct rush_rule *rule, struct rush_request *req)
 		uid = req->pw->pw_uid;
 		pw = getpwuid(uid);
 		if (!pw)
-			die(nologin_error, NULL,
+			die(req->interactive ? nologin_error : usage_error,
+			    NULL,
 			    _("invalid uid %lu"), (unsigned long) uid);
 		req->pw = pw;
 	}
@@ -932,6 +923,21 @@ run_rule(struct rush_rule *rule, struct rush_request *req)
                     req->home_dir, strerror(errno));
 	}
 
+	if (req->interactive && !req->prog) {
+		char *p;
+		
+		req->prog = req->argv[0];
+		p = strrchr(req->prog, '/');
+		if (p)
+			++p;
+		else
+			p = req->prog;
+		req->argv[0] = xmalloc(strlen(p) + 2);
+		req->argv[0][0] = '-';
+		strcpy(req->argv[0] + 1, p);
+		rebuild_cmdline(req);
+	}
+	
         debug2(2, _("Executing %s, %s"), PROGFILE(req), req->cmdline);
 	if (lint_option)
 		exit(0);
@@ -952,13 +958,13 @@ run_rule(struct rush_rule *rule, struct rush_request *req)
 
 static char *command = NULL;
 static char *test_user_name = NULL;
+static int interactive;
 
 #include "rushopt.h"
 
 int
 main(int argc, char **argv)
 {
-        int rc;
         uid_t uid;
         struct rush_rule *rule;
         struct rush_request req;
@@ -993,7 +999,7 @@ main(int argc, char **argv)
 
         uid = getuid();
         if ((rush_pw = getpwuid(uid)) == NULL)
-                die(nologin_error, NULL,
+                die(system_error, NULL,
 		    _("invalid uid %lu"), (unsigned long) uid);
 
         debug2(2, _("user %s, uid %lu"), rush_pw->pw_name,
@@ -1002,14 +1008,8 @@ main(int argc, char **argv)
         parse_config();
 
 	if (!command) {
-		if (lint_option) 
+		if (lint_option && !interactive) 
 			exit(0);
-		else if (rush_interactive_shell) {
-			command = rush_interactive_shell;
-			debug1(2, _("Mapping interactive shell to \"%s\""),
-			       command);
-		} else 
-			die(usage_error, NULL, _("invalid command line"));
 	}
 
         if (__debug_p(2)) {
@@ -1023,7 +1023,23 @@ main(int argc, char **argv)
         }
 
 	memset(&req, 0, sizeof(req));
-        req.cmdline = xstrdup(command);
+	if (!command) {
+		req.interactive = 1;
+		command = "/bin/sh";
+	}
+
+	req.cmdline = xstrdup(command);
+
+	if (wordsplit(req.cmdline, &ws, WRDSF_DEFFLAGS))
+		die(system_error, NULL,
+		    _("wordsplit(%s) failed: %s"),
+		    req.cmdline, wordsplit_strerror(&ws));
+	req.argc = ws.ws_wordc;
+	req.argv = ws.ws_wordv;
+	ws.ws_wordc = 0;
+	ws.ws_wordv = NULL;
+	wordsplit_free(&ws);
+	
         req.pw = rush_pw;
 	req.umask = 022;
 	req.chroot_dir = NULL;
@@ -1031,30 +1047,28 @@ main(int argc, char **argv)
 	req.gid = NO_GID;
 	req.fork = rush_undefined;
 	req.acct = rush_undefined;
-
-	if (wordsplit(req.cmdline, &ws, WRDSF_DEFFLAGS))
-                die(system_error, NULL,
-                    _("wordsplit(%s) failed: %s"),
-                    req.cmdline, wordsplit_strerror(&ws));
-	req.argc = ws.ws_wordc;
-	req.argv = ws.ws_wordv;
-	ws.ws_wordc = 0;
-	ws.ws_wordv = NULL;
-
-	wordsplit_free(&ws);
 	
 	for (rule = rule_head; rule; rule = rule->next) {
-                rule = match_rule(rule, &req);
+		if (req.interactive != rule->interactive)
+			continue;
+                if (run_tests(rule, &req))
+			continue;
                 if (!rule)
                         break;
-                if (debug_level) 
-                        logmsg(LOG_NOTICE,
-                               _("Serving request \"%s\" for %s by rule %s"),
-                               command, req.pw->pw_name, rule->tag);
+                if (debug_level) {
+			if (req.interactive)
+				logmsg(LOG_NOTICE,
+				       _("Serving interactive shell request for %s by rule %s"),
+				       req.pw->pw_name, rule->tag);
+			else
+				logmsg(LOG_NOTICE,
+				       _("Serving request \"%s\" for %s by rule %s"),
+				       command, req.pw->pw_name, rule->tag);
+		}
                 run_rule(rule, &req);
         }
-	die(usage_error, &req.i18n, 
+	die(req.interactive ? nologin_error : usage_error, &req.i18n,
 	    _("no matching rule for \"%s\", user %s"),
-	    req.cmdline, req.pw->pw_name);        
+	    req.cmdline, req.pw->pw_name);
         return 0;
 }

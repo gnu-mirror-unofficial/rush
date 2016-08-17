@@ -38,7 +38,7 @@ Published by the Free Software Foundation,
 51 Franklin Street, Fifth Floor,
 Boston, MA 02110-1301 USA 
 
-Copyright @copyright{} 2008-2010, 2013-2014 Sergey Poznyakoff
+Copyright @copyright{} 2008-2010, 2013-2014, 2016 Sergey Poznyakoff
 
 Permission is granted to copy, distribute and/or modify this document
 under the terms of the GNU Free Documentation License, Version 1.3 or
@@ -106,7 +106,6 @@ Configuration File
 * Regex::                       
 * Sleep Time::                  
 * Error Messages::
-* Interactive::
 
 Syntax
 
@@ -122,6 +121,7 @@ Rule
 * Accounting and Forked Mode::  
 * Notification::                
 * Exit::
+* Interactive::
 * Localization::
 
 Transformations
@@ -327,7 +327,6 @@ Any of these tests can be disabled using the
 * Regex::                       
 * Sleep Time::                  
 * Error Messages::
-* Interactive::
 @end menu
 
 @node Syntax
@@ -500,6 +499,7 @@ within a @code{rule}.
 * Accounting and Forked Mode::  
 * Notification::                
 * Exit::
+* Interactive::
 * Localization::
 @end menu
 
@@ -1416,6 +1416,55 @@ rule git-trap
 This rule will trap all git invocations that do not match the
 @samp{git} rule.
 
+@node Interactive
+@subsection Interactive Access
+@cindex interactive access
+  Sometimes it may be necessary to allow some group of users limited
+access to interactive shells.  GNU Rush contains provisions for such
+usage.  When @command{rush} is invoked without @option{-c} it assumes
+interactive usage.  In this case only rules explicitly marked as
+interactive are considered, the rest of rules is ignored.
+
+@deffn {Rule Config} interactive
+This statement marks the rule it appears in as interactive.  This rule
+will match only if @command{rush} is invoked without command line
+arguments.
+@end deffn
+
+Unless command line transformations are applied, interactive rule
+finishes by executing @command{/bin/sh}.  The first word in the
+command line (@code{argv[0]}) is normally set to the basename of
+the command being executed prefixed by a dash sign.
+
+Consider the following example:
+
+@smallexample
+rule login
+  interactive
+  group rshell
+  map[^] /etc/rush.shell : $@{user@} 1 2
+  transform[0] $@{program@} s,^,-r,
+
+rule nologin
+  interactive
+  exit You don't have interactive access to this machine.
+@end smallexample
+
+The @samp{login} rule will match interactive user requests if the user
+is a member of the group @samp{rshell}.  It uses
+@file{/etc/rush.shell} to select a shell to use for that user
+(@pxref{map}).  This map file consists of two fields, separated by a
+colon.  If the shell is found, its base name, prefixed with @samp{-r},
+will be used as @samp{argv[0]} (this indicates a restricted login shell).
+Otherwise, the trap rule @samp{nologin} will be matched, which will
+output the given diagnostics message and terminate @command{rush}. 
+
+To test interactive access, use the @option{-i} option:
+
+@smallexample
+rush --test -i 
+@end smallexample
+
 @node Localization
 @subsection Localization
 @cindex i18n
@@ -1891,48 +1940,6 @@ A system error occurred while attempting to execute command.
 @end smallexample
 @end deffn
 
-@node Interactive
-@section Interactive Access
-@cindex interactive access
-  Sometimes it may be necessary to allow some group of users limited
-access to interactive shells.  GNU Rush contains provisions for such
-usage.
-
-@deffn {Configuration} interactive @var{string}
-If this statement is present in the configuration file, the invocation
-of @command{rush} without command line arguments (interactive usage)
-becomes equivalent to @command{rush -c @var{string}}.
-@end deffn
-
-This can be used to catch interactive invocations.  Consider the
-following example:
-
-@smallexample
-interactive //shell//
-
-rule login
-  command //shell//
-  group rshell
-  map[^] /etc/rush.shell : $@{user@} 1 2
-  transform[0] $@{program@} s,^,-r,
-
-rule nologin
-  command //shell//
-  exit You don't have interactive access to this machine.
-@end smallexample
-
-The @code{interactive} statement supplies a fake command line which
-will indicate an attempt of interactive usage.  It is a common practice
-to select such a string that cannot be a valid system command.  The
-@samp{login} rule matches this command line if the user is a member
-of the group @samp{rshell}.  It uses @file{/etc/rush.shell} to select
-a shell to use for that user (@pxref{map}).  This map file consists of
-two fields, separated by a colon.  If the shell is found, its base
-name, prefixed with @samp{-r}, is used as @samp{argv[0]} (this indicates a
-restricted login shell).  Otherwise, the trap rule @samp{nologin} is
-matched, which outputs the given diagnostics message and exits
-@command{rush}. 
-
 @node Default Configuration
 @chapter Default Configuration
 
@@ -2337,6 +2344,9 @@ exits with the code 1.
 @item If the @option{-c} option is present, @command{rush} processes
 its argument as usual (@pxref{Operation}), except that the command
 itself is not executed.
+
+@item Otherwise, if @option{-i} option is present, @command{rush}
+emulates interactive usage, but does not execute the final command.
 @end enumerate
 
 An exit status of 0 means no errors, 1 means an error has occurred.
@@ -2371,6 +2381,12 @@ $ rush --test
 $ rush --test sample.rc
 @end smallexample
 
+@item Test interactive access
+
+@smallexample
+$ rush --test -i sample.rc
+@end smallexample
+
 @item Test the configuration file and emulate execution of the command
 @command{cvs server}.  Use debugging level 2:
 
@@ -2385,7 +2401,7 @@ $ rush --user=jeff --debug=2 -c "cvs server"
 @end smallexample
 
 Note, that you don't need to specify @option{--test} along with
-@option{--user}.
+@option{--user} or @option{-i} options.
 
 @item Same, but use @file{sample.rc} instead of the default
 configuration file:
@@ -2419,6 +2435,10 @@ Configure security checks for the main configuration file.
 @item -d @var{number}
 @itemx --debug=@var{number}
 Set debugging level.
+
+@opindex -i, @r{rush}
+@item -i
+Emulate interactive access.  @xref{Test Mode}.
 
 @opindex --show-default, @r{rush}
 @item --show-default

@@ -52,6 +52,13 @@ BEGIN
 	command = optarg;
 END
 
+OPTION(,i,,
+       [<Force interactive shell.>])
+BEGIN
+        lint_option = 1;
+        interactive = 1;
+END
+
 OPTION(security-check,C,CHECK,
        [<Add or remove configuration security check.>])
 BEGIN
