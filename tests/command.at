@@ -1,0 +1,48 @@
+# This file is part of GNU Rush. 
+# Copyright (C) 2008-2016 Sergey Poznyakoff
+#
+# GNU Rush is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3, or (at your option)
+# any later version.
+#
+# GNU Rush is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with GNU Rush.  If not, see <http://www.gnu.org/licenses/>.
+
+AT_SETUP([command])
+AT_KEYWORDS([command])
+
+AT_RUSH_TEST([
+rule
+  command echo[[:space:]]+foo$
+],
+[cmdline,argv,prog,interactive,fork,acct],
+
+[/usr/bin/echo foo],
+[0],
+[{
+    "cmdline":"/usr/bin/echo foo",
+    "argv":[[
+        "/usr/bin/echo",
+        "foo"
+    ]],
+    "prog":null,
+    "interactive":0,
+    "fork":-1,
+    "acct":-1
+}
+],
+[],
+
+[/usr/bin/echo foo bar],
+[1],
+[],
+[rush: Error: no matching rule for "/usr/bin/echo foo bar", user MY_USER
+])
+
+AT_CLEANUP

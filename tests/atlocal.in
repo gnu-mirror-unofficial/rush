@@ -1,0 +1,12 @@
+# @configure_input@                                     -*- shell-script -*-
+# Configurable variable values for GNU rush test suite.
+# Copyright (C) 2016 Sergey Poznyakoff
+
+PATH=@abs_builddir@:@abs_top_builddir@/src:$top_srcdir:$srcdir:$PATH
+myvars() {
+    set -- $(myid)
+    MY_USER=$1
+    MY_UID=$2
+    MY_GROUP=$3
+    MY_GID=$4
+}

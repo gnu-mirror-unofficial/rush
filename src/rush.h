@@ -236,6 +236,7 @@ extern int lint_option;
 extern unsigned sleep_time;
 extern struct rush_rule *rule_head, *rule_tail;
 extern unsigned debug_level;
+extern char *dump_option;
 extern int debug_option;
 extern struct passwd *rush_pw;
 
@@ -291,5 +292,8 @@ int cfck_keyword(const char *name);
 /* map.c */
 char *map_string(struct rush_map *map, struct rush_request *req);
 char *rush_expand_string(const char *string, struct rush_request *req);
+
+/* dump.c */
+void dump_request(struct rush_request *req, FILE *fp);
 
 

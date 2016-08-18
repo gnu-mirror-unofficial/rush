@@ -59,6 +59,13 @@ BEGIN
         interactive = 1;
 END
 
+OPTION(dump,D,KEYWORDS,
+       [<Dump final request in test mode.>])
+BEGIN
+	dump_option = optarg;
+	lint_option = 1;
+END	
+
 OPTION(security-check,C,CHECK,
        [<Add or remove configuration security check.>])
 BEGIN

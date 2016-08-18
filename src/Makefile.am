@@ -22,6 +22,7 @@ rush_SOURCES=\
  cfck.c\
  config.c\
  defines.h\
+ dump.c\
  limits.c\
  map.c\
  rush.c\

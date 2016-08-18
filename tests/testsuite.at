@@ -1,0 +1,62 @@
+# This file is part of GNU Rush.
+# Copyright (C) 2008-2016 Sergey Poznyakoff
+#
+# GNU Rush is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3, or (at your option)
+# any later version.
+#
+# GNU Rush is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with GNU Rush.  If not, see <http://www.gnu.org/licenses/>.
+
+m4_version_prereq([2.52g])
+
+dnl m4_run_rush([KW], [CMD],[EC],[STDOUT],[STDERR],...)
+m4_define([m4_run_rush],[m4_ifval([$2],[dnl
+echo "# $2"
+echo "# $2" >&2
+rush -C none -D$1 -c "$2" test.conf 2>err
+echo "# $?"
+sed "s/$MY_USER/MY_USER/g" err >&2
+$0([$1],m4_shiftn(5, $@))])])
+
+dnl m4_fmt_out([CMD],[EC],[STDOUT],[STDERR],...)
+m4_define([m4_fmt_out],[m4_ifval([$1],[dnl
+# $1
+$3[]dnl
+# $2
+$0(m4_shift(m4_shift3($@)))])])
+
+dnl m4_fmt_err([CMD],[EC],[STDOUT],[STDERR],...)
+m4_define([m4_fmt_err],[m4_ifval([$1],[dnl
+# $1
+$4[]dnl
+$0(m4_shift(m4_shift3($@)))])])
+
+dnl AT_RUSH_TEST([CONFIG],[KW], [CMD],[EC],[STDOUT],[STDERR])
+m4_define([AT_RUSH_TEST],[
+AT_CHECK([
+myvars
+cat > test.conf <<EOT
+[$1]
+EOT
+m4_run_rush(m4_shift($@))
+],
+[0],
+[m4_fmt_out(m4_shift(m4_shift($@)))],
+[m4_fmt_err(m4_shift(m4_shift($@)))])])
+#
+AT_INIT
+
+AT_TESTED([rush])
+
+AT_BANNER([Conditionals])
+m4_include([argc.at])
+m4_include([command.at])
+m4_include([match.at])
+m4_include([matchprog.at])

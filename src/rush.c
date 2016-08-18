@@ -23,6 +23,7 @@ int lint_option = 0;
 unsigned sleep_time = 5;
 unsigned debug_level;
 int debug_option;
+char *dump_option;
 struct rush_rule *rule_head, *rule_tail;
 struct passwd *rush_pw;
 
@@ -782,7 +783,7 @@ setowner(struct rush_request *req)
 		die(system_error, &req->i18n,
 		    _("seteuid(0) succeeded when it should not"));
 }
-
+
 void
 run_rule(struct rush_rule *rule, struct rush_request *req)
 {
@@ -928,8 +929,11 @@ run_rule(struct rush_rule *rule, struct rush_request *req)
 	}
 	
         debug(2, _("Executing %s, %s"), PROGFILE(req), req->cmdline);
-	if (lint_option)
+	if (lint_option) {
+		if (dump_option)
+			dump_request(req, stdout);
 		exit(0);
+	}
 
 	if (req->fork == rush_true) 
 		fork_process(rule, req);

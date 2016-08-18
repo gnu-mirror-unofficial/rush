@@ -2,7 +2,10 @@
 *.orig
 *.rej
 *.tar.*
+*.o
 *~
+.deps
+.gdbinit
 .bootstrap
 .emacs*
 ABOUT-NLS

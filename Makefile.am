@@ -15,7 +15,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 ACLOCAL_AMFLAGS = -I m4 -I doc/imprimatur
-SUBDIRS=gnu lib src etc doc po
+SUBDIRS=gnu lib src etc doc po tests
 
 # We never remove files from the configuration directory
 distuninstallcheck_listfiles = \

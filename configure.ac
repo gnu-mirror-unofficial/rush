@@ -86,6 +86,11 @@ AC_ARG_WITH([default-config],
 	     name=`expr x"$withval" : '.*/\(.*\)'`
 	     AC_SUBST(RUSH_DEFAULT_CONFIG, $dir/$name)])
 
+# Initialize the test suite.
+AC_CONFIG_TESTDIR(tests)
+AC_CONFIG_FILES([tests/Makefile tests/atlocal])
+AM_MISSING_PROG([AUTOM4TE], [autom4te])
+	     
 AC_CONFIG_FILES([Makefile
                  gnu/Makefile
 		 lib/Makefile

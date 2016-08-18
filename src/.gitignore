@@ -1,11 +1,7 @@
-.deps
 defines.h
-*.o
-*~
 rush
 rushlast
 rushwho
-.gdbinit
 rlopt.h
 rushopt.h
 rwopt.h
