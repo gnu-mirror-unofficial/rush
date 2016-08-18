@@ -31,7 +31,7 @@ rule
         "/usr/bin/echo",
         "foo"
     ]],
-    "prog":n () ull,
+    "prog":null,
     "interactive":0,
     "fork":-1,
     "acct":-1

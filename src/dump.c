@@ -188,7 +188,11 @@ dump_request(struct rush_request *req, FILE *fp)
 	ws.ws_delim = ",";
 	if (strcmp(dump_option, "all") == 0)
 		dump_option = allkw;
-	wordsplit(dump_option, &ws, WRDSF_DELIM|WRDSF_WS|WRDSF_SQUEEZE_DELIMS);
+	if (wordsplit(dump_option, &ws,
+		      WRDSF_DELIM
+		      |WRDSF_WS|WRDSF_SQUEEZE_DELIMS
+		      |WRDSF_NOVAR|WRDSF_NOCMD|WRDSF_SHOWERR))
+		abort();
 	
 	dumper_init(&dmp, fp, 4);
 	
