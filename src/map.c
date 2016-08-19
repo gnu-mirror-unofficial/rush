@@ -112,7 +112,7 @@ meta_expand_string(const char *string, struct metadef *def,
 				len = 1;
 				if (c_isdigit(*p)) {
 					unsigned n = *p - '0';
-					if (n >= req->argc) {
+					if (n < req->argc) {
 						s = req->argv[n];
 						len = strlen(req->argv[n]);
 					} 
@@ -191,6 +191,7 @@ static struct metadef mapdef[] = {
 	{ "home", NULL, meta_home },
 	{ "gecos", NULL, meta_gecos },
 	{ "program", NULL, meta_program },
+	{ "^", NULL, meta_program },
 	{ "command", NULL, meta_command },
 	{ NULL }
 };

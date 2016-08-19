@@ -107,25 +107,63 @@ dump_string(char const *string, char const *id, struct json_dumper *dmp)
 }
 
 static void
-dump_argv(char **argv, char const *id, struct json_dumper *dmp)
+dump_raw_argv(char **argv, struct json_dumper *dmp)
+{
+	size_t i;
+	
+	for (i = 0; argv[i]; i++) {
+		if (i)
+			dump_delim(dmp);
+		dump_string_data(argv[i], dmp);
+	}
+}
+
+static int
+cmp_ptr(const void *a, const void *b)
+{
+	char ** const aptr = (char ** const) a;
+	char ** const bptr = (char ** const) b;
+	return strcmp (*aptr, *bptr);
+}
+
+static void
+dump_argv(char **argv, char const *id, int sort, struct json_dumper *dmp)
 {
 	size_t i;
 	struct json_dumper nest_dmp;
 	
 	dump_id(id, dmp);
+	if (!argv) {
+		fputs("null", dmp->fp);
+		return;
+	}
 	fputc('[', dmp->fp);
+	if (!argv[0]) {
+		fputc(']', dmp->fp);
+		return;
+	}
+		
 	if (dmp->indent)
 		fputc('\n', dmp->fp);
 	
 	dumper_copy(&nest_dmp, dmp);
 
 	dump_indent(&nest_dmp);
-	for (i = 0; argv[i]; i++) {
-		if (i)
-			dump_delim(&nest_dmp);
-		dump_string_data(argv[i], &nest_dmp);
-	}
 
+	if (sort) {
+		char **newargv;
+		for (i = 0; argv[i]; i++)
+			;
+		newargv = xcalloc(i+1, sizeof(newargv[0]));
+		for (i = 0; (newargv[i] = argv[i]) != NULL; i++)
+			;
+		qsort(newargv, i, sizeof(newargv[0]), cmp_ptr);
+		dump_raw_argv(newargv, &nest_dmp);
+		free(newargv);
+	} else {
+		dump_raw_argv(argv, &nest_dmp);
+	}
+	
 	dump_separator(dmp);
 	fputc(']', dmp->fp);
 }
@@ -203,7 +241,7 @@ dump_request(struct rush_request *req, FILE *fp)
 		if (strcmp(ws.ws_wordv[i], "cmdline") == 0)
 			dump_string(req->cmdline, "cmdline", &dmp);
 		else if (strcmp(ws.ws_wordv[i], "argv") == 0)
-			dump_argv(req->argv, "argv", &dmp);
+			dump_argv(req->argv, "argv", 0, &dmp);
 		else if (strcmp(ws.ws_wordv[i], "prog") == 0)
 			dump_string(req->prog, "prog", &dmp);
 		else if (strcmp(ws.ws_wordv[i], "interactive") == 0)
@@ -239,7 +277,7 @@ dump_request(struct rush_request *req, FILE *fp)
 		else if (strcmp(ws.ws_wordv[i], "locale") == 0)
 			dump_string(req->i18n.locale, "locale", &dmp);
 		else if (strcmp(ws.ws_wordv[i], "environ") == 0)
-			dump_argv(environ, "environ", &dmp);
+			dump_argv(environ, "environ", 1, &dmp);
 		else
 			logmsg(LOG_ERR, _("unknown keyword: %s"), ws.ws_wordv[i]);
 	}		

@@ -13,7 +13,7 @@
 .\"
 .\" You should have received a copy of the GNU General Public License
 .\" along with GNU Rush.  If not, see <http://www.gnu.org/licenses/>.
-.TH RUSH.RC 1 "August 17, 2016" "RUSH.RC" "Rush User Reference"
+.TH RUSH.RC 1 "August 19, 2016" "RUSH.RC" "Rush User Reference"
 .SH NAME
 rush.rc \- configuration rules for rush.
 .SH DESCRIPTION
@@ -324,7 +324,7 @@ command prefixed with a dash:
 .RS
 .RS
 .EX
-transform[0] ${^} s,.*/,-
+transform[0] ${^} s,.*/,-,
 .EE
 .RE
 .RE
@@ -437,19 +437,19 @@ specifiers are allowed:
 Clear the environment.  If used, this must be the very first argument.
 .TP
 \fI\-NAME\fR
-Unset the environment variable \INAME\fR.
+Unset the environment variable \fINAME\fR.
 .TP
 \fI\-NAME\fB=\fIVAL\fR
-Unset the environment variable \INAME\fR only if its value is \fIVAL\fR.
+Unset the environment variable \fINAME\fR only if its value is \fIVAL\fR.
 .TP
 \fINAME\fR
 Retain the environment variable \fINAME\fR.
 .TP
 \fINAME\fB=\fIVALUE\fR
-Set the environment variable \INAME\fB to the given \fIVALUE\fR.
+Set the environment variable \fINAME\fB to the given \fIVALUE\fR.
 .TP
 \fINAME\fB+=\fIVALUE\fR
-Retain the variable \INAME\fB and append \fIVALUE\fR to its value.  If
+Retain the variable \fINAME\fB and append \fIVALUE\fR to its value.  If
 no such variable is present in the environment, it is created and
 \fIVALUE\fR is assigned to it.  However, if \fIVALUE\fR starts with a
 punctuation character, this character is removed from it before the

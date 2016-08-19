@@ -1,0 +1,79 @@
+# This file is part of GNU Rush. 
+# Copyright (C) 2016 Sergey Poznyakoff
+#
+# GNU Rush is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3, or (at your option)
+# any later version.
+#
+# GNU Rush is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with GNU Rush.  If not, see <http://www.gnu.org/licenses/>.
+
+AT_SETUP([map])
+AT_KEYWORDS([map])
+
+AT_CHECK([
+myvars
+
+cat > passwd.rush <<EOT
+root:x:0:0::/root:/bin/bash
+$MY_USER:x:$MY_UID:$MY_GID:Me:/:/rush_special_shell
+EOT
+
+WD=`pwd`
+cat > test.conf <<EOT
+rule
+    map[[0]] $WD/passwd.rush : \${user} 1 7 /nologin
+EOT
+
+set -e
+echo Matching map
+rush -C none -Dcmdline,argv,prog -c 'command arg' test.conf
+
+echo No match, return default
+> passwd.rush
+rush -C none -Dcmdline,argv,prog -c 'command arg' test.conf
+
+echo No match, no default
+cat > test.conf <<EOT
+rule
+    map[[0]] $WD/passwd.rush : \${user} 1 7
+EOT
+rush -C none -Dcmdline,argv,prog -c 'command arg' test.conf
+],
+[0],
+[Matching map
+{
+    "cmdline":"/rush_special_shell arg",
+    "argv":[[
+        "/rush_special_shell",
+        "arg"
+    ]],
+    "prog":null
+}
+No match, return default
+{
+    "cmdline":"/nologin arg",
+    "argv":[[
+        "/nologin",
+        "arg"
+    ]],
+    "prog":null
+}
+No match, no default
+{
+    "cmdline":"command arg",
+    "argv":[[
+        "command",
+        "arg"
+    ]],
+    "prog":null
+}
+])
+
+AT_CLEANUP

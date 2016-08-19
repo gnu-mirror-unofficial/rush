@@ -1,0 +1,106 @@
+# This file is part of GNU Rush. 
+# Copyright (C) 2016 Sergey Poznyakoff
+#
+# GNU Rush is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3, or (at your option)
+# any later version.
+#
+# GNU Rush is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with GNU Rush.  If not, see <http://www.gnu.org/licenses/>.
+
+AT_SETUP([transform])
+AT_KEYWORDS([transform])
+
+AT_RUSH_TEST([
+rule
+    transform s/^[^[:space:]]+/& -t/
+],
+[cmdline,argv,prog],
+[svnserve],
+[0],
+[{
+    "cmdline":"svnserve -t",
+    "argv":[[
+        "svnserve",
+        "-t"
+    ]],
+    "prog":null
+}
+],
+[])
+
+AT_RUSH_TEST([
+rule
+    transform "\${command} end"  s/[[:space:]]+-[^[:space:]]+//g
+],
+[cmdline,argv,prog],
+[echo -c -t foo -n bar],
+[0],
+[{
+    "cmdline":"echo foo bar end",
+    "argv":[[
+        "echo",
+        "foo",	
+        "bar",
+        "end"	
+    ]],
+    "prog":null
+}
+],
+[])
+
+AT_RUSH_TEST([
+rule
+    transform[0] s|^[^/]|/usr/bin/&|
+],
+[cmdline,argv,prog],
+[echo foo],
+[0],
+[{
+    "cmdline":"/usr/bin/echo foo",
+    "argv":[[
+        "/usr/bin/echo",
+        "foo"
+    ]],
+    "prog":null
+}
+],
+[],
+
+[/bin/echo foo],
+[0],
+[{
+    "cmdline":"/bin/echo foo",
+    "argv":[[
+        "/bin/echo",
+        "foo"
+    ]],
+    "prog":null
+}
+],
+[])
+
+AT_RUSH_TEST([
+rule
+    transform[0] \${^} s,.*/,-,
+],
+[cmdline,argv,prog],
+[/bin/sh],
+[0],
+[{
+    "cmdline":"-sh",
+    "argv":[[
+        "-sh"
+    ]],
+    "prog":null
+}
+],
+[])
+
+AT_CLEANUP

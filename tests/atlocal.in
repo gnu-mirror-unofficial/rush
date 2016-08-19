@@ -3,6 +3,7 @@
 # Copyright (C) 2016 Sergey Poznyakoff
 
 PATH=@abs_builddir@:@abs_top_builddir@/src:$top_srcdir:$srcdir:$PATH
+RUSHDIR=@abs_top_builddir@/src
 myvars() {
     set -- $(myid)
     MY_USER=$1
@@ -10,3 +11,12 @@ myvars() {
     MY_GROUP=$3
     MY_GID=$4
 }
+myfilter() {
+    sed -e "s^$PWD^PWD^g" \
+        -e "s/$MY_USER/MY_USER/g" \
+	-e "s/$MY_UID/MY_UID/g" \
+	-e "s/$MY_GROUP/MY_GROUP/g" \
+	-e "s/$MY_GID/MY_GID/g" \
+	$@
+}
+	

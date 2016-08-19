@@ -1,0 +1,111 @@
+# This file is part of GNU Rush. 
+# Copyright (C) 2016 Sergey Poznyakoff
+#
+# GNU Rush is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3, or (at your option)
+# any later version.
+#
+# GNU Rush is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with GNU Rush.  If not, see <http://www.gnu.org/licenses/>.
+
+AT_SETUP([set])
+AT_KEYWORDS([set])
+
+AT_RUSH_TEST([
+rule
+  set ls /
+],
+[cmdline,argv,prog],
+[echo],
+[0],
+[{
+    "cmdline":"ls /",
+    "argv":[[
+        "ls",
+        "/"
+    ]],
+    "prog":null
+}
+],
+[])
+
+AT_RUSH_TEST([
+rule
+  set[0] /usr/bin/\$0 
+],
+[cmdline,argv,prog],
+[ls /],
+[0],
+[{
+    "cmdline":"/usr/bin/ls /",
+    "argv":[[
+        "/usr/bin/ls",
+        "/"
+    ]],
+    "prog":null
+}
+],
+[])
+
+AT_RUSH_TEST([
+rule
+  set[1] /chroot\${1} 
+],
+[cmdline,argv,prog],
+[ls /],
+[0],
+[{
+    "cmdline":"ls /chroot/",
+    "argv":[[
+        "ls",
+        "/chroot/"
+    ]],
+    "prog":null
+}
+],
+[])
+
+AT_RUSH_TEST([
+rule
+  set[^] /usr/bin/ls
+],
+[cmdline,argv,prog],
+[ls /],
+[0],
+[{
+    "cmdline":"ls /",
+    "argv":[[
+        "ls",
+        "/"
+    ]],
+    "prog":"/usr/bin/ls"
+}
+],
+[])
+
+AT_RUSH_TEST([
+rule
+  set[$] /tmp
+],
+[cmdline,argv,prog],
+[ls /],
+[0],
+[{
+    "cmdline":"ls /tmp",
+    "argv":[[
+        "ls",
+        "/tmp"
+    ]],
+    "prog":null
+}
+],
+[])
+
+
+AT_CLEANUP

@@ -349,18 +349,32 @@ expand_tilde(const char *dir, const char *home)
         return res;
 }
 
-static char *
-find_env(char *name, int val)
+static int
+find_env_pos(char **env, char *name, int *idx, int *valoff)
 {
         int nlen = strcspn(name, "?+=");
         int i;
 
-        for (i = 0; environ[i]; i++) {
-                size_t elen = strcspn(environ[i], "=");
-                if (elen == nlen && memcmp(name, environ[i], nlen) == 0)
-                        return val ? environ[i] + elen + 1 : environ[i];
+        for (i = 0; env[i]; i++) {
+                size_t elen = strcspn(env[i], "=");
+                if (elen == nlen && memcmp(name, env[i], nlen) == 0) {
+			if (idx)
+				*idx = i;
+			if (valoff)
+				*valoff = elen + 1;
+			return 0;
+		}
         }
-        return NULL;
+        return -1;
+}
+
+static char *
+find_env_ptr(char **env, char *name, int val)
+{
+	int i, j;
+	if (find_env_pos(env, name, &i, &j))
+		return NULL;
+	return val ? env[i] + j : env[i];
 }
 
 static int
@@ -459,23 +473,35 @@ env_setup(char **env)
                 } if ((p = strchr(env[i], '='))) {
                         if (p == env[i])
                                 continue; /* Ignore erroneous entry */
-                        if (p[-1] == '+') 
-                                new_env[n++] = env_concat(env[i],
-                                                          p - env[i] - 1,
-                                                          find_env(env[i], 1),
-                                                          p + 1);
-                        else if (p[1] == '+')
-                                new_env[n++] = env_concat(env[i],
-                                                          p - env[i],
-                                                          p + 2,
-                                                          find_env(env[i], 1));
-			else if (p[-1] == '?') {
-				if (!find_env(env[i], 0))
+                        if (p[-1] == '+') {
+				int j;
+				
+				if (find_env_pos(new_env, env[i], &j, NULL))
+					j = n++;
+				new_env[j] = env_concat(env[i],
+							p - env[i] - 1,
+							find_env_ptr(environ,
+								     env[i],
+								     1),
+							p + 1);
+			} else if (p[1] == '+') {
+				int j;
+				
+				if (find_env_pos(new_env, env[i], &j, NULL))
+					j = n++;
+                                new_env[j] = env_concat(env[i],
+							p - env[i],
+							p + 2,
+							find_env_ptr(environ,
+								     env[i],
+								     1));
+			} else if (p[-1] == '?') {
+				if (find_env_pos(environ, env[i], NULL, NULL))
 					new_env[n++] = p + 1;
 			} else
                                 new_env[n++] = env[i];
                 } else {
-                        p = find_env(env[i], 0);
+                        p = find_env_ptr(environ, env[i], 0);
                         if (p)
                                 new_env[n++] = p;
                 }
@@ -536,6 +562,7 @@ run_transforms(struct rush_rule *rule, struct rush_request *req)
         int i, arg_no, arg_end;
         int args_transformed = 0;
 	char *val, **target;
+	char *mem = NULL;
 	
 #define GET_TGT_VAL()							\
 	if (node->progmod) {						\
@@ -551,8 +578,17 @@ run_transforms(struct rush_rule *rule, struct rush_request *req)
 		debug(2, _("Modifying argv[%d]"), arg_no);		\
 	} 								\
 	if (node->pattern) {						\
-		val = rush_expand_string(node->pattern, req);		\
+		val = mem = rush_expand_string(node->pattern, req);	\
+	} else {							\
+		mem = NULL;						\
 	}
+#define FREE_VAL() do {				\
+		if (mem) {			\
+			free(mem);		\
+			mem = NULL;		\
+		}				\
+	} while (0)
+	
 
         for (node = rule->transform_head; node; node = node->next) {
                 switch (node->type) {
@@ -562,7 +598,13 @@ run_transforms(struct rush_rule *rule, struct rush_request *req)
                                 args_transformed = 0;
                         }
                         debug(2, "%s", _("Transforming command line"));
-                        p = transform_string(node->v.trans, req->cmdline);
+			if (node->pattern) {
+				val = rush_expand_string(node->pattern, req);
+				p = transform_string(node->v.trans, val);
+				free(val);
+			} else
+				p = transform_string(node->v.trans,
+						     req->cmdline);
                         free(req->cmdline);
                         req->cmdline = p;
                         debug(2, _("Command line: %s"), req->cmdline);
@@ -580,12 +622,14 @@ run_transforms(struct rush_rule *rule, struct rush_request *req)
                         req->cmdline = xstrdup(val);
                         debug(2, _("Command line: %s"), req->cmdline);
                         reparse_cmdline(req);
+			FREE_VAL();
                         break;
 			
                 case transform_arg:
 			GET_TGT_VAL();
                         p = transform_string(node->v.trans, val);
 			assign_string(target, p);
+			FREE_VAL();
 			break;
 
 		case transform_map:
@@ -603,6 +647,7 @@ run_transforms(struct rush_rule *rule, struct rush_request *req)
 				assign_string(target, p);
 			else
 				args_transformed = 0;
+			FREE_VAL();
 			break;
 
 		case transform_delarg:
@@ -631,7 +676,8 @@ run_transforms(struct rush_rule *rule, struct rush_request *req)
 
 		case transform_setarg:
 			GET_TGT_VAL();
-			assign_string(target, val);
+			assign_string(target, xstrdup(val));
+			FREE_VAL();
 			break;
                 }
         }
@@ -913,21 +959,6 @@ run_rule(struct rush_rule *rule, struct rush_request *req)
                     req->home_dir, strerror(errno));
 	}
 
-	if (req->interactive && !req->prog) {
-		char *p;
-		
-		req->prog = req->argv[0];
-		p = strrchr(req->prog, '/');
-		if (p)
-			++p;
-		else
-			p = req->prog;
-		req->argv[0] = xmalloc(strlen(p) + 2);
-		req->argv[0][0] = '-';
-		strcpy(req->argv[0] + 1, p);
-		rebuild_cmdline(req);
-	}
-	
         debug(2, _("Executing %s, %s"), PROGFILE(req), req->cmdline);
 	if (lint_option) {
 		if (dump_option)

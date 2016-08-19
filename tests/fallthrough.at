@@ -1,0 +1,65 @@
+# This file is part of GNU Rush. 
+# Copyright (C) 2016 Sergey Poznyakoff
+#
+# GNU Rush is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3, or (at your option)
+# any later version.
+#
+# GNU Rush is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with GNU Rush.  If not, see <http://www.gnu.org/licenses/>.
+
+AT_SETUP([fall-through])
+AT_KEYWORDS([fallthrough fall-through])
+
+AT_RUSH_TEST([
+rule
+    env - USER=$MY_USER STATUS='Fall-through working'
+    fall-through
+    
+rule
+    set[0] newcommand
+],
+[cmdline,environ],
+[command],
+[0],
+[{
+    "cmdline":"newcommand",
+    "environ":[[
+        "STATUS=Fall-through working",
+        "USER=MY_USER"
+    ]]
+}
+],
+[])
+
+AT_RUSH_TEST([
+rule
+    chdir /tmp
+    fall-through
+    
+rule
+    set[0] newcommand
+    interactive
+],
+[cmdline,interactive,home_dir],
+[interactive],
+[0],
+[{
+    "cmdline":"newcommand",
+    "interactive":1,
+    "home_dir":null    
+}
+],
+[])
+
+AT_CLEANUP
+
+
+
+

@@ -1,0 +1,87 @@
+# This file is part of GNU Rush. 
+# Copyright (C) 2016 Sergey Poznyakoff
+#
+# GNU Rush is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3, or (at your option)
+# any later version.
+#
+# GNU Rush is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with GNU Rush.  If not, see <http://www.gnu.org/licenses/>.
+
+AT_SETUP([delete])
+AT_KEYWORDS([delete])
+
+AT_RUSH_TEST([
+rule
+  delete[1]
+],
+[cmdline,argv,prog],
+[echo foo bar],
+[0],
+[{
+    "cmdline":"echo bar",
+    "argv":[[
+        "echo",
+        "bar"
+    ]],
+    "prog":null
+}
+],
+[])
+
+AT_RUSH_TEST([
+rule
+  delete[$]
+],
+[cmdline,argv,prog],
+[echo foo bar],
+[0],
+[{
+    "cmdline":"echo foo",
+    "argv":[[
+        "echo",
+        "foo"
+    ]],
+    "prog":null
+}
+],
+[])
+
+AT_RUSH_TEST([
+rule
+  delete 2 4
+],
+[cmdline,argv,prog],
+[echo foo bar baz quux wum],
+[0],
+[{
+    "cmdline":"echo foo wum",
+    "argv":[[
+        "echo",
+        "foo",
+        "wum"
+    ]],
+    "prog":null
+}
+],
+[])
+
+AT_RUSH_TEST([
+rule
+  delete[0]
+],
+[cmdline,argv,prog],
+[echo foo bar],
+[1],
+[],
+[rush: Error: Deleting argv[[0]] is prohibited
+])
+
+AT_CLEANUP
+

@@ -814,7 +814,7 @@ The example below replaces the 0th argument with the base name of the
 command, prefixed by a dash:
 
 @smallexample
-transform[0] $@{^@} s,.*/,-
+transform[0] $@{^@} s,.*/,-,
 @end smallexample
 
 For instance, if the command name is @samp{/bin/bash}, @samp{argv[0]} will
