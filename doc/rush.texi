@@ -1105,8 +1105,11 @@ program will be executed.
 Modify the environment.
 @end deffn
 
-Its argument is a whitespace-delimited list of specifiers.  The
-following specifiers are understood: 
+Its arguments are a whitespace-delimited list of specifiers.  Each
+specifier can contain references to variables from the inherited
+environment.  The reference syntax is the same as in Bourne shell.
+
+The following specifiers are understood: 
 
 @table @asis
 @item - (a dash)
@@ -1140,6 +1143,12 @@ PATH+=:/sbin
 In this example, if @env{PATH} exists, @samp{:/sbin} will be appended
 to it.  Otherwise, it will be created and @samp{/sbin} will be
 assigned to it.
+
+This is roughly equivalent to
+
+@smallexample
+PATH=$PATH:/sbin
+@end smallexample
 
 @item @var{name}=+@var{value}
 Retain variable @var{name} and prepend @var{value} to its value.  If

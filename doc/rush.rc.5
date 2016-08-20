@@ -13,7 +13,7 @@
 .\"
 .\" You should have received a copy of the GNU General Public License
 .\" along with GNU Rush.  If not, see <http://www.gnu.org/licenses/>.
-.TH RUSH.RC 1 "August 19, 2016" "RUSH.RC" "Rush User Reference"
+.TH RUSH.RC 1 "August 20, 2016" "RUSH.RC" "Rush User Reference"
 .SH NAME
 rush.rc \- configuration rules for rush.
 .SH DESCRIPTION
@@ -429,8 +429,12 @@ The use of the \fBL\fR resource automatically enables forked mode.
 .TP
 \fIenv\fR \fIARG\fR...
 Modifies the execution environment.  Arguments are a list of
-specifiers separated by any amount of whitespace.  The following
-specifiers are allowed:
+specifiers separated by any amount of whitespace.  Each
+specifier can contain references to variables from the inherited
+environment.  The reference syntax is the same as in
+.BR sh (1).
+
+The following specifiers are allowed:
 .RS
 .TP
 \fI\-\fR (a dash)

@@ -1416,6 +1416,7 @@ _parse_newgroup(input_buf_ptr ibuf, struct rush_rule *rule,
 #define TOK_NEWBUF 0x10   /* Token may create new input buffer */
 #define TOK_CRT    0x24   /* Index after the token may contain ^ */
 #define TOK_SED    0x42   /* Arguments contain sed-exprs */
+#define TOK_ENV    0x80   /* Expand environment variables */
 #define TOK_DFL   TOK_ARG|TOK_RUL
 #define TOK_DFLN  TOK_ARGN|TOK_RUL
 
@@ -1449,7 +1450,7 @@ struct token toktab[] = {
 	{ KW("chroot"),           TOK_DFL, _parse_chroot },
 	{ KW("limits"),           TOK_DFL, _parse_limits },
 	{ KW("chdir"),            TOK_DFL, _parse_chdir },
-	{ KW("env"),              TOK_DFLN, _parse_env },
+	{ KW("env"),              TOK_DFLN|TOK_ENV, _parse_env },
 	{ KW("fork"),             TOK_DFL, _parse_fork },
 	{ KW("acct"),             TOK_DFL, _parse_acct },
 	{ KW("post-socket"),      TOK_DFL, _parse_post_socket },
@@ -1577,7 +1578,7 @@ parse_input_buf(input_buf_ptr ibuf)
 			}
 		}
 		
-		if (tok->flags & (TOK_ARG || TOK_ARGN) && !(val && *val)) {
+		if (tok->flags & (TOK_ARG | TOK_ARGN) && !(val && *val)) {
 			logmsg(LOG_NOTICE,
 			       _("%s:%d: invalid statement: missing value"),
 			       ibuf->file, ibuf->line);
@@ -1592,6 +1593,12 @@ parse_input_buf(input_buf_ptr ibuf)
 			if (tok->flags & TOK_SED)
 				flags |= WRDSF_SED_EXPR;
 
+			if (tok->flags & TOK_ENV) {
+				flags &= ~WRDSF_NOVAR;
+				flags |= WRDSF_ENV;
+				ws.ws_env = (const char **) environ;
+			}
+			
 			ws.ws_comment = "#";
 			if (wordsplit(val, &ws, flags)) {
 				logmsg(LOG_NOTICE,

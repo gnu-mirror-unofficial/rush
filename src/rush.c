@@ -348,11 +348,16 @@ expand_tilde(const char *dir, const char *home)
                 res = xstrdup(dir);
         return res;
 }
-
+
+/* Find variable NAME in environment ENV.
+   On success, store the index of the ENV slot in *IDX,
+   the offset of the value (position right past '=') in *VALOFF, and
+   return 0 (IDX and/or VALOFF can be NULL, if that info is not needed).
+   Return -1 if NAME was not found. */
 static int
 find_env_pos(char **env, char *name, int *idx, int *valoff)
 {
-        int nlen = strcspn(name, "?+=");
+        int nlen = strcspn(name, "+=");
         int i;
 
         for (i = 0; env[i]; i++) {
@@ -368,6 +373,10 @@ find_env_pos(char **env, char *name, int *idx, int *valoff)
         return -1;
 }
 
+/* Find variable NAME in environment ENV.
+   On success, return pointer to the variable assignment (if VAL is 0),
+   or to the value (if VAL is 1).
+   Return NULL if NAME is not present in ENV. */
 static char *
 find_env_ptr(char **env, char *name, int val)
 {
@@ -377,8 +386,9 @@ find_env_ptr(char **env, char *name, int val)
 	return val ? env[i] + j : env[i];
 }
 
+/* Return 1 if ENV contains a matching unset statement for variable NAME. */
 static int
-locate_unset(char **env, const char *name)
+var_is_unset(char **env, const char *name)
 {
         volatile int i;
         int nlen = strcspn(name, "=");
@@ -433,7 +443,7 @@ env_setup(char **env)
 {
         char **old_env = environ;
         char **new_env;
-        int count, i, n;
+        int count, i, j, n;
         
         if (!env)
                 return old_env;
@@ -460,24 +470,26 @@ env_setup(char **env)
         
         if (old_env)
                 for (i = 0; old_env[i]; i++) {
-                        if (!locate_unset(env, old_env[i]))
+                        if (!var_is_unset(env, old_env[i]))
                                 new_env[n++] = old_env[i];
                 }
 
         for (i = 0; env[i]; i++) {
                 char *p;
                 
-                if (env[i][0] == '-') {
+                if (env[i][0] == '-')
                         /* Skip unset directives. */
                         continue;
-                } if ((p = strchr(env[i], '='))) {
+
+		/* Find the slot for the variable.  Use next available
+		   slot if there's no such variable in new_env */
+		if (find_env_pos(new_env, env[i], &j, NULL))
+			j = n;
+		
+		if ((p = strchr(env[i], '='))) {
                         if (p == env[i])
                                 continue; /* Ignore erroneous entry */
                         if (p[-1] == '+') {
-				int j;
-				
-				if (find_env_pos(new_env, env[i], &j, NULL))
-					j = n++;
 				new_env[j] = env_concat(env[i],
 							p - env[i] - 1,
 							find_env_ptr(environ,
@@ -485,31 +497,26 @@ env_setup(char **env)
 								     1),
 							p + 1);
 			} else if (p[1] == '+') {
-				int j;
-				
-				if (find_env_pos(new_env, env[i], &j, NULL))
-					j = n++;
                                 new_env[j] = env_concat(env[i],
 							p - env[i],
 							p + 2,
 							find_env_ptr(environ,
 								     env[i],
 								     1));
-			} else if (p[-1] == '?') {
-				if (find_env_pos(environ, env[i], NULL, NULL))
-					new_env[n++] = p + 1;
 			} else
-                                new_env[n++] = env[i];
-                } else {
-                        p = find_env_ptr(environ, env[i], 0);
-                        if (p)
-                                new_env[n++] = p;
-                }
+                                new_env[j] = env[i];
+                } else if ((p = find_env_ptr(environ, env[i], 0)))
+			new_env[j] = p;
+		else
+			continue;
+		/* Adjust environment size */
+		if (j == n)
+			++n;
         }
         new_env[n] = NULL;
         return new_env;
 }
-
+
 void
 reparse_cmdline(struct rush_request *req)
 {
@@ -553,134 +560,198 @@ assign_string(char **pstr, char *val)
 	free(*pstr);
 	*pstr = val;
 }
+
+static int
+transform_cmdline_fun(struct rush_request *req, struct transform_node *node,
+		      char *val, char **return_val)
+{
+	char *p;
+	
+	debug(2, "%s", _("Transforming command line"));
+	if (node->pattern) {
+		char *val = rush_expand_string(node->pattern, req);
+		p = transform_string(node->v.trans, val);
+		free(val);
+	} else
+		p = transform_string(node->v.trans, req->cmdline);
+	assign_string(&req->cmdline, p);
+	debug(2, _("Command line: %s"), req->cmdline);
+	return 0;
+}
+
+int
+transform_setcmd_fun(struct rush_request *req, struct transform_node *node,
+		     char *val, char **return_val)
+{
+	debug(2, "%s", _("Setting command line"));
+	assign_string(&req->cmdline, xstrdup(val));
+	debug(2, _("Command line: %s"), req->cmdline);
+	return 0;
+}
+
+int
+transform_arg_fun(struct rush_request *req, struct transform_node *node,
+		  char *val, char **return_val)
+{
+	char *p = transform_string(node->v.trans, val);
+	assign_string(return_val, p);
+	return 1;
+}
+
+int
+transform_map_fun(struct rush_request *req, struct transform_node *node,
+		  char *val, char **return_val)
+{
+	char *p;
+	debug(2,
+	      _("Transformation map: %s, %s, %s, %u, %u, %s"),
+	      node->v.map.file,
+	      node->v.map.delim,
+	      node->v.map.key,
+	      node->v.map.key_field,
+	      node->v.map.val_field,
+	      node->v.map.defval);
+	p = map_string(&node->v.map, req);
+	if (p) {
+		assign_string(return_val, p);
+		return 1;
+	}
+	return 0;
+}
+
+int
+transform_delarg_fun(struct rush_request *req, struct transform_node *node,
+		     char *val, char **return_val)
+{
+	int i, arg_no, arg_end;
+	
+	arg_no = get_arg_no(node->arg_no, req);
+	arg_end = get_arg_no(node->v.arg_end, req);
+	if (arg_end < arg_no) {
+		int x = arg_end;
+		arg_end = arg_no;
+		arg_no = x;
+	}
+	debug(2, _("Deleting arguments %d-%d"), arg_no, arg_end);
+	if (arg_no == 0 || arg_end == 0)
+		die(config_error,
+		    &req->i18n, _("Deleting argv[0] is prohibited"));
+	for (i = arg_no; i <= arg_end; i++) 
+		free(req->argv[i]);
+	i = arg_end - arg_no + 1;
+	memmove(req->argv + arg_no,
+		req->argv + arg_end + 1,
+		(req->argc - i) * sizeof(req->argv[0]));
+	req->argc -= i;
+	return 1;
+}
+
+int
+transform_setarg_fun(struct rush_request *req, struct transform_node *node,
+		     char *val, char **return_val)
+{
+	assign_string(return_val, xstrdup(val));
+	return 1;
+}
+
+
+/* Transform flags */
+#define XFORM_DFL         0x00 /* Default: nothing */
+#define XFORM_CMDLINE     0x01 /* Function operates on entire command line */
+#define XFORM_VALUE       0x02 /* Function needs value */
+#define XFORM_CHARGV      0x04 /* Function can change argv */
+
+struct transform_function
+{
+	int flags;
+	int (*func)(struct rush_request *req, struct transform_node *node,
+		    char *val, char **return_val);
+};
+
+static struct transform_function transform_funtab[] = {
+	[transform_cmdline] = {
+		XFORM_CMDLINE,
+		transform_cmdline_fun
+	},
+	[transform_setcmd]  = {
+		XFORM_CMDLINE|XFORM_VALUE,
+		transform_setcmd_fun
+	},
+	[transform_arg]     = {
+		XFORM_VALUE,
+		transform_arg_fun
+	},
+	[transform_map]     = {
+		XFORM_VALUE,
+		transform_map_fun
+	},
+	[transform_delarg]  = {
+		XFORM_CHARGV,
+		transform_delarg_fun
+	},
+	[transform_setarg]  = {
+		XFORM_VALUE,
+		transform_setarg_fun
+	}
+};	
+static int transform_count =
+	sizeof(transform_funtab)/sizeof(transform_funtab[0]);
 
 void
 run_transforms(struct rush_rule *rule, struct rush_request *req)
 {
         struct transform_node *node;
-        char *p;
-        int i, arg_no, arg_end;
-        int args_transformed = 0;
 	char *val, **target;
 	char *mem = NULL;
+        int args_transformed = 0;
+	int res;
+	int flags;
 	
-#define GET_TGT_VAL()							\
-	if (node->progmod) {						\
-		arg_no = 0;						\
-		target = &req->prog;					\
-		val = PROGFILE(req);					\
-		debug(2, _("Modifying program name (%s)"), val);	\
-	} else {							\
-		arg_no = get_arg_no(node->arg_no, req);			\
-		target = &req->argv[arg_no];				\
-		val = *target;						\
-		args_transformed = 1;					\
-		debug(2, _("Modifying argv[%d]"), arg_no);		\
-	} 								\
-	if (node->pattern) {						\
-		val = mem = rush_expand_string(node->pattern, req);	\
-	} else {							\
-		mem = NULL;						\
-	}
-#define FREE_VAL() do {				\
-		if (mem) {			\
-			free(mem);		\
-			mem = NULL;		\
-		}				\
-	} while (0)
-	
-
         for (node = rule->transform_head; node; node = node->next) {
-                switch (node->type) {
-                case transform_cmdline:
-                        if (args_transformed) {
-                                rebuild_cmdline(req);
-                                args_transformed = 0;
-                        }
-                        debug(2, "%s", _("Transforming command line"));
-			if (node->pattern) {
-				val = rush_expand_string(node->pattern, req);
-				p = transform_string(node->v.trans, val);
-				free(val);
-			} else
-				p = transform_string(node->v.trans,
-						     req->cmdline);
-                        free(req->cmdline);
-                        req->cmdline = p;
-                        debug(2, _("Command line: %s"), req->cmdline);
-                        reparse_cmdline(req);
-                        break;
+		if (node->type < 0 || node->type >= transform_count)
+			die(system_error, &req->i18n,
+			    _("%s:%d: internal error"), __FILE__, __LINE__);
 
-		case transform_setcmd:
-			GET_TGT_VAL();
-			if (args_transformed) {
-                                rebuild_cmdline(req);
-                                args_transformed = 0;
-                        }
-                        debug(2, "%s", _("Setting command line"));
-                        free(req->cmdline);
-                        req->cmdline = xstrdup(val);
-                        debug(2, _("Command line: %s"), req->cmdline);
-                        reparse_cmdline(req);
-			FREE_VAL();
-                        break;
-			
-                case transform_arg:
-			GET_TGT_VAL();
-                        p = transform_string(node->v.trans, val);
-			assign_string(target, p);
-			FREE_VAL();
-			break;
-
-		case transform_map:
-			GET_TGT_VAL();
-			debug(2,
-			      _("Transformation map: %s, %s, %s, %u, %u, %s"),
-			      node->v.map.file,
-			      node->v.map.delim,
-			      node->v.map.key,
-			      node->v.map.key_field,
-			      node->v.map.val_field,
-			      node->v.map.defval);
-                        p = map_string(&node->v.map, req);
-			if (p) 
-				assign_string(target, p);
-			else
-				args_transformed = 0;
-			FREE_VAL();
-			break;
-
-		case transform_delarg:
-			arg_no = get_arg_no(node->arg_no, req);
-			arg_end = get_arg_no(node->v.arg_end, req);
-			if (arg_end < arg_no) {
-				int x = arg_end;
-				arg_end = arg_no;
-				arg_no = x;
+		val = NULL;
+		target = NULL;
+		flags = transform_funtab[node->type].flags;
+		
+		if ((flags & XFORM_CMDLINE) && args_transformed) {
+			rebuild_cmdline(req);
+			args_transformed = 0;
+		}
+		
+		if (flags & XFORM_VALUE) {
+			if (node->progmod) {
+				target = &req->prog;
+				val = PROGFILE(req);
+				debug(2, _("Modifying program name (%s)"), val);
+				flags &= ~XFORM_CHARGV;
+			} else {
+				int arg_no = get_arg_no(node->arg_no, req);
+				target = &req->argv[arg_no];
+				val = *target;
+				flags |= XFORM_CHARGV;
+				debug(2, _("Modifying argv[%d]"), arg_no);
 			}
-			debug(2, _("Deleting arguments %d-%d"),
-			      arg_no, arg_end);
-			if (arg_no == 0 || arg_end == 0)
-				die(config_error,
-				    &req->i18n, _("Deleting argv[0] is prohibited"));
-			for (i = arg_no; i <= arg_end; i++) 
-				free(req->argv[i]);
-			i = arg_end - arg_no + 1;
-			memmove(req->argv + arg_no,
-				req->argv + arg_end + 1,
-				(req->argc - i)
-				  * sizeof(req->argv[0]));
-			req->argc -= i;
-			args_transformed = 1;
-			break;
-
-		case transform_setarg:
-			GET_TGT_VAL();
-			assign_string(target, xstrdup(val));
-			FREE_VAL();
-			break;
-                }
-        }
+			if (node->pattern) {
+				mem = rush_expand_string(node->pattern, req);
+				val = mem;
+			} else {
+				mem = NULL;
+			}
+		}
+		res = transform_funtab[node->type].func(req, node,
+							val, target);
+		if (flags & XFORM_CHARGV)
+			args_transformed = res;
+		if (flags & XFORM_CMDLINE)
+			reparse_cmdline(req);
+		if (mem) {
+			free(mem);
+			mem = NULL;
+		}
+	}
 
         if (args_transformed) 
                 rebuild_cmdline(req);
