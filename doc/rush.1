@@ -13,18 +13,20 @@
 .\"
 .\" You should have received a copy of the GNU General Public License
 .\" along with GNU Rush.  If not, see <http://www.gnu.org/licenses/>.
-.TH RUSH 1 "August 17, 2016" "RUSH" "Rush User Reference"
+.TH RUSH 1 "August 20, 2016" "RUSH" "Rush User Reference"
 .SH NAME
 rush \- restricted user shell
 .SH SYNOPSIS
 \fBrush\fR\
  [\fB\-ht\fR]\
  [\fB\-C\fR \fICHECK\fR]\
+ [\fB\-D\fR \fIATTR\fR[\fB,\fIATTR\fR...]]\
  [\fB\-c\fR \fICOMMAND\fR]\
  [\fB\-d\fR \fINUMBER\fR]\
  [\fB\-i\fR]\
  [\fB\-u\fR \fIUSER\fR]\
  [\fB\-\-debug\fR \fINUMBER\fR]\
+ [\fB\-\-dump=\fIATTR\fR[\fB,\fIATTR\fR...]]\
  [\fB\-\-help\fR]\
  [\fB\-\-show\-default\fR]\
  [\fB\-\-usage\fR]\
@@ -73,6 +75,13 @@ using
 priority
 .BR debug .
 Maximum meaningful value for \fINUMBER\fR is \fB3\fR.
+.TP
+\fB\-D\fR, \fB\-\-dump=\fIATTR\fR[\fB,\fIATTR\fR...]
+Request dump mode.  Arguments are the names of the attributes to be
+dumped, or the word
+.B all
+standing for all attributes.  Refer to the GNU Rush manual for a
+detailed description.
 .TP
 \fB\-t\fR, \fB\-\-test\fR, \fB\-\-lint
 Run in test mode.  When this option is given, the following occurs:

@@ -2420,6 +2420,115 @@ $ rush --test --debug=2 -c "cvs server" sample.rc
 @end smallexample
 @end enumerate
 
+@menu
+* dump mode::
+@end menu
+
+@node dump mode
+@section Dump Mode
+@cindex dump mode
+Dump mode is similar to test mode.  The main difference is that in
+this mode, @command{rush} dumps on the standard error a description of
+the user request after performing all checks and transformations.
+
+@opindex --dump
+@opindex -D
+The mode is requested by the @option{--dump=@var{attr}} (@option{-D
+@var{attr}}) option.  The argumen @var{attr} is a comma-separated list
+of the names of attributes to be included in the dump, or the word
+@samp{all}, standing for all attributes.
+
+Additional options and arguments are the same as for the
+@option{--test} option.
+
+The description is formatted as a JSON object@footnote{Well, almost.
+It diverges from the JSON standard in that slash characters are not
+escaped in string objects.} with the following attributes.  These are
+also the allowed values for the @var{attr} list:
+
+@table @asis
+@kwindex cmdline, dump attribute
+@item cmdline
+Command line after transformations.
+
+@kwindex argv, dump attribute
+@item argv
+Array of command line arguments after transformations.
+
+@kwindex prog, dump attribute
+@item prog
+Name of the program to be executed.  If @samp{null}, @code{argv[0]}
+will be used.
+
+@kwindex interactive, dump attribute
+@item interactive
+@samp{0} for normal requests, @samp{1} for interactive requests.
+
+@kwindex pw_name, dump attribute
+@item pw_name
+Name of the user from the system user database.
+
+@kwindex pw_uid, dump attribute
+@item pw_uid
+UID of the user.
+
+@kwindex pw_gid, dump attribute
+@item pw_gid
+GID of the user.
+
+@kwindex pw_dir, dump attribute
+@item pw_dir
+Home directory of the user, as set in the system user database. 
+
+@kwindex umask, dump attribute
+@item umask
+Value of the umask (octal).
+
+@kwindex chroot_dir, dump attribute
+@item chroot_dir
+Chroot directory.
+
+@kwindex home_dir, dump attribute
+@item home_dir
+Current working direcory.
+
+@kwindex gid, dump attribute
+@item gid
+New GID as set by the @code{newgrp} action, or @samp{-1} if
+unchanged.
+
+@kwindex fork, dump attribute
+@item fork
+Fork mode.  It is a three-state attribute: @samp{0} meaning
+@dfn{disabled}, @samp{1} meaning @dfn{enabled}, and @samp{-1} meaning
+@dfn{default state}.
+
+@kwindex acct, dump attribute
+@item acct
+Accounting mode.  See @samp{fork}, for a description of possible
+values.
+
+@kwindex text_domain, dump attribute
+@item text_domain
+Textual domain for i18n.
+
+@kwindex localedir, dump attribute
+@item localedir
+Locale directory for i18n.
+
+@kwindex locale, dump attribute
+@item locale
+Locale name
+
+@kwindex environ, dump attribute
+@item environ
+Dump of the environment (array of assignments).
+@end table
+
+@kwindex all, dump attribute
+The attribute @samp{all} stands for all attribute in the same order as
+listed in the table above.
+
 @node Option Summary
 @chapter Option Summary
 @cindex options, command line
@@ -2444,6 +2553,14 @@ Configure security checks for the main configuration file.
 @item -d @var{number}
 @itemx --debug=@var{number}
 Set debugging level.
+
+@opindex -D
+@opindex --dump
+@item --dump=@var{attrs}
+@itemx -D @var{attrs}
+Run in @dfn{request dump mode}.  Argument is a comma-separated list of
+attribute names.  @xref{dump mode}, for a detailed description of the
+request dump mode.
 
 @opindex -i, @r{rush}
 @item -i
