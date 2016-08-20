@@ -180,7 +180,7 @@ struct rush_rule {
 	
 	/* Source location */
 	const char *file;                 /* Configuration file name */
-	size_t line;                      /* and line number. */
+	int line;                         /* and line number. */
 	
 	/* Match parameters */
 	struct test_node *test_head, *test_tail;

@@ -418,7 +418,7 @@ env_concat(char *name, size_t namelen, char *a, char *b)
         if (a && b) {
                 res = xmalloc(namelen + 1 + strlen(a) + strlen(b) + 1);
                 strcpy(res + namelen + 1, a);
-                strcat(res, b);
+                strcat(res + namelen + 1, b);
         } else if (a) {
                 len = strlen(a);
                 if (c_ispunct(a[len-1]))

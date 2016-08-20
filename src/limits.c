@@ -41,7 +41,7 @@ struct limits_rec {
         rlim_t   limit_nofile;
         rlim_t   limit_rss;
         rlim_t   limit_stack;
-        int      limit_logins;
+        size_t   limit_logins;
         int      limit_prio;  
 };
 
@@ -76,7 +76,7 @@ set_prio(int prio)
 
 /* Counts the number of user logins and check against the limit */
 static int
-check_logins(const char *name, int limit)
+check_logins(const char *name, size_t limit)
 {
         size_t count = 0;
 	struct rush_wtmp *wtmp = 0;
@@ -116,16 +116,16 @@ check_logins(const char *name, int limit)
 
 	rushdb_close();
 	
-        debug(3, _("counted %d/%d logins for %s"), count, limit, name);
+        debug(3, _("counted %zu/%zu logins for %s"), count, limit, name);
 
         /*
          * This is called after setutmp(), so the number of logins counted
          * includes the user who is currently trying to log in.
          */
         if (count >= limit) {
-                debug(2, _("Too many logins (max %d) for %s"),
+                debug(2, _("Too many logins (max %zu) for %s"),
 		       limit, name);
-                logmsg(LOG_ERR, _("Too many logins (max %d) for %s"),
+                logmsg(LOG_ERR, _("Too many logins (max %zu) for %s"),
                        limit, name);
                 return 1;
         }
@@ -185,7 +185,7 @@ set_user_limits(const char *name, struct limits_rec *lrec)
         if (lrec->set & SET_LIMIT_LOGINS)
                 rc |= check_logins(name, lrec->limit_logins);
         if (lrec->set & SET_LIMIT_PRIO)
-                rc |= set_prio(lrec->limit_logins);
+                rc |= set_prio(lrec->limit_prio);
         return rc;
 }
 
@@ -303,9 +303,8 @@ parse_limits(limits_record_t *plrec, char *str, char **endp)
                         break;
                 case 'l':
                 case 'L':
-                        lrec->limit_logins = strtol(str, &str, 10);
-                        if (lrec->limit_logins >= 0)
-                                lrec->set |= SET_LIMIT_LOGINS;
+                        lrec->limit_logins = strtoul(str, &str, 10);
+			lrec->set |= SET_LIMIT_LOGINS;
                         break;
                 case 'p':
                 case 'P':
