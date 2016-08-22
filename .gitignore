@@ -1,13 +1,13 @@
 *.diff
+*.o
 *.orig
 *.rej
 *.tar.*
-*.o
 *~
-.deps
-.gdbinit
 .bootstrap
+.deps
 .emacs*
+.gdbinit
 ABOUT-NLS
 ChangeLog
 INSTALL

@@ -868,7 +868,7 @@ the interaction is defined to be: ignore matches before the
 @var{number}th on.
 @end table
 
-Any delimiter can be used in lieue of @samp{/}, the only requirement being
+Any delimiter can be used in lieu of @samp{/}, the only requirement being
 that it be used consistently throughout the expression.  For example,
 the following two expressions are equivalent:
 
@@ -1378,8 +1378,8 @@ and used instead of @var{message}.  For example:
 @end smallexample
 
   If the characters after @samp{@@} do not correspond to any
-predefefined error message name, an error of type @samp{config-error}
-is signalled and @command{rush} exits.
+predefined error message name, an error of type @samp{config-error}
+is signaled and @command{rush} exits.
 
   If you need to begin your exit message with a @samp{@@} sign,
 duplicate it, as in this example:
@@ -2434,7 +2434,7 @@ the user request after performing all checks and transformations.
 @opindex --dump
 @opindex -D
 The mode is requested by the @option{--dump=@var{attr}} (@option{-D
-@var{attr}}) option.  The argumen @var{attr} is a comma-separated list
+@var{attr}}) option.  The argument @var{attr} is a comma-separated list
 of the names of attributes to be included in the dump, or the word
 @samp{all}, standing for all attributes.
 
@@ -2490,7 +2490,7 @@ Chroot directory.
 
 @kwindex home_dir, dump attribute
 @item home_dir
-Current working direcory.
+Current working directory.
 
 @kwindex gid, dump attribute
 @item gid
