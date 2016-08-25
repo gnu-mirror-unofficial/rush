@@ -32,7 +32,7 @@ rule
     "cmdline":"newcommand",
     "environ":[[
         "STATUS=Fall-through working",
-        "USER=MY_USER"
+        "USER=$MY_USER"
     ]]
 }
 ],

@@ -25,7 +25,7 @@ rule
 [command],
 [0],
 [{
-    "home_dir":"PWD"
+    "home_dir":"$TESTDIR"
 }
 ],
 [])

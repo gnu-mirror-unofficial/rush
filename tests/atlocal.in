@@ -10,13 +10,5 @@ myvars() {
     MY_UID=$2
     MY_GROUP=$3
     MY_GID=$4
+    TESTDIR=$(pwd)
 }
-myfilter() {
-    sed -e "s^$PWD^PWD^g" \
-        -e "s/$MY_USER/MY_USER/g" \
-	-e "s/$MY_UID/MY_UID/g" \
-	-e "s/$MY_GROUP/MY_GROUP/g" \
-	-e "s/$MY_GID/MY_GID/g" \
-	$@
-}
-	

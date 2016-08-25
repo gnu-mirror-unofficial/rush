@@ -39,7 +39,7 @@ rule
 [echo foo],
 [1],
 [],
-[rush: Error: no matching rule for "echo foo", user MY_USER
+[rush: Error: no matching rule for "echo foo", user $MY_USER
 ])
 
 

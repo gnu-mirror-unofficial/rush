@@ -21,7 +21,7 @@ AT_CHECK([
 myvars
 
 cat > passwd.rush <<EOT
-root:x:0:0::/root:/bin/bash
+x$MY_USER:x:$(($MY_UID + 1)):$(($MY_GID + 1))::/root:/bin/bash
 $MY_USER:x:$MY_UID:$MY_GID:Me:/:/rush_special_shell
 EOT
 

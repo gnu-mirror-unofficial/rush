@@ -21,17 +21,15 @@ m4_define([m4_run_rush],[m4_ifval([$2],[dnl
 echo "# $2"
 echo "# $2" >&2
 m4_ifset([RUSH_ENVIRON],[env RUSH_ENVIRON $RUSHDIR/])rush -C none -D$1 dnl
-m4_if([$2],[interactive],[-i],[-c "$2"]) test.conf 2>err 1>out
+m4_if([$2],[interactive],[-i],[-c "$2"]) test.conf
 echo "# $?"
-myfilter out
-myfilter err >&2
 $0([$1],m4_shiftn(5, $@))])])
 
 dnl m4_fmt_out([CMD],[EC],[STDOUT],[STDERR],...)
 m4_define([m4_fmt_out],[m4_ifval([$1],[dnl
 # $1
-# $2
 $3[]dnl
+# $2
 $0(m4_shift(m4_shift3($@)))])])
 
 dnl m4_fmt_err([CMD],[EC],[STDOUT],[STDERR],...)
@@ -42,8 +40,8 @@ $0(m4_shift(m4_shift3($@)))])])
 
 dnl AT_RUSH_TEST([CONFIG],[KW], [CMD],[EC],[STDOUT],[STDERR])
 m4_define([AT_RUSH_TEST],[
-AT_CHECK([
 myvars
+AT_CHECK_UNQUOTED([
 cat > test.conf <<EOT
 [$1]
 EOT

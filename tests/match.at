@@ -39,7 +39,7 @@ rule
 [/usr/bin/echo bar],
 [1],
 [],
-[rush: Error: no matching rule for "/usr/bin/echo bar", user MY_USER
+[rush: Error: no matching rule for "/usr/bin/echo bar", user $MY_USER
 ])
 
 AT_CLEANUP
