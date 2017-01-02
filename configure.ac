@@ -1,5 +1,5 @@
 # This file is part of GNU Rush.                  -*- Autoconf -*-
-# Copyright (C) 2008-2011, 2013-2016 Sergey Poznyakoff
+# Copyright (C) 2008-2011, 2013-2017 Sergey Poznyakoff
 #
 # GNU Rush is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
