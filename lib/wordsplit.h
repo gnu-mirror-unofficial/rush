@@ -1,5 +1,5 @@
 /* wordsplit - a word splitter
-   Copyright (C) 2009-2017 Sergey Poznyakoff
+   Copyright (C) 2009-2018 Sergey Poznyakoff
 
    This program is free software; you can redistribute it and/or modify it
    under the terms of the GNU General Public License as published by the
@@ -26,9 +26,11 @@ typedef struct wordsplit wordsplit_t;
    provide return values when the function returns.  If neither mark is
    used, the member is internal and must not be used by the caller.
 
-   In the comments below, the
-   identifiers in parentheses indicate bits that must be set (or unset, if
-   starting with !) in the ws_flags to initialize or use the given member.
+   In the comments below, the identifiers in parentheses indicate bits that
+   must be set (or unset, if starting with !) in ws_flags (if starting with
+   WRDSF_) or ws_options (if starting with WRDSO_) to initialize or use the
+   given member.
+   
    If not redefined explicitly, most of them are set to some reasonable
    default value upon entry to wordsplit(). */
 struct wordsplit            
@@ -39,8 +41,13 @@ struct wordsplit
 			       elements in ws_wordv to fill with NULLs. */
   size_t ws_wordn;          /* Number of elements ws_wordv can accomodate. */ 
   int ws_flags;             /* [Input] Flags passed to wordsplit. */
-  int ws_options;           /* [Input] (WRDSF_PATHEXPAND)
+  int ws_options;           /* [Input] (WRDSF_OPTIONS)
 			       Additional options. */
+  size_t ws_maxwords;       /* [Input] (WRDSO_MAXWORDS) Return at most that
+			       many words */
+  size_t ws_wordi;          /* [Output] (WRDSF_INCREMENTAL) Total number of
+			       words returned so far */
+
   const char *ws_delim;     /* [Input] (WRDSF_DELIM) Word delimiters. */
   const char *ws_comment;   /* [Input] (WRDSF_COMMENT) Comment characters. */
   const char *ws_escape[2]; /* [Input] (WRDSF_ESCAPE) Characters to be escaped
@@ -81,9 +88,8 @@ struct wordsplit
                      void *clos);
 	                    /* [Input] (!WRDSF_NOCMD) Returns in the memory
 			       location pointed to by RET the expansion of
-			       the command CMD (LEN bytes nong).  If WRDSF_ARGV
-			       flag is set, ARGV contains CMD split out to
-			       words.  Otherwise ARGV is NULL.
+			       the command CMD (LEN bytes long).  On input,
+			       ARGV contains CMD split out to words.
 
 			       See ws_getvar for a discussion of possible
 			       return values. */
@@ -189,14 +195,18 @@ struct wordsplit
 #define WRDSO_FAILGLOB        0x00000002
 /* Allow a leading period to be matched by metacharacters. */
 #define WRDSO_DOTGLOB         0x00000004
-/* ws_command needs argv parameter */
+#if 0 /* Unused value */
 #define WRDSO_ARGV            0x00000008
 /* Keep backslash in unrecognized escape sequences in words */
+#endif
 #define WRDSO_BSKEEP_WORD     0x00000010
 /* Handle octal escapes in words */
 #define WRDSO_OESC_WORD       0x00000020
 /* Handle hex escapes in words */
 #define WRDSO_XESC_WORD       0x00000040
+
+/* ws_maxwords field is initialized */
+#define WRDSO_MAXWORDS        0x00000080
 
 /* Keep backslash in unrecognized escape sequences in quoted strings */
 #define WRDSO_BSKEEP_QUOTE    0x00000100
@@ -235,7 +245,18 @@ int wordsplit_len (const char *s, size_t len, wordsplit_t *ws, int flags);
 void wordsplit_free (wordsplit_t *ws);
 void wordsplit_free_words (wordsplit_t *ws);
 void wordsplit_free_envbuf (wordsplit_t *ws);
-void wordsplit_getwords (wordsplit_t *ws, size_t *wordc, char ***wordv);
+int wordsplit_get_words (wordsplit_t *ws, size_t *wordc, char ***wordv);
+
+static inline void wordsplit_getwords (wordsplit_t *ws, size_t *wordc, char ***wordv)
+  __attribute__ ((deprecated));
+
+static inline void
+wordsplit_getwords (wordsplit_t *ws, size_t *wordc, char ***wordv)
+{
+  wordsplit_get_words (ws, wordc, wordv);
+}
+
+int wordsplit_append (wordsplit_t *wsp, int argc, char **argv);
 
 int wordsplit_c_unquote_char (int c);
 int wordsplit_c_quote_char (int c);
