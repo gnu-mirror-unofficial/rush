@@ -1145,8 +1145,6 @@ main(int argc, char **argv)
 			continue;
                 if (run_tests(rule, &req))
 			continue;
-                if (!rule)
-                        break;
                 if (debug_level) {
 			if (req.interactive)
 				logmsg(LOG_NOTICE,
