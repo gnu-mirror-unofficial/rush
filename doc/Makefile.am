@@ -1,5 +1,5 @@
 # This file is part of GNU Rush.
-# Copyright (C) 2008-2017 Sergey Poznyakoff
+# Copyright (C) 2008-2019 Sergey Poznyakoff
 #
 # GNU Rush is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -25,7 +25,7 @@ EXTRA_DIST = \
  gendocs_template
 
 dist_man_MANS=\
- rush.1\
+ rush.8\
  rushlast.1\
  rushwho.1\
  rush.rc.5
