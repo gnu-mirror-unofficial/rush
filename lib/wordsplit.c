@@ -1,5 +1,5 @@
 /* wordsplit - a word splitter
-   Copyright (C) 2009-2018 Sergey Poznyakoff
+   Copyright (C) 2009-2019 Sergey Poznyakoff
 
    This program is free software; you can redistribute it and/or modify it
    under the terms of the GNU General Public License as published by the

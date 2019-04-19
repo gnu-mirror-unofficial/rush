@@ -1,5 +1,4 @@
-GNU Rush NEWS -- history of user-visible changes. 2016-10-01
-Copyright (C) 2008-2011, 2014, 2016-2017 Sergey Poznyakoff
+GNU Rush NEWS -- history of user-visible changes. 2019-04-19
 See the end of file for copying conditions.
 
 Please send bug reports to <bug-rush@gnu.org.ua>
@@ -318,7 +317,7 @@ Initial version.
 =========================================================================
 Copyright information:
 
-Copyright (C) 2008-2011, 2014, 2016-2017 Sergey Poznyakoff
+Copyright (C) 2008-2019 Sergey Poznyakoff
 
    Permission is granted to anyone to make or distribute verbatim copies
    of this document as received, in any medium, provided that the
