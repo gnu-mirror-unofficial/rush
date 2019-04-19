@@ -64,6 +64,11 @@ rush_wtmp_rewind(void)
 		
 	case rush_wtmp_backward:
 		whence = SEEK_END;
+		break;
+
+	default:
+		/* Should not happen */
+		abort();
 	}
 	return lseek(wtmp_fd, 0, whence) == -1;
 }
@@ -177,6 +182,11 @@ rush_wtmp_read(struct rush_wtmp **pwtmp)
 			if (lseek(wtmp_fd, -reclen, SEEK_CUR) == -1)
 				return rushdb_result_fail;
 		}
+		break;
+
+	default:
+		/* Should not happen */
+		abort();
 	}
 	return res;
 }

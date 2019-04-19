@@ -1082,8 +1082,10 @@ main(int argc, char **argv)
 		die(usage_error, NULL, _("invalid command line"));
 	
 	/* Relinquish root privileges in test mode */
-	if (lint_option)
-		setuid(getuid());
+	if (lint_option) {
+		if (setuid(getuid()))
+			die(system_error, NULL, "setuid: %s", strerror(errno));
+	}
 	
 	if (test_user_name) {
 		struct passwd *pw = getpwnam(test_user_name);

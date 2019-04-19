@@ -37,7 +37,9 @@ mode_t rushdb_umask = 022;
 mode_t rushdb_dir_mode = 0777;
 mode_t rushdb_file_mode = 0666;
 
-char *rushdb_error_string;
+#define ERROR_BUFFER_SIZE 1024
+static char rushdb_error_buffer[ERROR_BUFFER_SIZE];
+char *rushdb_error_string = rushdb_error_buffer;
 
 static void format_error(const char *fmt, ...) RUSH_PRINTFLIKE(1,2);
 	
@@ -46,8 +48,7 @@ format_error(const char *fmt, ...)
 {
 	va_list ap;
 	va_start(ap, fmt);
-	free(rushdb_error_string);
-	vasprintf(&rushdb_error_string, fmt, ap);
+	vsnprintf(rushdb_error_buffer, sizeof(rushdb_error_buffer), fmt, ap);
 	va_end(ap);
 }
 
@@ -350,11 +351,11 @@ output_duration(time_t t, int width, struct format_key *key)
 		else if (width >= dlen + 1)
 			outbytes = printf("%*sd",
 					  width - 1, dptr);
-		else 
-			while (width--) {
+		else {
+			outbytes = width;
+			while (width--)
 				putchar('>');
-				outbytes++;
-			}
+		}
 	} else {
 		if (width >= 8)
 			outbytes = printf("%*s%02u:%02u:%02u",
@@ -372,11 +373,11 @@ output_duration(time_t t, int width, struct format_key *key)
 			if (width >= dlen + 1)
 				outbytes = printf("%*sh",
 						  width - 1, dptr);
-			else
-				while (width--) {
+			else {
+				outbytes = width;
+				while (width--)
 					putchar('>');
-					outbytes++;
-				}
+			}
 		} else {
 			dptr = uinttostr(s, dbuf);
 			dlen = strlen(dptr);
@@ -388,11 +389,11 @@ output_duration(time_t t, int width, struct format_key *key)
 				if (width >= dlen + 1)
 					outbytes = printf("%*sm",
 							  width - 1, dptr);
-				else
-					while (width--) {
+				else {
+					outbytes = width;
+					while (width--)
 						putchar('>');
-						outbytes++;
-					}
+				}
 			}
 		}
 	}
