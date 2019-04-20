@@ -100,7 +100,9 @@ enum transform_node_type {
 	transform_map,
 	transform_delarg,
 	transform_setcmd,
-	transform_setarg
+	transform_setarg,
+	transform_setvar,
+	transform_unsetvar,
 };
 
 struct transform_node {
@@ -113,6 +115,7 @@ struct transform_node {
 		transform_t trans;
 		struct rush_map map;
 		int arg_end;
+		char *varname;
 	} v;
 };
 
@@ -209,6 +212,13 @@ struct rush_rule {
 	struct rush_sockaddr post_sockaddr;
 };
 
+struct rush_backref {
+	char *subject;
+ 	regmatch_t *match;
+	size_t nmatch;
+	size_t maxmatch;
+};
+
 struct rush_request {
         char *cmdline;         /* Command line */
         size_t argc;           /* Number of elements in argv */
@@ -225,6 +235,23 @@ struct rush_request {
 	enum rush_three_state acct;
 	const struct rush_sockaddr *post_sockaddr;
 	struct rush_i18n i18n;
+
+	/* Backreferences
+	   The backref field contains backreferences from the recent and
+	   penultimate regex matches. The backref_cur field indexes the
+	   recent backreferences. Remaining slot is used as a temporary
+	   storage during eventual next match. If that match succeeds, the
+	   value of backref_cur is updated to reflect the fact. The
+	   backref_count field keeps the actual number of backreferences
+	   used in the recent match. */
+	struct rush_backref backref[2]; 
+	int backref_cur;
+	size_t backref_count;
+
+	/* Temporary variable storage */
+	char **var_kv;
+	size_t var_count;
+	size_t var_max;
 };
 
 #define PROGFILE(req) ((req)->prog ? (req)->prog : (req)->argv[0])

@@ -18,7 +18,6 @@
 # include <config.h>
 #endif
 #include <gettext.h>
-#include <configmake.h>
 #include <locale.h>
 #include <librush.h>
 #include <xalloc.h>

@@ -15,4 +15,3 @@ lib/version.c
 
 gnu/error.c
 gnu/getopt.c
-gnu/strftime.c

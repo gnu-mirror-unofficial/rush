@@ -16,6 +16,56 @@
 
 #include <rush.h>
 
+static inline int
+d2n(int d)
+{
+	static char dig[] = "0123456789";
+	return strchr(dig, d) - dig;
+}
+
+/* Expand references to BACKREF in INPUT. A reference begins with one
+   of characters in PFX, followed by the ordinal number of the parenthesized
+   subgroup (in decimal, range [0, 9]).
+*/
+static char *
+expandref(char *input, struct rush_backref *backref, char *pfx)
+{
+	char *output;
+	size_t output_len = strlen(input) + 1;
+	size_t istart = 0, ostart = 0;
+	
+	output = xmalloc(output_len);
+	while (input[istart]) {
+		size_t len = strcspn(input + istart, pfx);
+		int n;
+		
+		while (ostart + len >= output_len)
+			output = x2realloc(output, &output_len);
+		memcpy(output + ostart, input + istart, len);
+		ostart += len;
+		istart += len;
+		if (input[istart]
+		    && isdigit(input[istart + 1])
+		    && (n = d2n(input[istart + 1])) < backref->nmatch) {
+			len = backref->match[n].rm_eo - backref->match[n].rm_so;
+			while (ostart + len >= output_len)
+				output = x2realloc(output, &output_len);
+			memcpy(output + ostart,
+			       backref->subject + backref->match[n].rm_so, len);
+			ostart += len;
+			istart += 2;
+		} else {
+			if (ostart + 2 >= output_len)
+				output = x2realloc(output, &output_len);
+			memcpy(output + ostart, input + istart, 2);
+			ostart += 2;
+			istart += 2;
+		}
+	}
+	output[ostart] = 0;
+	return xrealloc(output, ostart + 1);
+}
+
 static const char *
 var_uid(struct rush_request *req)
 {
@@ -122,19 +172,23 @@ char *
 rush_expand_string(const char *string, struct rush_request *req)
 {
 	struct wordsplit ws;
-	char *result;
-	
-	ws.ws_getvar = getvar;
-	ws.ws_closure = req;
-	if (wordsplit(string, &ws,
-		      WRDSF_NOSPLIT
+	int wsflags = WRDSF_NOSPLIT
 		      | WRDSF_NOCMD
 		      | WRDSF_UNDEF
 		      | WRDSF_GETVAR
-		      | WRDSF_CLOSURE))
+		      | WRDSF_CLOSURE;
+	char *result;
+
+	ws.ws_getvar = getvar;
+	ws.ws_closure = req;
+	if (req->var_kv) {
+		ws.ws_env = (const char **)req->var_kv;
+		wsflags |= WRDSF_ENV|WRDSF_ENV_KV;
+	}
+	if (wordsplit(string, &ws, wsflags))
 		die(system_error, &req->i18n, "%s", wordsplit_strerror(&ws));
-	result = ws.ws_wordv[0];
-	ws.ws_wordv[0] = NULL;
+	result = expandref(ws.ws_wordv[0], &req->backref[req->backref_cur],
+			   "%");
 	wordsplit_free(&ws);
 	return result;
 }

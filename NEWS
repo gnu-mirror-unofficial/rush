@@ -1,8 +1,52 @@
-GNU Rush NEWS -- history of user-visible changes. 2019-04-19
+GNU Rush NEWS -- history of user-visible changes. 2019-04-20
 See the end of file for copying conditions.
 
 Please send bug reports to <bug-rush@gnu.org.ua>
 
+Version 1.8.90 (git)
+
+* Backreference expansion
+
+Arguments to tranformations, chroot and chdir statements can contain
+references to parenthesized groups in the recent regular expression
+match. Such references are replaced with the strings that matched the
+corresponding groups. Syntactically, a backreference expansion is a
+percent sign followed by one-digit number of the subexpression
+(1-based, %0 refers to entire matched line). For example
+
+ rule X
+   command ^cd (.+) && (.+)
+   chdir %1
+   set %2
+
+* User-defined variables
+
+The configuration file can define new variables or reset built-in ones
+using the "setvar" statement:
+
+  setvar[VAR] PATTERN
+
+Here, VAR is the variable name, and PATTERN is its new value. Prior to
+assignment PATTERN is subject to variable and backreference expansion.
+
+User-defined variables can be unset using the "unsetvar" statement:
+
+  unsetvar[VAR]
+
+Unsetting a built-in variable, previously redefined using the "setvar"
+statement causes the user-supplied definition to be forgotten and the
+built-in one restored.
+
+* Shell-like variable expansion
+
+The following shell-like notations are supported:
+
+${VAR:-WORD}   Use Default Values
+${VAR:=WORD}   Assign Default Values
+${VAR:?WORD}   Display Error if Null or Unset
+${VAR:+WORD} "Use Alternate Value"
+
+
 Version 1.8, 2016-10-01
 
 * rushlast and rushwho

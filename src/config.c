@@ -582,7 +582,7 @@ _parse_command(input_buf_ptr ibuf, struct rush_rule *rule,
 
 	node = new_test_node(rule, test_cmdline);
 	val = _parse_negation(node, env->val);
-	rc = regcomp(&node->v.regex, val, re_flags|REG_NOSUB);
+	rc = regcomp(&node->v.regex, val, re_flags);
 	if (rc) 
 		regexp_error(ibuf, &node->v.regex, rc);
 	return rc;
@@ -599,7 +599,7 @@ _parse_match(input_buf_ptr ibuf, struct rush_rule *rule,
 	node = new_test_node(rule, test_arg);
 	node->v.arg.arg_no = env->index;
 	val = _parse_negation(node, env->val);
-	rc = regcomp(&node->v.arg.regex, val, re_flags|REG_NOSUB);
+	rc = regcomp(&node->v.arg.regex, val, re_flags);
 	if (rc) 
 		regexp_error(ibuf, &node->v.regex, rc);
 	return rc;
@@ -776,8 +776,7 @@ _parse_chdir(input_buf_ptr ibuf, struct rush_rule *rule,
 		       _("%s:%d: invalid home directory"),
 		       ibuf->file, ibuf->line);
 		return 1;
-	} else if (!rule->chroot_dir && check_dir(home_dir, ibuf))
-		return 1;
+	} 
 	rule->home_dir = home_dir;
 	return 0;
 }
@@ -1395,6 +1394,30 @@ _parse_set_ar(input_buf_ptr ibuf, struct rush_rule *rule,
 }
 
 static int
+_parse_setvar(input_buf_ptr ibuf, struct rush_rule *rule,
+	      struct stmt_env *env)
+{
+	struct transform_node *node = new_transform_node(rule,
+							 transform_setvar,
+							 0, 0);
+	node->v.varname = xstrdup(env->argv[0]);
+	node->pattern = xstrdup(env->argv[1]);
+	return 0;
+}	
+
+static int
+_parse_unsetvar(input_buf_ptr ibuf, struct rush_rule *rule,
+		struct stmt_env *env)
+{
+	struct transform_node *node = new_transform_node(rule,
+							 transform_unsetvar,
+							 0, 0);
+	node->v.varname = xstrdup(env->argv[0]);
+	node->pattern = NULL;
+	return 0;
+}	
+
+static int
 _parse_newgroup(input_buf_ptr ibuf, struct rush_rule *rule,
 		struct stmt_env *env)
 {
@@ -1408,15 +1431,16 @@ _parse_newgroup(input_buf_ptr ibuf, struct rush_rule *rule,
 }
 
 
-#define TOK_NONE   0x00   /* No flags */
-#define TOK_ARG    0x01   /* Token requires an argument */
-#define TOK_ARGN   0x02   /* Token requires one or more arguments */
-#define TOK_IND    0x04   /* Token must be followed by an index */
-#define TOK_RUL    0x08   /* Token is valid only within a rule */
-#define TOK_NEWBUF 0x10   /* Token may create new input buffer */
-#define TOK_CRT    0x24   /* Index after the token may contain ^ */
-#define TOK_SED    0x42   /* Arguments contain sed-exprs */
-#define TOK_ENV    0x80   /* Expand environment variables */
+#define TOK_NONE   0x000   /* No flags */
+#define TOK_ARG    0x001   /* Token requires an argument */
+#define TOK_ARGN   0x002   /* Token requires one or more arguments */
+#define TOK_IND    0x004   /* Token must be followed by an index */
+#define TOK_RUL    0x008   /* Token is valid only within a rule */
+#define TOK_NEWBUF 0x010   /* Token may create new input buffer */
+#define TOK_CRT    0x024   /* Index after the token may contain ^ */
+#define TOK_SED    0x042   /* Arguments contain sed-exprs */
+#define TOK_ENV    0x080   /* Expand environment variables */
+#define TOK_ASSC   0x104   /* Token must be followed by associative index */
 #define TOK_DFL   TOK_ARG|TOK_RUL
 #define TOK_DFLN  TOK_ARGN|TOK_RUL
 
@@ -1445,7 +1469,9 @@ struct token toktab[] = {
 	{ KW("delete"),           TOK_RUL|TOK_ARGN, _parse_delete },
 	{ KW("set"),              TOK_DFL, _parse_set },  
 	{ KW("set"),              TOK_DFL|TOK_IND|TOK_CRT,
-	  _parse_set_ar },  
+	  _parse_set_ar },
+	{ KW("setvar"),           TOK_RUL|TOK_ARG|TOK_ASSC, _parse_setvar },
+	{ KW("unsetvar"),         TOK_RUL|TOK_ASSC, _parse_unsetvar },
 	{ KW("umask"),            TOK_DFL, _parse_umask },
 	{ KW("chroot"),           TOK_DFL, _parse_chroot },
 	{ KW("limits"),           TOK_DFL, _parse_limits },
@@ -1560,8 +1586,22 @@ parse_input_buf(input_buf_ptr ibuf)
 		kw += len;
 		if (tok->flags & TOK_IND) {
 			char *q;
-			
-			if (kw[1] == '$') {
+
+			if ((tok->flags & TOK_ASSC) == TOK_ASSC) {
+				q = strchr(kw + 1, ']');
+				if (q) {
+					size_t len = q - kw - 1;
+					env.argc = 2;
+					env.argv = xcalloc(env.argc + 1,
+							   sizeof(env.argv[0]));
+					env.argv[0] = xmalloc(len + 1);
+					memcpy(env.argv[0], kw + 1, len);
+					env.argv[0][len] = 0;
+					env.argv[1] = env.val
+						       ? xstrdup(env.val)
+						       : NULL;
+				} /* else: handled below */
+			} else if (kw[1] == '$') {
 				env.index = -1;
 				q = kw + 2;
 			} else if (tok->flags & TOK_CRT && kw[1] == '^') {
@@ -1634,7 +1674,7 @@ parse_input_buf(input_buf_ptr ibuf)
 			ibuf = env.ret_buf;
 			debug(3, _("Parsing %s"), ibuf->file);
 		}
-		if (tok->flags & TOK_ARGN) 
+		if (tok->flags & (TOK_ARGN|TOK_ASSC)) 
 			argcv_free(env.argc, env.argv);
 	}
 	free(buf);

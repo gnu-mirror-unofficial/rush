@@ -156,56 +156,46 @@ xalloc_die()
 {
         die(system_error, NULL, _("Not enough memory"));
 }
-
-int
-is_prefix(const char *pref, const char *str)
-{
-        int len = strlen(pref);
-        int slen = strlen(str);
-        
-        if (slen < len)
-                return 0;
-        if (memcmp(str, pref, len))
-                return 0;
-        if (str[len] != '/')
-                return 0;
-        return 1;
-}
-
-int
-is_suffix(const char *suf, const char *str)
-{
-        int len = strlen(suf);
-        int slen = strlen(str);
-        
-        if (slen < len)
-                return 0;
-        if (memcmp(str + slen - len, suf, len))
-                return 0;
-        if (slen > len && str[slen - len - 1] != '/')
-                return 0;
-        return 1;
-}
-
 
-int
+static int
+test_regex(struct rush_request *req, regex_t *rx, char const *subj)
+{
+	int rc;
+	struct rush_backref *bref = &req->backref[!req->backref_cur];
+	size_t n = rx->re_nsub + 1;
+	if (n > bref->maxmatch) {
+		bref->match = xrealloc(bref->match,
+				       sizeof(bref->match[0]) * n);
+		bref->maxmatch = n;
+	}
+	rc = regexec(rx, subj, bref->maxmatch, bref->match, 0);
+	if (rc == 0) {
+		free(bref->subject);
+		bref->subject = xstrdup(subj);
+		bref->nmatch = n;
+		req->backref_cur = !req->backref_cur;
+	}
+	return rc;
+}
+
+static int
 test_request_cmdline(struct test_node *node, struct rush_request *req)
 {
-        return regexec(&node->v.regex, req->cmdline, 0, NULL, 0);
+	return test_regex(req, &node->v.regex, req->cmdline);
 }
 
 #define ARG_NO(n,argc) (((n) < 0) ? (argc) + (n) : (n))
 
-int
+static int
 test_request_arg(struct test_node *node, struct rush_request *req)
 {
         int n = ARG_NO(node->v.arg.arg_no, req->argc);
         if (n < 0 || n >= req->argc)
                 return 1;
-        return regexec(&node->v.arg.regex, req->argv[n], 0, NULL, 0);
+        return test_regex(req, &node->v.arg.regex, req->argv[n]);
 }
 
-int
+static int
 test_num_p(struct test_numeric_node *node, unsigned long val)
 {
         switch (node->op) {
@@ -225,25 +215,25 @@ test_num_p(struct test_numeric_node *node, unsigned long val)
         return 0;
 }
 
-int
+static int
 test_request_argc(struct test_node *node, struct rush_request *req)
 {
         return !test_num_p(&node->v.num, req->argc);
 }
 
-int
+static int
 test_request_uid(struct test_node *node, struct rush_request *req)
 {
         return !test_num_p(&node->v.num, req->pw->pw_uid);
 }
 
-int
+static int
 test_request_gid(struct test_node *node, struct rush_request *req)
 {
         return !test_num_p(&node->v.num, req->pw->pw_gid);
 }
 
-int
+static int
 groupcmp(char *gname, struct passwd *pw)
 {
         struct group *grp;
@@ -262,7 +252,7 @@ groupcmp(char *gname, struct passwd *pw)
         return 1;
 }
 
-int
+static int
 test_request_group(struct test_node *node, struct rush_request *req)
 {
         char **p;
@@ -273,7 +263,7 @@ test_request_group(struct test_node *node, struct rush_request *req)
         return 1;
 }
 
-int
+static int
 test_request_user(struct test_node *node, struct rush_request *req)
 {
         char **p;
@@ -284,7 +274,7 @@ test_request_user(struct test_node *node, struct rush_request *req)
         return 1;
 }
 
-int (*test_request[])(struct test_node *, struct rush_request *) = {
+static int (*test_request[])(struct test_node *, struct rush_request *) = {
         [test_cmdline]     = test_request_cmdline,
         [test_arg]         = test_request_arg,
         [test_argc]        = test_request_argc,
@@ -294,7 +284,7 @@ int (*test_request[])(struct test_node *, struct rush_request *) = {
         [test_group]       = test_request_group,
 };
 
-int
+static int
 run_tests(struct rush_rule *rule, struct rush_request *req)
 {
         struct test_node *node;
@@ -347,6 +337,18 @@ expand_tilde(const char *dir, const char *home)
         } else
                 res = xstrdup(dir);
         return res;
+}
+
+char *
+expand_dir(const char *dir, struct rush_request *req)
+{
+	char *exp = rush_expand_string(dir, req);
+	if (exp[0] == '~') {
+		char *t = expand_tilde(exp, req->pw->pw_dir);
+		free(exp);
+		exp = t;
+	}
+	return exp;
 }
 
 /* Find variable NAME in environment ENV.
@@ -517,7 +519,7 @@ env_setup(char **env)
         return new_env;
 }
 
-void
+static void
 reparse_cmdline(struct rush_request *req)
 {
         struct wordsplit ws;
@@ -533,7 +535,7 @@ reparse_cmdline(struct rush_request *req)
 	req->prog = NULL;
 }
 
-void
+static void
 rebuild_cmdline(struct rush_request *req)
 {
         free(req->cmdline);
@@ -579,7 +581,7 @@ transform_cmdline_fun(struct rush_request *req, struct transform_node *node,
 	return 0;
 }
 
-int
+static int
 transform_setcmd_fun(struct rush_request *req, struct transform_node *node,
 		     char *val, char **return_val)
 {
@@ -589,7 +591,7 @@ transform_setcmd_fun(struct rush_request *req, struct transform_node *node,
 	return 0;
 }
 
-int
+static int
 transform_arg_fun(struct rush_request *req, struct transform_node *node,
 		  char *val, char **return_val)
 {
@@ -598,7 +600,7 @@ transform_arg_fun(struct rush_request *req, struct transform_node *node,
 	return 1;
 }
 
-int
+static int
 transform_map_fun(struct rush_request *req, struct transform_node *node,
 		  char *val, char **return_val)
 {
@@ -619,7 +621,7 @@ transform_map_fun(struct rush_request *req, struct transform_node *node,
 	return 0;
 }
 
-int
+static int
 transform_delarg_fun(struct rush_request *req, struct transform_node *node,
 		     char *val, char **return_val)
 {
@@ -646,7 +648,7 @@ transform_delarg_fun(struct rush_request *req, struct transform_node *node,
 	return 1;
 }
 
-int
+static int
 transform_setarg_fun(struct rush_request *req, struct transform_node *node,
 		     char *val, char **return_val)
 {
@@ -654,6 +656,39 @@ transform_setarg_fun(struct rush_request *req, struct transform_node *node,
 	return 1;
 }
 
+static int
+transform_setvar_fun(struct rush_request *req, struct transform_node *node,
+		     char *val, char **return_val)
+{
+	size_t i;
+
+	if (req->var_kv) {
+		for (i = 0; i < req->var_count; i += 2)
+			if (strcmp(req->var_kv[i], node->v.varname) == 0)
+				break;
+	} else
+		i = req->var_count;
+
+	if (i < req->var_count) {
+		free(req->var_kv[i + 1]);
+		if (val)
+			req->var_kv[i + 1] = xstrdup(val);
+		else {
+			free(req->var_kv[i]);
+			memmove(req->var_kv + i, req->var_kv + i + 2,
+				(req->var_count - i - 1) * sizeof(req->var_kv[0]));
+			req->var_count -= 2;
+		}
+	} else if (val) {
+		while (req->var_count + 3 >= req->var_max)
+			req->var_kv = x2nrealloc(req->var_kv, &req->var_max,
+						 sizeof(req->var_kv[0]));
+		req->var_kv[req->var_count++] = xstrdup(node->v.varname);
+		req->var_kv[req->var_count++] = xstrdup(val);
+		req->var_kv[req->var_count] = NULL;
+	}
+	return 1;
+}
 
 /* Transform flags */
 #define XFORM_DFL         0x00 /* Default: nothing */
@@ -692,12 +727,20 @@ static struct transform_function transform_funtab[] = {
 	[transform_setarg]  = {
 		XFORM_VALUE,
 		transform_setarg_fun
-	}
+	},
+	[transform_setvar] = {
+		XFORM_VALUE,
+		transform_setvar_fun
+	},
+	[transform_unsetvar] = {
+		XFORM_DFL,
+		transform_setvar_fun
+	}		
 };	
 static int transform_count =
 	sizeof(transform_funtab)/sizeof(transform_funtab[0]);
 
-void
+static void
 run_transforms(struct rush_rule *rule, struct rush_request *req)
 {
         struct transform_node *node;
@@ -765,7 +808,7 @@ run_transforms(struct rush_rule *rule, struct rush_request *req)
         }
 }
 
-void
+static void
 acct_on(struct rush_rule *rule, struct rush_request *req, pid_t pid)
 {
 	struct rush_wtmp wtmp;
@@ -781,7 +824,7 @@ acct_on(struct rush_rule *rule, struct rush_request *req, pid_t pid)
 		    RUSH_DB, strerror(errno));
 }
 
-void
+static void
 acct_off(void)
 {
 	if (rushdb_stop())
@@ -791,7 +834,7 @@ acct_off(void)
 	rushdb_close();
 }
 
-void
+static void
 fork_process(struct rush_rule *rule, struct rush_request *req)
 {
 	int status;
@@ -901,7 +944,7 @@ setowner(struct rush_request *req)
 		    _("seteuid(0) succeeded when it should not"));
 }
 
-void
+static void
 run_rule(struct rush_rule *rule, struct rush_request *req)
 {
         char **new_env;
@@ -966,12 +1009,16 @@ run_rule(struct rush_rule *rule, struct rush_request *req)
         run_transforms(rule, req);
 
         if (rule->chroot_dir) {
-                char *dir = expand_tilde(rule->chroot_dir,
-                                               req->pw->pw_dir);
+                char *dir = expand_dir(rule->chroot_dir, req);
                 debug(2, _("Chroot dir: %s"), dir);
 		free(req->chroot_dir);
 		req->chroot_dir = dir;
         }
+        if (rule->home_dir) {
+                free(req->home_dir);
+                req->home_dir = expand_dir(rule->home_dir, req);
+		debug(2, _("Home dir: %s"), req->home_dir);
+	}
 
 	if (rule->gid != NO_GID) {
 		req->gid = rule->gid;
@@ -1020,10 +1067,8 @@ run_rule(struct rush_rule *rule, struct rush_request *req)
 		req->pw = pw;
 	}
 
-        if (rule->home_dir) {
-                free(req->home_dir);
-                req->home_dir = expand_tilde(rule->home_dir, req->pw->pw_dir);
-		debug(2, _("Home dir: %s"), req->home_dir);
+        if (req->home_dir) {
+		debug(2, _("chdir %s"), req->home_dir);
 		if (chdir(req->home_dir)) 
 			die(system_error, &req->i18n,
 			    _("cannot change to dir %s: %s"),

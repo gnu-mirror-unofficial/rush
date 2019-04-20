@@ -40,6 +40,7 @@ $(srcdir)/package.m4: $(top_srcdir)/configure.ac
 
 TESTSUITE_AT = \
   argc.at\
+  backref.at\
   chdir.at\
   command.at\
   delete.at\
@@ -53,9 +54,11 @@ TESTSUITE_AT = \
   matchprog.at\
   newgrp.at\
   set.at\
+  setvar.at\
   testsuite.at\
   transform.at\
   uid.at\
+  unsetvar.at\
   umask.at
 
 TESTSUITE = $(srcdir)/testsuite

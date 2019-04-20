@@ -10,7 +10,6 @@ getopt-gnu
 gettext-h
 gitlog-to-changelog
 inttostr
-obstack
 regex
 strerror
 xalloc

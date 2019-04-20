@@ -620,8 +620,8 @@ True if the command line does not begin with @samp{scp}.
 @node Transformations
 @subsection Transformations
 @cindex transformations
-  Special actions that allow to rewrite command line are called
-@dfn{transformations}.  GNU Rush supports five kinds of
+  Special actions that modify the original command line are called
+@dfn{transformations}.  GNU Rush supports several kinds of
 transformations: @samp{set}, @samp{transform}, @samp{delete}, 
 @samp{map}.  All of them operate on command line split into
 @dfn{words}.  Additionally, @samp{set} and @samp{transform} can
@@ -650,7 +650,7 @@ one gets:
 @end multitable
 
   Negative indexes can also be used.  They refer to words in the
-backward order, as illustrated in the following table:
+reverse order, as illustrated in the following table:
 
 @multitable @columnfractions 0.3 0.7
 @headitem Index @tab Value
@@ -659,42 +659,89 @@ backward order, as illustrated in the following table:
 @item -3 @tab /bin/scp
 @end multitable
 
-  Finally, the last word may be referred to as @samp{$}, and the
-command name itself as @samp{^}.  There is a subtle difference between
-@samp{0} and @samp{^}.  The notation @samp{^} refers to the name of
-the program that @command{rush} will execute at the end of the
-matching rule, whereas the notation @samp{0} refers to the 0th
-argument that will be passed to that program (@samp{argv[0]}).  Most
-of the time the two values coincide.  Unless the rule modifies @samp{^},
-@samp{0}th word will be used as the program name.  There exist some
-cases when you need to explicitly set @samp{^}.  @xref{Interactive},
-for a possible use of this feature.
+  Finally, two special notations are available.  The last word may be
+referred to as @samp{$}, and the command name itself as @samp{^}.
+There is a subtle difference between @samp{0} and @samp{^}.  The
+notation @samp{^} refers to the name of the program that
+@command{rush} will execute at the end of the matching rule, whereas
+the notation @samp{0} refers to the 0th argument that will be passed
+to that program (@samp{argv[0]}).  Most of the time the two values
+coincide.  Unless the rule modifies @samp{^}, @samp{0}th word will be
+used as the program name.  There exist some cases when you need to
+explicitly set @samp{^}.  @xref{Interactive}, for a possible use of
+this feature.
 
 @anchor{patterns}
 @cindex patterns
-@cindex meta-variables
-  Some of the transformations implement @dfn{patterns}.  A pattern is
-a string which may contain @dfn{meta-variables}.  Before using, these
-meta-variables are expanded using the following rules:
+  In the detailed discussion below, arguments to some transformations
+are referred to as @dfn{patterns}.  A pattern is a string which, prior
+to its actual use, is subject to @dfn{variable} and @dfn{backreference}
+expansions.
+
+@cindex variable expansion
+@anchor{variable expansion}
+  During @dfn{variable expansion} all references to variables in the
+string are replaced with the actual values of the corresponding variables.  
+Variables are referred to using the following syntax: @samp{$@var{x}}
+or @samp{$@{@var{x}@}}, where @var{x} is the variable name. The latter
+notation serves two purposes. First, it should be used if the variable
+reference is immediately followed by an alphanumeric symbol, which
+will otherwise be considered part of it. Consider, for example the
+string @samp{$@{home@}dir}. Here, the curly braces separate the name
+of the variable @samp{home} from the string that follows it. Secondly,
+this form allows for specifying the action to take if the variable is
+undefined or expands to an empty value. The following constructs test
+for a variable that is unset or null. Omitting the colon results in a
+test only for a variable that is unset.
+
+@table @asis
+@item $@{@var{variable}:-@var{word}@}
+@dfn{Use Default Values}. If @var{variable} is unset or null, the expansion
+of @var{word} is  substituted. Otherwise, the value of @var{variable} is
+substituted.
+
+@item $@{@var{variable}:=@var{word}@}
+@dfn{Assign Default Values}. If @var{variable} is unset or null, the
+expansion  of @var{word} is assigned to variable. The value of 
+@var{variable} is then substituted.
+                            
+@item $@{@var{variable}:?@var{word}@}
+@dfn{Display Error if Null or Unset}. If @var{variable} is null or unset,
+the expansion of @var{word} (or a message to that effect if @var{word} is
+not present) is output to the current logging channel. Otherwise, the
+value of @var{variable} is substituted.
+
+@item $@{@var{variable}:+@var{word}@}
+@dfn{Use Alternate Value}. If @var{variable} is null or unset, nothing is
+substituted, otherwise the expansion of @var{word} is substituted.
+@end table
+
+All variables fall into two categories: @dfn{built-in} and
+@dfn{user-defined}. Built-in variables are always
+defined. User-defined variables are created using the @samp{setvar}
+statement and can be undefined using the @samp{unsetvar} statement
+(see below).
+
+The built-in variables are summarized in the table below:
 
 @multitable @columnfractions 0.3 0.7
-@headitem Meta-variable  @tab Expansion
+@headitem Variable   @tab Expansion
 @vindex user
-@item $@{user@}          @tab User name
+@item $user          @tab User name
 @vindex group
-@item $@{group@}         @tab Name of the user's principal group
+@item $group         @tab Name of the user's principal group
 @vindex uid
-@item $@{uid@}           @tab UID
+@item $uid           @tab UID
 @vindex gid
-@item $@{gid@}           @tab GID
+@item $gid           @tab GID
 @vindex home
-@item $@{home@}          @tab User's home directory
+@item $home          @tab User's home directory
 @vindex gecos
-@item $@{gecos@}         @tab User's @acronym{GECOS} field
+@item $gecos         @tab User's @acronym{GECOS} field
 @vindex program
-@item $@{program@}       @tab Program name (@samp{^})
+@item $program       @tab Program name (@samp{^})
 @vindex command
-@item $@{command@}       @tab Full command line
+@item $command       @tab Full command line
 @vindex $@var{n}
 @item $0 to $9           @tab Corresponding word from the command line
 @vindex $@{@var{n}@}
@@ -702,11 +749,34 @@ meta-variables are expanded using the following rules:
 allowed values of @var{N})
 @end multitable
 
+@cindex backreferences
+@anchor{backreference expansion}
+During the @dfn{backreference expansion}, references to parenthesized
+subgroups from the last regexp match are replaced by the text that
+matched each subgroup. Syntactically a backreference consists of a
+percent sign followed by a decimal number of the subgroup in range
+between 0 and 9, inclusively. Consider the following rule:
+
+@example
+rule chdir
+  command ^cd (.+) && (.+)
+  chdir %1
+  set %2
+  fall-through
+@end example
+
+It splits the compound command into the working directory and the
+command itself. Then it remembers the name of the working directory
+(first parenthesized group -- @samp{%1}) for changing to it later and
+resets the command line to the part of the string that follows the @samp{&&}
+token. Finally, it passes control to another rules (@samp{fall-through}).
+
 @menu
-* set::
-* delete::
-* transform::
-* map::
+* set::             Overriding the command line or parts of it.
+* delete::          Delete words from the command line.
+* transform::       Modify command line or its parts using regular expressions.
+* map::             Use file lookup to modify the command line
+* setvar and unsetvar::  Set and unset variables 
 @end menu
 
 @node set
@@ -724,7 +794,7 @@ set /bin/echo "Command forbidden: $@{command@}"
 @end smallexample
 
 @anchor{set-command}
-  As another example, the following rule uses @code{transform} to
+  As another example, the following rule uses @code{set} to
 ensure that @file{/usr/bin/cvs} binary is used:
 
 @smallexample
@@ -734,9 +804,6 @@ rule cvs
   set[0] /usr/bin/cvs
 @end group
 @end smallexample
-
-In versions of GNU Rush prior to 1.6, it was common to use the
-@code{transform} action for this purpose.
 @end deffn
 
 @deffn {Rule Config} set[@var{n}] @var{pattern}
@@ -999,6 +1066,55 @@ map[0] /etc/passwd.rush : $@{user@} 1 7
 See also @ref{Interactive}, for another example of using this
 statement.
 
+@node setvar and unsetvar
+@subsubsection Set and unset variables
+
+@cindex setvar
+The @samp{setvar} statement allows you to define or redefine
+variables. The syntax is:
+
+@deffn {Rule Config} setvar[@var{name}] @var{pattern}
+When executing this statement, the @var{pattern} is first expanded
+using variable and backreference expansions (@pxref{patterns}), then
+the resulting value is assigned to the variable @var{name}.
+@end deffn
+
+You can set both user-defined and built-in variables. The common use
+for the @samp{setvar} statement is to save the result of pattern
+matching for use in further rules, e.g.:
+
+@example
+@group
+rule chdir
+  command ^cd "(.+)" && (.*)$
+  setvar[workdir] %1
+  set %2
+  fall-through
+
+...
+
+rule runcom
+  command ^runcom
+  chdir $workdir
+  ...
+@end group  
+@end example
+
+Here, the rule @samp{chdir} saves the argument to the @command{cd}
+command in the variable @samp{workdir}, which will eventually be used
+in the rule @samp{runcom} to actually change to that directory.
+
+User-defined variables can also be unset:
+
+@deffn {Rule Config} unsetvar[@var{name}]
+Undefines the variable @var{name}. If the variable is not defined, the
+statement is silently ignored. If @var{name} is a name of a buil-in
+variable previously overwritten using the @samp{setvar} statement, the
+user-supplied definition is removed and the built-in value is
+restored. Otherwise, if @var{name} refers to a built-in variable which
+was not overridden, this statement does nothing.
+@end deffn
+
 @node System Actions
 @subsection System Actions
 @cindex system actions
@@ -1021,8 +1137,11 @@ numeric value or a name of an existing group.
 @cindex tilde expansion
 Change the root directory to that specified in @var{dir}.  This
 directory will be used for file names beginning with @samp{/}.
-A tilde (@samp{~}) at the start of @var{dir} is replaced with
-the user's home directory.
+The argument is subject to tilde, variable, and backreference
+expansions. During tilde expansion, a tilde (@samp{~}) at the start of
+string is replaced with the absolute pathname of the user's home
+directory. The two other expansions are described in @ref{variable
+expansion}, and @ref{backreference expansion}.
 @end deffn
 
 The directory @var{dir} must be properly set up to execute the 
@@ -1046,8 +1165,10 @@ directories and files that are needed for executing it, in particular
 
 @deffn {Rule Config} chdir @var{dir}
 Change to the directory @var{dir}.  The argument is subject to
-tilde-expansion (see @code{chroot}, above).  If both @code{chdir} and
-@code{chroot} are specified, then @code{chroot} is executed first.
+tilde, variable (@pxref{variable expansion}), and backreference
+expansions (@pxref{backreference expansion}).  If both
+@code{chdir} and @code{chroot} are specified, then @code{chroot} is
+executed first.
 @end deffn
 
 @deffn {Rule Config} limits @var{res}

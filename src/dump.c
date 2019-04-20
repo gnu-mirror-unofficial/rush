@@ -190,12 +190,45 @@ dump_int(int val, char const *id, struct json_dumper *dmp)
 	fprintf(dmp->fp, "%d", val);
 }
 
-struct dump_var {
-	char const *name;
-	size_t off;
-	void (*dumper) (struct rush_request *, const char *id, struct json_dumper *);
-};
+static char **kv_ar;
 
+static int
+cmp_idx(void const *a, void const *b)
+{
+	size_t const *ai = a;
+	size_t const *bi = b;
+	return strcmp(kv_ar[*ai], kv_ar[*bi]);
+}
+	
+static void
+dump_vars(struct rush_request *req, char const *id, struct json_dumper *dmp)
+{
+	dump_id(id, dmp);
+	fputc('{', dmp->fp);
+	if (req->var_count) {
+		size_t i, ic;
+		size_t *iv;
+		struct json_dumper nest_dmp;
+
+		ic = req->var_count / 2;
+		iv = xcalloc(ic, sizeof(iv[0]));
+		for (i = 0; i < ic; i++) {
+			iv[i] = 2*i;
+		}
+		kv_ar = req->var_kv;
+		qsort(iv, ic, sizeof(iv[0]), cmp_idx);
+		
+		dumper_copy(&nest_dmp, dmp);
+		dump_separator(&nest_dmp);
+		for (i = 0; i < ic; i++) {
+			dump_id(req->var_kv[iv[i]], &nest_dmp);
+			dump_string_data(req->var_kv[iv[i]+1], &nest_dmp);
+		}
+		dump_separator(dmp);
+	}
+	fputc('}', dmp->fp);
+}
+	
 static char allkw[] =
 	"cmdline,"
 	"argv,"
@@ -214,7 +247,8 @@ static char allkw[] =
 	"text_domain,"
 	"localedir,"
 	"locale,"
-	"environ";
+	"environ,"
+	"vars";
 
 void
 dump_request(struct rush_request *req, FILE *fp)
@@ -278,6 +312,8 @@ dump_request(struct rush_request *req, FILE *fp)
 			dump_string(req->i18n.locale, "locale", &dmp);
 		else if (strcmp(ws.ws_wordv[i], "environ") == 0)
 			dump_argv(environ, "environ", 1, &dmp);
+		else if (strcmp(ws.ws_wordv[i], "vars") == 0)
+			dump_vars(req, "vars", &dmp);
 		else
 			logmsg(LOG_ERR, _("unknown keyword: %s"), ws.ws_wordv[i]);
 	}		
