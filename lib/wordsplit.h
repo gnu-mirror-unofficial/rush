@@ -66,9 +66,15 @@ struct wordsplit
   const char **ws_env;      /* [Input] (WRDSF_ENV, !WRDSF_NOVAR) Array of
 			       environment variables. */
 
-  char **ws_envbuf;
-  size_t ws_envidx;
-  size_t ws_envsiz;
+	/* Temporary storage for environment variables. It is initialized
+	   upon first assignment which occurs during the parsing process
+	   (e.g. ${x:=2}). When this happens, all variables from ws_env are
+	   moved to ws_envbuf first, and the ws_envbuf address is assigned
+	   to ws_env. From this moment on, all variable expansions are served
+	   from ws_envbuf. */
+  char **ws_envbuf;         /* Storage for variables */
+  size_t ws_envidx;         /* Index of first free slot */
+  size_t ws_envsiz;         /* Size of the ws_envbuf array */
   
   int (*ws_getvar) (char **ret, const char *var, size_t len, void *clos);
                             /* [Input] (WRDSF_GETVAR, !WRDSF_NOVAR) Looks up
@@ -197,8 +203,8 @@ struct wordsplit
 #define WRDSO_DOTGLOB         0x00000004
 #if 0 /* Unused value */
 #define WRDSO_ARGV            0x00000008
-/* Keep backslash in unrecognized escape sequences in words */
 #endif
+/* Keep backslash in unrecognized escape sequences in words */
 #define WRDSO_BSKEEP_WORD     0x00000010
 /* Handle octal escapes in words */
 #define WRDSO_OESC_WORD       0x00000020

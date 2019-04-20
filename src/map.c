@@ -15,191 +15,128 @@
    along with GNU Rush.  If not, see <http://www.gnu.org/licenses/>. */
 
 #include <rush.h>
-#define obstack_chunk_alloc malloc
-#define obstack_chunk_free free
-#include <obstack.h>
-
-struct metadef {
-	char *kw;
-	char *value;
-	const char *(*expand)(struct metadef *, struct rush_request *);
-	int static_p;
-	void *storage;
-};
 
 static const char *
-meta_expand(struct metadef *def, struct rush_request *req)
+var_uid(struct rush_request *req)
 {
-	if (!def->value) {
-		if (def->expand)
-			return def->expand(def, req);
-		def->value = "INTERNAL ERROR: NONEXPANDABLE DATA";
-		def->static_p = 1;
-	}
-	return def->value;
+	static char buf[INT_BUFSIZE_BOUND(uintmax_t)];
+	return umaxtostr(req->pw->pw_uid, buf);
 }
 
 static const char *
-find_expansion_char(int c, struct metadef *def, struct rush_request *req)
-{
-	for (; def->kw; def++)
-		if (def->kw[1] == 0 && def->kw[0] == c)
-			return meta_expand(def, req);
-	return NULL;
-}
-
-static const char *
-find_expansion_word(const char *kw, size_t len,
-		    struct metadef *def, struct rush_request *req)
-{
-	for (; def->kw; def++)
-		if (strlen(def->kw) == len && memcmp(def->kw, kw, len) == 0)
-			return meta_expand(def, req);
-	return NULL;
-}
-
-char *
-meta_expand_string(const char *string, struct metadef *def,
-		   struct rush_request *req)
-{
-	const char *p, *s;
-	char *res;
-	struct obstack stk;
-	
-	if (!string)
-		return NULL;
-
-	obstack_init(&stk);
-
-	for (p = string; *p; ) {
-		char *e;
-		size_t len = strcspn(p, "$");
-		obstack_grow(&stk, p, len);
-		p += len;
-		if (*p == '$') {
-			switch (*++p) {
-			case '$':
-				obstack_grow(&stk, p, 1);
-				p++;
-				break;
-	      
-			case '{':
-				e = strchr(p + 1, '}');
-				if (e
-				    && (s = find_expansion_word(p + 1,
-								e - p - 1,
-								def, req))) {
-					obstack_grow(&stk, s, strlen(s));
-					p = e + 1;
-				} else {
-					char *q;
-					unsigned n = strtoul(p + 1, &q, 10);
-					if (q == e && n < req->argc) {
-						s = req->argv[n];
-						len = strlen(req->argv[n]);
-						p = e + 1;
-					} else {
-						s = p - 1;
-						len = 1;
-						p++;
-					}
-					obstack_grow(&stk, s, len);
-				}
-				break;
-	      
-			default:
-				s = p - 1;
-				len = 1;
-				if (c_isdigit(*p)) {
-					unsigned n = *p - '0';
-					if (n < req->argc) {
-						s = req->argv[n];
-						len = strlen(req->argv[n]);
-					} 
-				} else if ((s = find_expansion_char(*p, def, 
-								    req))
-					   != NULL) 
-					len = strlen(s);
-				obstack_grow(&stk, s, len);
-				p++;
-			}
-		} else
-			obstack_grow(&stk, p, 1);
-	}
-	obstack_1grow(&stk, 0);
-	res = xstrdup(obstack_finish(&stk));
-	obstack_free(&stk, NULL);
-	return res;
-}
-
-const char *
-meta_uid(struct metadef *def, struct rush_request *req)
-{
-	char buf[INT_BUFSIZE_BOUND(uintmax_t)];
-	return def->storage = xstrdup(umaxtostr(req->pw->pw_uid, buf));
-}
-
-const char *
-meta_user(struct metadef *def, struct rush_request *req)
+var_user(struct rush_request *req)
 {
 	return req->pw->pw_name;
 }
 
-const char *
-meta_gid(struct metadef *def, struct rush_request *req)
+static const char *
+var_gid(struct rush_request *req)
 {
-	char buf[INT_BUFSIZE_BOUND(uintmax_t)];
-	return def->storage = xstrdup(umaxtostr(req->pw->pw_gid, buf));
+	static char buf[INT_BUFSIZE_BOUND(uintmax_t)];
+	return umaxtostr(req->pw->pw_gid, buf);
 }
 
-const char *
-meta_group(struct metadef *def, struct rush_request *req)
+static const char *
+var_group(struct rush_request *req)
 {
 	struct group *grp = getgrgid(req->pw->pw_gid);
-	return grp ? grp->gr_name : meta_gid(def, req);
+	return grp ? grp->gr_name : var_gid(req);
 }
 
-const char *
-meta_home(struct metadef *def, struct rush_request *req)
+static const char *
+var_home(struct rush_request *req)
 {
 	return req->pw->pw_dir;
 }
 
-const char *
-meta_gecos(struct metadef *def, struct rush_request *req)
+static const char *
+var_gecos(struct rush_request *req)
 {
 	return req->pw->pw_gecos;
 }
 
-const char *
-meta_program(struct metadef *def, struct rush_request *req)
+static const char *
+var_program(struct rush_request *req)
 {
 	return PROGFILE(req);
 }
 
-const char *
-meta_command(struct metadef *def, struct rush_request *req)
+static const char *
+var_command(struct rush_request *req)
 {
 	return req->cmdline;
 }
 
-static struct metadef mapdef[] = {
-	{ "user", NULL, meta_user },
-	{ "group", NULL, meta_group },
-	{ "uid", NULL, meta_uid },
-	{ "gid", NULL, meta_gid },
-	{ "home", NULL, meta_home },
-	{ "gecos", NULL, meta_gecos },
-	{ "program", NULL, meta_program },
-	{ "^", NULL, meta_program },
-	{ "command", NULL, meta_command },
+struct vardef {
+	char *name;
+	const char *(*expand)(struct rush_request *);
+};
+
+static struct vardef request_vars[] = {
+	{ "user",    var_user },
+	{ "group",   var_group },
+	{ "uid",     var_uid },
+	{ "gid",     var_gid },
+	{ "home",    var_home },
+	{ "gecos",   var_gecos },
+	{ "program", var_program },
+	{ "command", var_command },
 	{ NULL }
 };
+
+static int
+getvar(char **ret, const char *var, size_t len, void *clos)
+{
+	const char *s = NULL;
+	struct rush_request *req = clos;
+	
+	if (c_isdigit(*var)) {
+		unsigned long n;
+		errno = 0;
+		n = strtoul(var, NULL, 10);
+		if (errno || n >= req->argc)
+			return WRDSE_UNDEF;
+		s = req->argv[n];
+	} else {
+		struct vardef *vd;
+		for (vd = request_vars; vd->name; vd++) {
+			if (strncmp(vd->name, var, len) == 0) {
+				s = vd->expand(clos);
+				break;
+			}
+		}
+	}
+
+	if (s) {
+		char *p = strdup(s);
+		if (!p)
+			return WRDSE_NOSPACE;
+		*ret = p;
+		return WRDSE_OK;
+	}
+
+	return WRDSE_UNDEF;
+}
 
 char *
 rush_expand_string(const char *string, struct rush_request *req)
 {
-	return meta_expand_string(string, mapdef, req);
+	struct wordsplit ws;
+	char *result;
+	
+	ws.ws_getvar = getvar;
+	ws.ws_closure = req;
+	if (wordsplit(string, &ws,
+		      WRDSF_NOSPLIT
+		      | WRDSF_NOCMD
+		      | WRDSF_UNDEF
+		      | WRDSF_GETVAR
+		      | WRDSF_CLOSURE))
+		die(system_error, &req->i18n, "%s", wordsplit_strerror(&ws));
+	result = ws.ws_wordv[0];
+	ws.ws_wordv[0] = NULL;
+	wordsplit_free(&ws);
+	return result;
 }
 
 char *
@@ -228,7 +165,7 @@ map_string(struct rush_map *map, struct rush_request *req)
 		die(system_error, &req->i18n, _("%s: cannot open map file"),
 		    file);
 
-	key = meta_expand_string(map->key, mapdef, req);
+	key = rush_expand_string(map->key, req);
 	while (getline(&buf, &size, fp) != -1) {
 		size_t len;
 		struct wordsplit ws;

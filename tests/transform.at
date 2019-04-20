@@ -88,7 +88,7 @@ rule
 
 AT_RUSH_TEST([
 rule
-    transform[0] \${^} s,.*/,-,
+    transform[0] \$program s,.*/,-,
 ],
 [cmdline,argv,prog],
 [/bin/sh],

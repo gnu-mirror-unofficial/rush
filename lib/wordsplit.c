@@ -1,5 +1,5 @@
 /* wordsplit - a word splitter
-   Copyright (C) 2009-2019 Sergey Poznyakoff
+   Copyright (C) 2009-2018 Sergey Poznyakoff
 
    This program is free software; you can redistribute it and/or modify it
    under the terms of the GNU General Public License as published by the
@@ -1086,12 +1086,16 @@ wsplt_assign_var (struct wordsplit *wsp, const char *name, size_t namelen,
 	}
       else
 	{
-	  wsp->ws_envsiz *= 2;
-	  newenv = realloc (wsp->ws_envbuf,
-			    wsp->ws_envsiz * sizeof (wsp->ws_envbuf[0]));
+	  size_t n = wsp->ws_envsiz;
+	  
+	  if ((size_t) -1 / 3 * 2 / sizeof (wsp->ws_envbuf[0]) <= n)
+	    return _wsplt_nomem (wsp);
+	  n += (n + 1) / 2;
+	  newenv = realloc (wsp->ws_envbuf, n * sizeof (wsp->ws_envbuf[0]));
 	  if (!newenv)
 	    return _wsplt_nomem (wsp);
 	  wsp->ws_envbuf = newenv;
+	  wsp->ws_envsiz = n;
 	  wsp->ws_env = (const char**) wsp->ws_envbuf;
 	}
     }
@@ -1128,6 +1132,29 @@ wsplt_assign_var (struct wordsplit *wsp, const char *name, size_t namelen,
   return WRDSE_OK;
 }
 
+/* Recover from what looked like a variable reference, but turned out
+   not to be one. STR points to first character after '$'. */
+static int
+expvar_recover (struct wordsplit *wsp, const char *str,
+		struct wordsplit_node **ptail, const char **pend, int flg)
+{
+  struct wordsplit_node *newnode;
+
+  if (wsnode_new (wsp, &newnode))
+    return 1;
+  wsnode_insert (wsp, newnode, *ptail, 0);
+  *ptail = newnode;
+  newnode->flags = _WSNF_WORD | flg;
+  newnode->v.word = malloc (3);
+  if (!newnode->v.word)
+    return _wsplt_nomem (wsp);
+  newnode->v.word[0] = '$';
+  newnode->v.word[1] = str[0];
+  newnode->v.word[2] = 0;
+  *pend = str;
+  return 0;
+}
+
 static int
 expvar (struct wordsplit *wsp, const char *str, size_t len,
 	struct wordsplit_node **ptail, const char **pend, int flg)
@@ -1148,7 +1175,12 @@ expvar (struct wordsplit *wsp, const char *str, size_t len,
 	  break;
       *pend = str + i - 1;
     }
-  else if (str[0] == '{')
+  else if (ISDIGIT (str[0]))
+    {
+      i = 1;
+      *pend = str;
+    }
+  else if (str[0] == '{' && (ISVARBEG (str[1]) || ISDIGIT (str[1])))
     {
       str++;
       len--;
@@ -1180,25 +1212,24 @@ expvar (struct wordsplit *wsp, const char *str, size_t len,
 	      *pend = str + j;
 	      break;
 	    }
+	  else if (ISDIGIT (str[1]))
+	    {
+	      if (!ISDIGIT (str[i]))
+		{
+		  return expvar_recover (wsp, str - 1, ptail, pend, flg);
+		}
+	    }
+	  else if (!ISVARCHR (str[i]))
+	    {
+	      return expvar_recover (wsp, str - 1, ptail, pend, flg);
+	    }
 	}
       if (i == len)
 	return _wsplt_seterr (wsp, WRDSE_CBRACE);
     }
   else
     {
-      if (wsnode_new (wsp, &newnode))
-	return 1;
-      wsnode_insert (wsp, newnode, *ptail, 0);
-      *ptail = newnode;
-      newnode->flags = _WSNF_WORD | flg;
-      newnode->v.word = malloc (3);
-      if (!newnode->v.word)
-	return _wsplt_nomem (wsp);
-      newnode->v.word[0] = '$';
-      newnode->v.word[1] = str[0];
-      newnode->v.word[2] = 0;
-      *pend = str;
-      return 0;
+      return expvar_recover (wsp, str, ptail, pend, flg);
     }
 
   /* Actually expand the variable */
@@ -1417,7 +1448,7 @@ expvar (struct wordsplit *wsp, const char *str, size_t len,
 static int
 begin_var_p (int c)
 {
-  return c == '{' || ISVARBEG (c);
+  return c == '{' || ISVARBEG (c) || ISDIGIT (c);
 }
 
 static int
