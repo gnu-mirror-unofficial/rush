@@ -194,11 +194,11 @@ for the user who executes @command{rush} are said to form a
 @cindex actions
   After startup, @command{rush} reads a set of @dfn{rules} from its
 configuration file.  Each rule consists of conditions
-and actions.  @dfn{Conditions} are used to match the rule
-with the request.  They can include regular expression matching
-with entire command line or particular fields thereof, user name or
-group comparisons, etc.  If all conditions match the request, 
-actions are executed.  @dfn{Actions} allow to:
+and actions.  @dfn{Conditions} decide whether the request matches
+the rule.  They can include regular expression matching against entire
+command line or particular words thereof, comparisons of user name or
+group,, etc.  If all conditions match the request, actions are
+executed.  @dfn{Actions} can instruct @command{rush} to:
 
 @itemize @bullet
 @item Modify the command line;
@@ -210,9 +210,9 @@ actions are executed.  @dfn{Actions} allow to:
 @end itemize
 
   Finally, after all actions have been executed successfully, @command{rush}
-executes the requested command.  Notice, that the resulting command
-line is not necessarily the same as was supplied to @command{rush} via
-the @option{-c} option.
+executes the requested command.  Notice, that by that time the
+resulting command line is not necessarily the same as the original one
+supplied to @command{rush} with the @option{-c} option.
 
 @cindex fall-through rule
 @cindex rule, fall-through
@@ -272,6 +272,8 @@ appropriate:
 @smallexample
   set[0] bin/sftp-server
 @end smallexample
+
+@xref{set}, for details.
 }.
 
   The @code{umask} clause sets the file creation mask.
@@ -506,12 +508,12 @@ within a @code{rule}.
 @node Conditions
 @subsection Conditions
 @cindex conditions
-  These statements define conditions that are used to match the rule with
-the request.  A rule may contain any number of conditions.  All
-conditions are tested in order of their appearance in the rule and are
-tied together using boolean shortcut @samp{and} evaluation: if any of
-them yields false, the rest is not evaluated and control is
-transferred to the subsequent rule. 
+  These statements define conditions that are evaluated when matching
+the rule against the request.  A rule may contain any number of
+conditions.  All conditions are tested in order of their appearance in
+the rule and are tied together using boolean shortcut @samp{and}
+evaluation: if any of them yields false, the rest is not evaluated and
+control is transferred to the subsequent rule. 
 
 @deffn {Rule Config} command @var{regex}
 True, if the current command line matches regular expression
@@ -531,13 +533,16 @@ This, however can be changed using @code{regex} statement (@pxref{Regex}).
 @deffn {Rule Config} match[@var{n}] @var{regexp}
 True, if @var{n}th @dfn{word} from the command line matches
 regular expression @var{regexp}.  Notice, that square brackets form
-part of the statement syntax.  A special value @samp{$} can be used
-instead of @var{n} to denote the last word.  Unless changed by
-previous @code{regex} statement (@pxref{Regex}), @acronym{POSIX}
-extended regular expressions are used. 
+part of the statement syntax.  The index @var{n} is normally a decimal
+number indicating position of the word in the command line (first word
+being at index 0).  It can be negative, which means that the position
+is counted from the last word.  Several special notations are also
+allowed, e.g. @samp{$} denotes the last word.  For a detailed discussion of
+word-splitting alorithm and allowed notations of @var{n}, @ref{indexing}.  
 
-The command line is split into words using the same rules as used in
-@code{/bin/sh}.
+Second argument @var{regexp} is a regular expression to match the word
+against.  Unless changed by previous @code{regex} statement
+(@pxref{Regex}), @acronym{POSIX} extended regular expression is assumed.
 
 For example, the condition below yields true if the last argument is
 an absolute path name:
@@ -590,14 +595,14 @@ of the following: @samp{=} (@samp{==}), @samp{!=}, @samp{<},
 
 @deffn {Rule Config} user @var{names}
 Argument is a whitespace-separated list of user names.  This condition
-yields true, if the user name matches one of the listed names.
+yields true, if the user name is listed in @var{names}.
 String comparisons are case-sensitive.
 @end deffn
 
 @deffn {Rule Config} group @var{names}
 Argument is a whitespace-separated list of group names.  This condition
 yields true, if the the name of any group the user is a member of
-matches one of listed names.  String comparisons are case-sensitive.
+is listed in @var{names}.  String comparisons are case-sensitive.
 
 For example, to match users from groups @samp{admin} and @samp{root}:
 
@@ -606,8 +611,8 @@ group admin root
 @end smallexample
 @end deffn
 
-  Each condition allows for a negated form, by placing an exclamation
-sign between the condition keyword and expression.  For example:
+  Each condition can be negated by placing exclamation sign between
+the condition keyword and expression.  For example: 
 
 @table @code
 @item command ^scp
@@ -654,10 +659,12 @@ reverse order, as illustrated in the following table:
 
 @multitable @columnfractions 0.3 0.7
 @headitem Index @tab Value
-@item -1 @tab /upload
-@item -2 @tab -t
 @item -3 @tab /bin/scp
+@item -2 @tab -t
+@item -1 @tab /upload
 @end multitable
+
+  Notice that negative indexes are 1-based.
 
   Finally, two special notations are available.  The last word may be
 referred to as @samp{$}, and the command name itself as @samp{^}.
@@ -782,7 +789,7 @@ token. Finally, it passes control to another rules (@samp{fall-through}).
 @node set
 @subsubsection Set
 @kwindex set
-  The @samp{set} transformation allows to replace entire command line,
+  The @samp{set} transformation replaces the entire command line,
 or any of its arguments, with the given value.
 
 @deffn {Rule Config} set @var{pattern}
@@ -846,7 +853,7 @@ or @samp{[^]}.
 @kwindex transform
 
   The @code{transform} action modifies the value of the command line,
-or any particular word of it, according to a sed @dfn{s-expression}.
+or any particular word of it, according to a sed-like @dfn{s-expression}.
 S-expressions are described in more detail below (@pxref{s-expression}).
 This action has several forms.
 
@@ -1219,7 +1226,7 @@ The use of @samp{L} resource automatically enables @dfn{forked mode}.
 @subsection Environment
 @cindex Environment
 
-The @code{env} action allows to modify the environment in which the
+The @code{env} action modifies the environment in which the
 program will be executed.
 
 @deffn {Rule Config} env @var{args}
@@ -1282,14 +1289,14 @@ assignment.
 @node Fall-through
 @subsection Fall-through
 @cindex fall-through rule
-A @dfn{fall-through} rule is a special rule that does not execute the
-requested command.  When a matching fall-through rule is encountered,
-@command{rush} evaluates it and continues scanning its configuration
-for the next matching rule.  Any transformation and @code{env}
-actions found in the fall-through rule take effect immediately, which
-means that subsequent rules will see modified command line and
-environment.  Execution of any other actions found in the fall-through rule
-is delayed until a usual rule is found.
+The @dfn{fall-through} statement is a special action that does not
+execute the requested command.  When a matching fall-through rule is
+encountered, @command{rush} evaluates it and continues scanning its
+configuration for the next matching rule.  Any transformation and
+@code{env} actions found in the fall-through rule take effect
+immediately, which means that subsequent rules will see modified
+command line and environment.  Execution of any other actions found in
+the fall-through rule is delayed until a usual rule is found.
 
 A fall-through rule is declared using the following statement:
 
@@ -1353,7 +1360,7 @@ mode}.  When running in this mode, @command{rush} executes the
 requested command in a subprocess, and remains in memory supervising
 its execution.  Once the command terminates, @command{rush} exits.
 
-  One advantage of the forked mode is that it allows to run
+  One advantage of the forked mode is that it allows you to keep
 @dfn{accounting}, i.e. to note who is doing what and to keep a
 history of invocations.  The accounting, in turn, can be used to limit
 simultaneous executions of commands (@dfn{logins}, in
@@ -1376,10 +1383,10 @@ you use @command{limit L}.
 
 The notion @samp{rule contains}, used above, means that either the
 rule in question contains that statement, or inherits it from one
-of the above fall-through rules (@pxref{Fall-through}).  In fact, in
-most cases the accounting should affect all rules, therefore we
-suggest to enable it in a fall-through rule at the beginning of the
-configuration file, e.g.:
+of the fall-through rules (@pxref{Fall-through}) that were matched
+before it.  In fact, in most cases the accounting should affect all
+rules, therefore we suggest to enable it in a fall-through rule at the
+beginning of the configuration file, e.g.:
 
 @smallexample
 rule default
@@ -1398,7 +1405,7 @@ Enable or disable forked mode.  This statement is mainly designed as a
 way of disabling the forked mode for a given rule.
 @end deffn
 
-  Once the accounting enabled, you can view the list of currently
+  Once accounting is enabled, you can view the list of currently
 logged in users using @code{rushwho} command (@pxref{Rushwho}) and
 view the history of last logins using @code{rushlast} command
 (@pxref{Rushlast}).
@@ -1526,14 +1533,14 @@ rule git
 @end group
 @end smallexample
 
-It allows to use only those Git repositories that are located under
-@file{/sources} directory@footnote{@xref{git}, for a better way to
-handle Git accesses.}.  If a user tries to access a repository
-outside this root, he will be returned a default error message, saying
-@samp{You are not permitted to execute this command} (@pxref{Error
-Messages, usage-error}).  You can, however, provide a more convenient
-message in this case.  To do so, place the following after the
-@samp{git} rule: 
+It allows the client to use only those Git repositories that are
+located under @file{/sources} directory@footnote{@xref{git}, for a
+better way to handle Git accesses.}.  If a user tries to access a
+repository outside this root, he will be returned a default error
+message, saying @samp{You are not permitted to execute this command}
+(@pxref{Error Messages, usage-error}).  You can, however, provide a
+more convenient message in this case.  To do so, place the following
+after the @samp{git} rule:
 
 @smallexample
 @group
@@ -1666,28 +1673,14 @@ compile time and defaults to @file{@var{prefix}/share/locale}, where
 
 GNU Rush is shipped with several localization files, which are installed
 by default.  As of version @value{VERSION}, these files cover the
-following locales:
-
-@table @asis
-@item C
-@itemx POSIX
-This is default domain, it is always supported and does not require
-any special handling.  It is roughly equivalent to @samp{en_US}
-(English). 
-
-@item pl
-Polish messages. 
-
-@item uk
-Ukrainian messages.
-@end table
-
-If the localization you need is not in this list, visit
+following languages: Chinese, Danish, Dutch, Finnish, French, Galician,
+German, Polish, Portuguese, Serbian, Spanish, Svedish, Ukrainian, and
+Vietnamese.  If the localization you need is not in this list, visit
 @uref{http://translationproject.org/domain/rush.html}.  If it is not
 there either, consider writing it (see @ref{Translators,,,gettext, GNU
 gettext utilities}, for a detailed instructions on how to do that).
 
-Exit messages use custom domain files.  It is responsibility of
+Exit messages use custom domain files.  It is the responsibility of
 the system administrator to provide and install such files.
 
 @menu
@@ -1704,7 +1697,7 @@ are available for use in @code{rule} statements:
 
 @deffn {Configuration} locale @var{name}
 Sets the locale name.  To specify empty locale, use @samp{""} as
-@var{name} (recall that empty locale name means use the value of the
+@var{name} (recall that empty locale name means to use the value of the
 environment variable @env{LC_ALL} as locale name).
 @end deffn
 
@@ -1901,17 +1894,18 @@ whichever occurs first.
 @end deffn
 
 The @code{include} statement can appear in any place of the
-configuration file, both within or outside a rule.
+configuration file, both within or outside of a rule.
 
 This statement provides a convenient way for user-dependent
 @command{rush} configuration.  For example, the following fall-through
-rule (@pxref{Fall-through}) allows to keep each user's configuration
-in a file named @file{.rush}, located in the user's home directory:
+rule (@pxref{Fall-through}) allows the administrator to keep each
+user's configuration in a file named @file{.rush}, located in the
+user's home directory:
 
 @smallexample
 @group
 rule user
-  inlcude ~/.rush
+  include ~/.rush
   fall-through
 @end group
 @end smallexample
@@ -2075,7 +2069,7 @@ A system error occurred while attempting to execute command.
 
 You can compile @command{rush} with the default configuration built in
 the binary.  Such a binary can then be run without configuration file.
-However, if a configuration file is present, it takes priority over
+However, if a configuration file is present, it will be used instead of
 the built-in configuration.
 
 To compile @command{rush} with the built-in configuration, first
@@ -2230,7 +2224,7 @@ rule scp-from
 On the server side, @command{rsync} is executed with the
 @option{--server} command line option.  In addition, when copying
 files from the server, the @option{--sender} option is used.  This
-allows to discern between incoming and outgoing requests.
+makes it possible to discern between incoming and outgoing requests.
 
 In our setup, @command{rsync} is used the same way as @command{scp}, so
 the two rules will be:
@@ -2456,7 +2450,7 @@ EOT
 @opindex --lint
 @opindex -c
   GNU Rush provides a special @dfn{test mode}, intended to test
-configuration files and to emulate execution of commands.  The test
+configuration files and to emulate execution of commands.  Test
 mode is enabled by @option{--test} command line option (aliases:
 @option{--lint}, @option{-t}).  When @command{rush} is given this option, the 
 following occurs:
@@ -2483,19 +2477,19 @@ An exit status of 0 means no errors, 1 means an error has occurred.
 
 @opindex --user
 @opindex -u
-You may also emulate access by a particular user, by supplying his
+You can also emulate access by a particular user, by supplying his
 user name via the @option{--user} (@option{-u}) option.  This option
 implies @option{--test}.
 
 @opindex --debug
 @opindex -d
-In test mode, you may set debugging level (@pxref{Debugging}) from the
+In test mode, you can set debugging level (@pxref{Debugging}) from the
 command line, using the @option{--debug} (@option{-d}) command line
 option.  It expects a single number specifying debugging level as its
 argument.  The debugging level set this way overrides settings
 from the configuration file.
 
-  Following are several examples that illustrate the use of test mode
+  Here are several examples that illustrate the use of test mode
 in various cases:
 
 @enumerate 1
@@ -2549,7 +2543,7 @@ $ rush --test --debug=2 -c "cvs server" sample.rc
 @section Dump Mode
 @cindex dump mode
 Dump mode is similar to test mode.  The main difference is that in
-this mode, @command{rush} dumps on the standard error a description of
+this mode, @command{rush} dumps to the standard output a description of
 the user request after performing all checks and transformations.
 
 @opindex --dump
@@ -2644,6 +2638,10 @@ Locale name
 @kwindex environ, dump attribute
 @item environ
 Dump of the environment (array of assignments).
+
+@kwindex vars, dump attribute
+@item vars
+Defined variables, as a JSON object.
 @end table
 
 @kwindex all, dump attribute
@@ -2796,7 +2794,7 @@ Use @var{string} instead of the default format, described in
 @ref{Rushwho}.  @xref{Formats}, for a detailed description of the
 output format syntax.  If @var{string} begins with a @samp{@@}, then
 this character is removed from it, and the resulting string is
-regarded as a name of the file to read.  The contents of this file is
+treated as the name of the file to read.  The contents of this file is
 the format string.  The file is read literally, except that lines
 beginning with @samp{;} are ignored (they can be used to introduce
 comments).  For example, @command{rushwho --format=@@formfile} reads
@@ -2875,7 +2873,7 @@ a particular piece of information from the database record.
 
 Each format specification starts with an opening brace and ends with
 a closing brace.  The first word after the brace is the name of the
-format specification.  The rest of words are @dfn{positional arguments}
+format specification.  Remaining words are @dfn{positional arguments}
 followed by @dfn{keyword arguments}.  Both are optional.  When
 specified, keyword arguments must follow positional ones.  A keyword
 argument begins with a colon.  For example:
@@ -2899,7 +2897,7 @@ argument.  Notice the use of quoted string to preserve the
 whitespace.
 @end table
 
-The full list of format specifications follows.
+A full list of format specifications follows.
 
 @deffn {Format Spec} newline [@var{count}]
 Causes the newline character to be output.  If the optional @var{count}
@@ -2922,7 +2920,7 @@ is less than the width, they will be padded with whitespace either to
 the left or to the right, depending on the presence of the @code{:right}
 keyword argument.  If the number of characters is greater than
 @var{width}, they will be truncated to fit.  If @var{width} is
-not given, the exact data are output as is.
+not given, the field is output as is.
 
 The second argument, @var{title}, gives the title of this column for
 the heading line.  By default no title is output.
@@ -2931,7 +2929,7 @@ Every field specification accepts at least two keyword arguments.
 The keyword @code{:right} may be used to request alignment to the right
 for the data.  This keyword is ignored if @var{width} is not given.
 
-The keyword @code{:empty} followed by a string causes @command{rushwho}
+The keyword @code{:empty} followed by a string instructs @command{rushwho}
 to output that string if the resulting value for this specification
 would otherwise be empty.
 
@@ -2940,9 +2938,9 @@ Print the user login name.
 @end deffn
 
 @deffn {Format Spec} time @var{width} @var{title} @
-       [:empty @var{repl}][:right][:format @var{date-format}]
+       [:empty @var{repl}] [:right] [:format @var{date-format}]
 @deffnx {Format Spec} start-time @var{width} @var{title} @
-       [:empty @var{repl}][:right][:format @var{date-format}]
+       [:empty @var{repl}] [:right] [:format @var{date-format}]
        
 Date and time when the session started.
 
@@ -2953,14 +2951,14 @@ description of @code{strftime} format strings.
 @end deffn
 
 @deffn {Format Spec} stop-time @var{width} @var{title} @
-        [:empty @var{repl}][:right][:format @var{date-format}]
-Time when the command finished.  This specifier has sense only for
+        [:empty @var{repl}] [:right] [:format @var{date-format}]
+Time when the command finished.  This specifier is meaningful only for
 @command{rushlast} (@pxref{Rushlast}).  If the command is still
 running, the word @samp{running} is output.
 @end deffn
 
 @deffn {Format Spec} duration @var{width} @var{title} @
-       [:empty @var{repl}][:right]
+       [:empty @var{repl}] [:right]
 Total time of the session duration.
 @end deffn
 
@@ -2970,7 +2968,7 @@ detailed description of rules and tags.
 @end deffn
 
 @deffn {Format Spec} command @var{width} @var{title} @
-       [:empty @var{repl}][:right]
+       [:empty @var{repl}] [:right]
 Command line being executed.
 @end deffn
 
@@ -3109,7 +3107,7 @@ the name of the local state directory, defined at compile time.  By
 default, it is @file{@var{prefix}/var}, where @var{prefix} is the
 installation prefix, which defaults to @file{/usr/local}.  Thus, the
 default database directory is @file{/usr/local/var/rush}.  You can
-change this default by using @option{--localstatedir} option to
+change this default using the @option{--localstatedir} option to
 @command{configure} before compiling the package.  The
 @option{--prefix} option affects it as well.
 

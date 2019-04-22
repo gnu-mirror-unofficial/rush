@@ -44,7 +44,7 @@ The following shell-like notations are supported:
 ${VAR:-WORD}   Use Default Values
 ${VAR:=WORD}   Assign Default Values
 ${VAR:?WORD}   Display Error if Null or Unset
-${VAR:+WORD} "Use Alternate Value"
+${VAR:+WORD}   Use Alternate Value
 
 
 Version 1.8, 2016-10-01
