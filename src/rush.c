@@ -82,8 +82,15 @@ string_to_error_index(const char *name)
 void
 send_msg(const char *msg, size_t len)
 {
-        if (write(STDERR_FILENO, msg, len) < 0)
-                write(STDOUT_FILENO, msg, len);
+        if (write(STDERR_FILENO, msg, len) < 0) {
+		logmsg(LOG_ERR,
+		       _("failed to write message to stderr: %s"),
+		       strerror(errno));
+		if (write(STDOUT_FILENO, msg, len) < 0)
+			logmsg(LOG_ERR,
+			       _("failed to write message to stdout: %s"),
+			       strerror(errno));
+	}
 }
 
 void
@@ -1136,7 +1143,9 @@ main(int argc, char **argv)
 		struct passwd *pw = getpwnam(test_user_name);
 		if (!pw)
 			die(usage_error, NULL, _("invalid user name"));
-		setreuid(pw->pw_uid, 0);
+		if (setreuid(pw->pw_uid, 0))
+			die(system_error, NULL, "setreuid: %s",
+			    strerror(errno));
 	}
 
         uid = getuid();

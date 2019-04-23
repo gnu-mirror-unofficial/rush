@@ -21,13 +21,13 @@ percent sign followed by one-digit number of the subexpression
 
 * User-defined variables
 
-The configuration file can define new variables or reset built-in ones
-using the "setvar" statement:
+The configuration file can define new variables or redefine the
+built-in ones using the "setvar" statement:
 
   setvar[VAR] PATTERN
 
-Here, VAR is the variable name, and PATTERN is its new value. Prior to
-assignment PATTERN is subject to variable and backreference expansion.
+Here, VAR is the variable name, and PATTERN is its new value. The
+PATTERN is subject to variable and backreference expansion.
 
 User-defined variables can be unset using the "unsetvar" statement:
 
