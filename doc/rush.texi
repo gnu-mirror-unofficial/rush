@@ -1742,39 +1742,17 @@ containing original messages and their translations for a particular
 language.  @xref{PO Files, The Format of PO Files,,gettext, GNU
 gettext utilities}, for a description of its format.
 
-@cindex rush-po.awk
-  The script @command{rush-po.awk} serves for extracting messages from
-the configuration file and forming a @acronym{PO} file.  This script
-is installed in the @file{@var{prefix}/share/rush}
-directory@footnote{To be precise, it is installed in
-@file{@var{dataroot}/rush}, where @var{dataroot} is a directory for
-read-only architecture-independent data, which is set by the
-@option{--datarootdir} option to @command{configure}.  Unless that
-option is used, this directory defaults to
-@file{@var{prefix}/share/rush}}, where @var{prefix} stands for your
-installation prefix. 
-
-  Supposing the package is installed in the default prefix, the
-following command will create a @acronym{PO} file from your
-configuration file:
-
+@cindex rush-po
+@anchor{rush-po}
+  The script @command{rush-po} extracts translatable messages from the
+configuration file and produces a valid @acronym{PO} file.  It takes
+the name of the rush configuration file as its argument and produces
+the PO file on the standard output, or in the file given with the
+@option{-o} (@option{--output}) option. E.g., to create a PO file
+from your configuration file, run:
+  
 @smallexample
-@group
-  awk -f /usr/local/share/rush/rush-po.awk \
-         /usr/local/etc/rush.rc > myconf.po
-@end group
-@end smallexample
-
-  Please note, that @command{rush-po.awk} does not handle
-@code{include} directives (@pxref{Include}).  If your configuration
-file uses these directives, you need to specify each include file in
-the @command{rush-po.awk} command line, e.g.:
-
-@smallexample
-@group
-  awk -f /usr/local/share/rush/rush-po.awk \
-         /usr/local/etc/rush.rc /home/*/.rush > myconf.po
-@end group
+rush-po -o myconf.po /usr/local/etc/rush.rc
 @end smallexample
 
 @item Editing the @acronym{PO} file

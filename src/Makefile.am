@@ -16,7 +16,7 @@
 
 sbin_PROGRAMS=rush
 bin_PROGRAMS=rushlast rushwho
-pkgdata_DATA = rush-po.awk
+bin_SCRIPTS = rush-po
 
 rush_SOURCES=\
  cfck.c\
@@ -35,9 +35,11 @@ rushlast_SOURCES=rushlast.c rlopt.h
 rushwho_SOURCES=rushwho.c rwopt.h
 rushlast.c: rlopt.h
 rushwho.c: rwopt.h
-EXTRA_DIST=rush-po.awk rushopt.opt rlopt.opt rwopt.opt getopt.m4 defconf.sed
+EXTRA_DIST = rush-po rushopt.opt rlopt.opt rwopt.opt getopt.m4 defconf.sed
 AM_CPPFLAGS=-I$(top_srcdir)/gnu -I$(top_builddir)/gnu -I$(top_srcdir)/lib
 LDADD=../lib/librush.a ../gnu/libgnu.a @LTLIBINTL@
+
+AM_INSTALLCHECK_STD_OPTIONS_EXEMPT=rush-po
 
 change-suid-mode:
 	@proglist='$(sbin_PROGRAMS)'; \

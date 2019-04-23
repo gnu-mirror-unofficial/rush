@@ -28,6 +28,7 @@ dist_man_MANS=\
  rush.8\
  rushlast.1\
  rushwho.1\
+ rush-po.1\
  rush.rc.5
 
 clean-local:

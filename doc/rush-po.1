@@ -1,0 +1,61 @@
+.\" This file is part of GNU Rush.
+.\" Copyright (C) 2016-2019 Sergey Poznyakoff
+.\"
+.\" GNU Rush is free software; you can redistribute it and/or modify
+.\" it under the terms of the GNU General Public License as published by
+.\" the Free Software Foundation; either version 3, or (at your option)
+.\" any later version.
+.\"
+.\" GNU Rush is distributed in the hope that it will be useful,
+.\" but WITHOUT ANY WARRANTY; without even the implied warranty of
+.\" MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+.\" GNU General Public License for more details.
+.\"
+.\" You should have received a copy of the GNU General Public License
+.\" along with GNU Rush.  If not, see <http://www.gnu.org/licenses/>.
+.TH RUSH-PO 1 "April 23, 2019" "RUSH-PO" "Rush User Reference"
+.SH NAME
+rush\-po \- extracts translatable strings from \fBrush\.rc\fR file
+.SH SYNOPSIS
+\fBrush\-po\fR\
+ [\fB\-o \fIPOFILE\fR]\
+ [\fB\-\-output=\fIPOFILE\fR]\
+ \fIFILE\fR
+.sp
+\fBrush\-po \-h\fR | \fB\-\-help\fR
+.SH DESCRIPTION
+Extracts translatable strings from \fBrush\fR configuration file
+\fIFILE\fR.
+.PP
+Produces on output a valid portable object (PO) file that can be
+compiled into localization file using
+.BR msgfmt (1).
+.SH OPTIONS
+.TP
+\fB\-h, \fB\-\-help\fR
+Print a short help summary and exit.
+.TP
+\fB\-o, \fB\-\-output=\fIFILE\fR
+Write output to \fIFILE\fR, instead of the standard output.
+.SH SEE ALSO
+.BR rush.rc (5),
+.BR rush (8),
+.BR msgfmt (1).
+.SH "BUG REPORTS"
+Report bugs to <bug-rush@gnu.org>.
+.SH COPYRIGHT
+Copyright \(co 2019 Sergey Poznyakoff
+.br
+.na
+License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
+.br
+.ad
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
+.\" Local variables:
+.\" eval: (add-hook 'write-file-hooks 'time-stamp)
+.\" time-stamp-start: ".TH [A-Z_][A-Z0-9_.\\-]* [0-9] \""
+.\" time-stamp-format: "%:B %:d, %:y"
+.\" time-stamp-end: "\""
+.\" time-stamp-line-limit: 20
+.\" end:

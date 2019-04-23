@@ -1,0 +1,137 @@
+#! /bin/sh
+#! -*-perl-*-
+eval 'exec perl -x -wS $0 ${1+"$@"}'
+    if 0;
+# This file is part of GNU Rush.
+# Copyright (C) 2009-2019 Sergey Poznyakoff
+#
+# GNU Rush is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3, or (at your option)
+# any later version.
+#
+# GNU Rush is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with GNU Rush.  If not, see <http://www.gnu.org/licenses/>.
+
+use strict;
+use warnings;
+use File::Basename;
+use Getopt::Long qw(:config gnu_getopt no_ignore_case require_order);
+
+sub usage {
+    my $code = shift;
+    my $name = basename($0);
+    select(STDERR) if $code;
+    print "usage: $name [-o FILE] [--output=FILE] INPUT\n";
+    print <<'EOF'
+Extracts translatable strings from rush.rc to PO file
+
+Options:
+
+    -o, --output=FILE    write PO to FILE (default - standard output)
+
+Report bugs to <bug-rush@gnu.org>	
+EOF
+    ;
+    exit $code
+}
+
+sub initial_entry {
+    print <<'EOF';
+# SOME DESCRIPTIVE TITLE.
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: rush-config ADDITIONAL-DATA\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI +ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=CHARSET\n"
+"Content-Transfer-Encoding: 8bit\n"
+""
+
+EOF
+}
+
+sub scan {
+    my $filename = shift || '-';
+    my $fd;
+    if ($filename eq '-') {
+	open($fd, '<&', \*STDIN) or
+	    die "can't dup stdin: $!";
+    } else {
+	open($fd, '<', $filename) or
+	    die "can't open file $filename: $!";
+    }
+    my $line = 0;
+    my $start_line;
+    my $cont_lines = 0;
+    while (<$fd>) {
+	chomp;
+
+	if (/\\$/) {
+	    $cont_lines++;
+	    chop;
+	    $_ .= <$fd>;
+	    redo;
+	}
+
+	$start_line = $line + 1;
+	$line = $start_line + $cont_lines;
+	$cont_lines = 0;
+
+	s/\s+$//;
+	s/^\s+//;
+
+	if (/^include\s+(.+)$/) {
+	    scan($1);
+	    next;
+	}
+
+	if (s/^exit\s+\d+\s+//) {
+	    if (s/^\@\@/\@/) {
+		# ok
+	    } elsif (/^@/) {
+		next
+	    }
+	} elsif (!s/^(usage|nologin|config)-error\s+//) {
+	    next;
+	}
+
+	s{"}{\\"}g;
+	printf("#: %s:%d\n", $filename, $start_line);
+	printf("msgid \"%s\"\n", $_);
+	printf("msgstr \"\"\n\n");
+    }
+    close $fd;
+}
+
+my $outfile;
+GetOptions('output|o=s' => \$outfile,
+	   'help|usage|h' => sub { usage(0) }
+    ) or usage(1);
+
+my $input = shift @ARGV or usage(1);
+usage(1) if @ARGV;
+
+if ($input && $input ne '-') {
+    die "input file $input does not exist"
+	unless -f $input;
+    die "input file $input is unreadable"
+	unless -r $input;
+} else {
+    $input = '-';
+}
+
+if ($outfile) {
+    open(STDOUT, '>', $outfile) or die "can't open output file $outfile: $!";
+}
+
+initial_entry();
+scan($input);
