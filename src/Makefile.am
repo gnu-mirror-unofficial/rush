@@ -29,7 +29,8 @@ rush_SOURCES=\
  rush.h\
  rushopt.h\
  socket.c\
- transform.c
+ transform.c\
+ cflex.l cfgram.y cf.h cf.c
 
 rushlast_SOURCES=rushlast.c rlopt.h
 rushwho_SOURCES=rushwho.c rwopt.h
@@ -73,3 +74,8 @@ SUFFIXES=.opt .c .h
 
 .opt.h:
 	$(AM_V_GEN)m4 -s $(srcdir)/getopt.m4 $< | sed '1d' > $@
+
+AM_YFLAGS=-dt
+AM_LFLAGS=-d
+cflex.c: cfgram.h
+cfgram.h: cfgram.c

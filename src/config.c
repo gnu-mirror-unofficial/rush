@@ -20,8 +20,7 @@
 #include <sys/un.h>
 #include <netdb.h>
 #include <arpa/inet.h>
-
-static int re_flags = REG_EXTENDED;
+#include <cf.h>
 
 static char *
 skipws(char *p)
@@ -47,7 +46,7 @@ trimws(char *s)
 		s[--len] = 0;
 }
 
-static size_t
+size_t
 trimslash(char *s)
 {
 	size_t len = strlen(s);
@@ -112,89 +111,36 @@ parseuid(char *val, uid_t *puid)
 }
 
 struct input_buf {
-	char *buf;
-	size_t off;
-	size_t size;
+	CFSTREAM *cf;
 	char *file;
-	unsigned line;
+	int line;
 	struct input_buf *next;
 };
 
 typedef struct input_buf *input_buf_ptr;
 
-int
-init_input_buf(input_buf_ptr *ibufptr, const char *file)
+void
+init_input_buf(input_buf_ptr *ibufptr, input_buf_ptr next,
+	       CFSTREAM *cf, char const *filename, int line)
 {
-	struct stat st;
-	char *p;
-	size_t rest;
-	int fd;
 	input_buf_ptr ibuf;
 	
-	if (stat(file, &st)) {
-#ifdef RUSH_DEFAULT_CONFIG			
-		if (errno == ENOENT) {
-			debug(1, _("Ignoring non-existing file %s"), file);
-			return 1;
-		}
-#endif
-		die(system_error, NULL, _("cannot stat file %s: %s"),
-		    file, strerror(errno));
-	}
-	if (check_config_permissions(file, &st)) 
-		die(config_error, NULL, _("%s: file is not safe"), file);
-
-	ibuf = xzalloc(sizeof(*ibuf));
-	ibuf->size = st.st_size;
-	ibuf->buf = xmalloc(ibuf->size + 1);
-	fd = open(file, O_RDONLY);
-	if (fd == -1) 
-		die(system_error, NULL, _("cannot open file %s: %s"),
-		    file, strerror(errno));
-	rest = ibuf->size;
-	p = ibuf->buf;
-	while (rest) {
-		int n = read(fd, p, rest);
-		if (n < 0) 
-			die(system_error, NULL, _("error reading file %s: %s"),
-			    file, strerror(errno));
-		else if (n == 0)
-			die(system_error, NULL, _("read 0 bytes from file %s"),
-			    file);
-		p += n;
-		rest -= n;
-	}
-	*p = 0;
-	close(fd);
-	
-	ibuf->off = 0;
-	ibuf->line = 0;
-	ibuf->file = xstrdup(file);
-	*ibufptr = ibuf;
-	return 0;
-}
-
-void
-init_input_string(input_buf_ptr *ibufptr, const char *string)
-{
-	input_buf_ptr ibuf = xzalloc(sizeof(*ibuf));
-	ibuf->buf = xstrdup(string);
-	ibuf->size = strlen(string);
-	ibuf->off = 0;
-	ibuf->line = 0;
-	ibuf->file = xstrdup("<string>");
+	ibuf = xmalloc(sizeof(*ibuf));
+	ibuf->cf = cf;
+	ibuf->file = xstrdup(filename);
+	ibuf->line = line;
+	ibuf->next = next;
 	*ibufptr = ibuf;
 }
-
+		
 void
 free_input_buf(input_buf_ptr *ibufptr)
 {
 	if (ibufptr && *ibufptr) {
 		input_buf_ptr ibuf = *ibufptr;
+		cfstream_close(ibuf->cf);
 		/* FIXME: We cannot free ibuf->file, because it is stored
 		   in rule->tag. Need a hash table for it. */
-		/* free(ibuf->file); */
-		free(ibuf->buf);
 		free(ibuf);
 		*ibufptr = NULL;
 	}
@@ -203,40 +149,35 @@ free_input_buf(input_buf_ptr *ibufptr)
 static char *
 read_line_plain(input_buf_ptr ibuf, char **pbuf, size_t *psize)
 {
-	slist_t slist = NULL;
-	int cont;
+	char *buf = NULL;
+	size_t size = 0;
+	size_t len = 0; 
+	int c;
 	
-	do {
-		size_t len;
-		char *ptr;
-		if (ibuf->off >= ibuf->size) {
-			if (slist)
+	while (1) {
+		c = cfstream_getc(ibuf->cf);
+		if (c == 0)
+			break;
+		if (len == size)
+			buf = x2realloc(buf, &size);
+		buf[len] = c;
+		if (c == '\n') {
+			ibuf->line++;
+			if (len > 0 && buf[len-1] == '\\') {
+				len--;
+			} else 
 				break;
-			return NULL;
-		}
-		len = strcspn(ibuf->buf + ibuf->off, "\n");
-		ptr = ibuf->buf + ibuf->off;
-		ibuf->off += len + 1;
-
-		if (len == 0)
-			ibuf->line++;
-		else if (ptr[len] == '\n') 
-			ibuf->line++;
-		
-		if (len > 0 && ptr[len - 1] == '\\') {
-			len--;
-			cont = 1;
-		} else 
-			cont = 0;
-
-		if (!slist)
-			slist = slist_create();
-		slist_append(slist, ptr, len);
-	} while (cont);
-	
-	slist_reduce(slist, pbuf, psize);
-	slist_free(slist);
-	return *pbuf;
+		} else
+			len++;
+	}
+	if (buf) {
+		if (len == size)
+			buf = x2realloc(buf, &size);
+		buf[len] = 0;
+	}
+	*pbuf = buf;
+	*psize = len;
+	return buf;
 }
 
 static char *
@@ -260,7 +201,7 @@ read_line(input_buf_ptr *ibufptr, char **pbuf, size_t *psize)
 	return NULL;
 }
 
-int
+static int
 unquote_char (int c)
 {
   char *p;
@@ -272,7 +213,7 @@ unquote_char (int c)
   return c;
 }
 
-char *
+static char *
 copy_string(const char *src)
 {
 	char *p;
@@ -291,18 +232,6 @@ copy_string(const char *src)
 		*p++ = '\n';
 	*p = 0;
 	return dest;
-}
-
-struct rush_rule *
-new_rush_rule()
-{
-	struct rush_rule *p = xzalloc(sizeof(*p));
-	LIST_APPEND(p, rule_head, rule_tail);
-	p->mask = NO_UMASK;
-	p->gid = NO_GID;
-	p->fork = rush_undefined;
-	p->acct = rush_undefined;
-	return p;
 }
 
 int
@@ -377,29 +306,8 @@ check_dir(const char *dir, input_buf_ptr ibuf)
 	return 0;
 }
 	
-struct transform_node *
-new_transform_node(struct rush_rule *rule, enum transform_node_type type,
-		   int arg_no, int progmod)
-{
-	struct transform_node *p = xzalloc(sizeof(*p));
-	LIST_APPEND(p, rule->transform_head, rule->transform_tail);
-	p->type = type;
-	p->arg_no = arg_no;
-	p->progmod = progmod;
-	return p;
-}
-
-struct test_node *
-new_test_node(struct rush_rule *rule, enum test_type type)
-{
-	struct test_node *p = xzalloc(sizeof(*p));
-	LIST_APPEND(p, rule->test_head, rule->test_tail);
-	p->type = type;
-	return p;
-}
-
 int
-parse_cmp_op (enum cmp_op *op, char **pstr)
+parse_cmp_op(enum cmp_op *op, char **pstr)
 {
 	char *str = *pstr;
 	if (*str == '=') {
@@ -432,10 +340,12 @@ parse_cmp_op (enum cmp_op *op, char **pstr)
 }
 
 static char *
-_parse_negation(struct test_node *node, char *val)
+_parse_negation(struct test_node **pnode, char *val)
 {
 	if (val[0] == '!' && val[1] != '=') {
-		node->negate = 1;
+		struct test_node *neg = new_test_node(test_not);
+		neg->v.arg[0] = *pnode;
+		*pnode = neg;
 		val = skipws(val + 1);
 	}
 	return val;
@@ -443,11 +353,11 @@ _parse_negation(struct test_node *node, char *val)
 
 static int
 numstrtonum(input_buf_ptr ibuf, char *val,
-	    struct test_numeric_node *node)
+	    struct test_node *node)
 {
 	char *q;
 	
-	node->val = strtoul(val, &q, 10);
+	node->v.cmp.rarg.num = strtoul(val, &q, 10);
 	if (*q) {
 		logmsg(LOG_NOTICE,
 		       _("%s:%d: invalid number: %s"),
@@ -458,11 +368,11 @@ numstrtonum(input_buf_ptr ibuf, char *val,
 }
 
 int
-parse_numtest(input_buf_ptr ibuf, struct test_numeric_node *numtest,
+parse_numtest(input_buf_ptr ibuf, struct test_node *numtest,
 	      char *val, int (*valtonum)(input_buf_ptr, char *,
-					 struct test_numeric_node *))
+					 struct test_node *))
 {
-	if (parse_cmp_op(&numtest->op, &val)
+	if (parse_cmp_op(&numtest->v.cmp.op, &val)
 	    && val[strcspn(val, " \t")]) {
 		logmsg(LOG_NOTICE,
 		       _("%s:%d: invalid opcode"),
@@ -478,23 +388,10 @@ struct stmt_env {
 	int argc;              /* Number of arguments (if TOK_ARGN) */
 	char **argv;           /* Parsed out value */
 	int index;             /* Index, if given */
-	int progmod;           /* Modify program name */ 
+	int progmod;           /* Modify program name */
+	struct test_node *node;/* New node */
 	input_buf_ptr ret_buf; /* Return input buffer, for TOK_NEWBUF */
 };
-
-void
-parse_neg_strv(input_buf_ptr ibuf, struct test_node *node,
-	       struct stmt_env *env)
-{
-	if (env->argv[0][0] == '!' && env->argv[0][1] != '=') {
-		node->negate = 1;
-		memmove(env->argv, env->argv + 1,
-			env->argc * sizeof env->argv[0]);
-	}
-	node->v.strv = env->argv;
-	env->argv = NULL;
-	env->argc = 0;
-}
 
 void
 regexp_error(input_buf_ptr ibuf, regex_t *regex, int rc)
@@ -580,11 +477,16 @@ _parse_command(input_buf_ptr ibuf, struct rush_rule *rule,
 	struct test_node *node;
 	const char *val;
 
-	node = new_test_node(rule, test_cmdline);
-	val = _parse_negation(node, env->val);
-	rc = regcomp(&node->v.regex, val, re_flags);
+	node = new_test_node(test_cmps);
+	val = _parse_negation(&node, env->val);
+	rc = regcomp(&node->v.cmp.rarg.rx, val, re_flags);
 	if (rc) 
-		regexp_error(ibuf, &node->v.regex, rc);
+		regexp_error(ibuf, &node->v.cmp.rarg.rx, rc);
+	else {
+		node->v.cmp.op = cmp_match;
+		node->v.cmp.larg = "$command";
+	}
+	env->node = node;
 	return rc;
 }
 	
@@ -596,12 +498,21 @@ _parse_match(input_buf_ptr ibuf, struct rush_rule *rule,
 	int rc;
 	const char *val;
 	
-	node = new_test_node(rule, test_arg);
-	node->v.arg.arg_no = env->index;
-	val = _parse_negation(node, env->val);
-	rc = regcomp(&node->v.arg.regex, val, re_flags);
+	node = new_test_node(test_cmps);
+	val = _parse_negation(&node, env->val);
+	rc = regcomp(&node->v.cmp.rarg.rx, val, re_flags);
 	if (rc) 
-		regexp_error(ibuf, &node->v.regex, rc);
+		regexp_error(ibuf, &node->v.cmp.rarg.rx, rc);
+	else {
+		char buf[INT_BUFSIZE_BOUND(uintmax_t)];
+		char *p = umaxtostr(env->index, buf);
+		node->v.cmp.larg = xmalloc(strlen(p) + 4);
+		strcpy(node->v.cmp.larg, "${");
+		strcat(node->v.cmp.larg, p);
+		strcat(node->v.cmp.larg, "}");
+		node->v.cmp.op = cmp_match;
+	}
+	env->node = node;
 	return rc;
 }
 	
@@ -609,14 +520,16 @@ static int
 _parse_argc(input_buf_ptr ibuf, struct rush_rule *rule,
 	    struct stmt_env *env)
 {
-	struct test_node *node = new_test_node(rule, test_argc);
-	char *val = _parse_negation(node, env->val);
-	return parse_numtest(ibuf, &node->v.num, val, numstrtonum);
+	char *val;
+	struct test_node *node = new_test_node(test_cmpn);
+	env->node = node;
+	val = _parse_negation(&env->node, env->val);
+	node->v.cmp.larg = "$argc";
+	return parse_numtest(ibuf, node, val, numstrtonum);
 }
 
 static int
-uidtonum(input_buf_ptr ibuf, char *str,
-	 struct test_numeric_node *node)
+uidtonum(input_buf_ptr ibuf, char *str, struct test_node *node)
 {
 	uid_t uid;
 	
@@ -626,7 +539,7 @@ uidtonum(input_buf_ptr ibuf, char *str,
 		       ibuf->file, ibuf->line, str);
 		return 1;
 	}
-	node->val = uid;
+	node->v.cmp.rarg.num = uid;
 	return 0;
 }
 
@@ -634,14 +547,16 @@ static int
 _parse_uid(input_buf_ptr ibuf, struct rush_rule *rule,
 	   struct stmt_env *env)
 {
-	struct test_node *node = new_test_node(rule, test_uid);
-	char *val = _parse_negation(node, env->val);
-	return parse_numtest(ibuf, &node->v.num, val, uidtonum);
+	char *val;
+	struct test_node *node = new_test_node(test_cmpn);
+	env->node = node;
+	val = _parse_negation(&env->node, env->val);
+	node->v.cmp.larg = "$uid";
+	return parse_numtest(ibuf, node, val, uidtonum);
 }
 
 static int
-gidtonum(input_buf_ptr ibuf, char *str,
-	 struct test_numeric_node *node)
+gidtonum(input_buf_ptr ibuf, char *str, struct test_node *node)
 {
 	gid_t gid;
 	
@@ -651,7 +566,7 @@ gidtonum(input_buf_ptr ibuf, char *str,
 		       ibuf->file, ibuf->line, str);
 		return 1;
 	}
-	node->val = gid;
+	node->v.cmp.rarg.num = gid;
 	return 0;
 }
 
@@ -659,17 +574,42 @@ static int
 _parse_gid(input_buf_ptr ibuf, struct rush_rule *rule,
 	   struct stmt_env *env)
 {
-	struct test_node *node = new_test_node(rule, test_gid);
-	char *val = _parse_negation(node, env->val);
-	return parse_numtest(ibuf, &node->v.num, val, gidtonum);
+	char *val;
+	struct test_node *node = new_test_node(test_cmpn);
+	env->node = node;
+	val = _parse_negation(&env->node, env->val);
+	node->v.cmp.larg = "$gid";
+	return parse_numtest(ibuf, node, val, gidtonum);
 }
 
 static int
 _parse_user(input_buf_ptr ibuf, struct rush_rule *rule,
 	    struct stmt_env *env)
 {
-	struct test_node *node = new_test_node(rule, test_user);
-	parse_neg_strv(ibuf, node, env);
+	char *val;
+	struct test_node *node;
+
+	if (env->argc == 1) {
+		node = new_test_node(test_cmps);
+		val = _parse_negation(&node, env->val);
+		node->v.cmp.op = cmp_eq;
+		node->v.cmp.larg = "$user";
+		node->v.cmp.rarg.str = xstrdup(val);
+	} else {
+		size_t i;
+		
+		node = new_test_node(test_in);
+		val = _parse_negation(&node, env->argv[0]);
+		node->v.cmp.op = cmp_in;
+		node->v.cmp.larg = "$user";
+		node->v.cmp.rarg.strv = xcalloc(env->argc + 1,
+						sizeof node->v.cmp.rarg.strv[0]);
+		node->v.cmp.rarg.strv[0] = xstrdup(val);
+		for (i = 1; i < env->argc; i++)
+			node->v.cmp.rarg.strv[i] = xstrdup(env->argv[i]);
+		node->v.cmp.rarg.strv[i] = NULL;
+	}
+	env->node = node;
 	return 0;
 }
 
@@ -677,8 +617,18 @@ static int
 _parse_group(input_buf_ptr ibuf, struct rush_rule *rule,
 	     struct stmt_env *env)
 {
-	struct test_node *node = new_test_node(rule, test_group);
-	parse_neg_strv(ibuf, node, env);
+	char *val;
+	struct test_node *node;
+	size_t i;
+		
+	node = new_test_node(test_member);
+	val = _parse_negation(&node, env->argv[0]);
+	node->v.groups = xcalloc(env->argc + 1, sizeof node->v.groups[0]);
+	node->v.groups[0] = xstrdup(val);
+	for (i = 1; i < env->argc; i++)
+		node->v.groups[i] = xstrdup(env->argv[i]);
+	node->v.groups[i] = NULL;
+	env->node = node;
 	return 0;
 }
 
@@ -720,22 +670,22 @@ _parse_limits(input_buf_ptr ibuf, struct rush_rule *rule,
 	return 0;
 }
 
-static int
+static struct transform_node *
 _parse_transform_common(input_buf_ptr ibuf, struct rush_rule *rule,
-			struct stmt_env *env, enum transform_node_type type)
+			struct stmt_env *env)
 {
 	struct transform_node *node;
 	char *expr;
 	
 	if (check_argc(ibuf, env, 1, 3))
-		return 1;
+		return NULL;
 	else if (env->argc == 3 && strcmp(env->argv[1], "~")) {
 		logmsg(LOG_NOTICE,
 		       _("%s:%d: expected ~ as the second argument, but found %s"),
 		       ibuf->file, ibuf->line, env->argv[2]);
-		return 1;
+		return NULL;
 	}
-	node = new_transform_node(rule, type, env->index, env->progmod);
+	node = new_transform_node(rule, transform_set);
 	switch (env->argc) {
 	case 1:
 		expr = env->argv[0];
@@ -745,25 +695,43 @@ _parse_transform_common(input_buf_ptr ibuf, struct rush_rule *rule,
 		break;
 	case 3:
 		expr = env->argv[2];
+		break;
+	default:
+		abort();
 	}
-	node->v.trans = compile_transform_expr(expr, re_flags);
+	node->v.xf.trans = compile_transform_expr(expr, re_flags);
 	if (env->argc > 1) 
-		node->pattern = xstrdup(env->argv[0]);
-	return 0;
+		node->v.xf.pattern = xstrdup(env->argv[0]);
+	else
+		node->v.xf.pattern = NULL;
+	return node;
 }
 
 static int
 _parse_transform(input_buf_ptr ibuf, struct rush_rule *rule,
 		 struct stmt_env *env)
 {
-	return _parse_transform_common(ibuf, rule, env, transform_cmdline);
+	struct transform_node *node = _parse_transform_common(ibuf, rule, env);
+	if (!node)
+		return 1;
+	node->target.type = target_command;
+	return 0;
 }
 
 static int
 _parse_transform_ar(input_buf_ptr ibuf, struct rush_rule *rule,
 		    struct stmt_env *env)
 {
-	return _parse_transform_common(ibuf, rule, env, transform_arg);
+	struct transform_node *node = _parse_transform_common(ibuf, rule, env);
+	if (!node)
+		return 1;
+	if (env->progmod)
+		node->target.type = target_program;
+	else {
+		node->target.type = target_arg;
+		node->target.v.arg = env->index;
+	}
+	return 0;
 }
 
 static int
@@ -784,9 +752,90 @@ _parse_chdir(input_buf_ptr ibuf, struct rush_rule *rule,
 static int
 _parse_env(input_buf_ptr ibuf, struct rush_rule *rule, struct stmt_env *env)
 {
-	rule->env = env->argv;
-	env->argv = NULL;
-	env->argc = 0;
+	size_t i = 0;
+	
+	if (strcmp(env->argv[0], "-") == 0) {
+		rule->clrenv = 1;
+		i++;
+	}
+	for (; i < env->argc; i++) {
+		char *name = env->argv[i];
+		size_t len = strcspn(name, "=");
+		char *value;
+		size_t vlen;
+		char *mem = NULL;
+		size_t msize = 0;
+		enum envar_type type;
+		
+		if (name[0] == '-') {
+			/* Unset directive */
+			name++;
+			len--;
+			
+			if (name[len]) {
+				value = name + len + 1;
+				vlen = strlen(value);
+			} else {
+				value = NULL;
+				vlen = 0;
+			}
+			
+			type = envar_unset;
+		} else if (name[len]) {
+			if (len == 0)
+				/* Skip erroneous entry */
+				continue;
+			value = name + len + 1;
+			vlen = strlen(value);
+			name[len] = 0;
+			if (name[len-1] == '+') {
+				name[--len] = 0;
+				if (c_ispunct(value[0])) {
+					msize = 2*len + 9 + vlen + 1;
+					mem = xmalloc(msize);
+					snprintf(mem, msize,
+						 "${%s:-}${%s+%c}%s",
+						 name, name,
+						 value[0], value + 1);
+				} else {
+					msize = len + vlen + 6;
+					snprintf(mem, msize,
+						 "${%s:-}%s",
+						 name, value);
+				}
+				value = mem;
+				vlen = strlen(value);
+			} else if (value[0] == '+') {
+				value++;
+				vlen--;
+
+				if (vlen > 0 && c_ispunct(value[vlen-1])) {
+					int c = value[vlen-1];
+					value[--vlen] = 0;
+					
+					msize = 2*len + 10 + vlen + 1;
+					mem = xmalloc(msize);
+					snprintf(mem, msize,
+						 "%s${%s+%c}${%s:-}",
+						 value, name, c, name);
+				} else {
+					msize = len + vlen + 6;
+					snprintf(mem, msize,
+						 "%s${%s:-}",
+						 value, name);
+				}
+				value = mem;
+				vlen = strlen(value);
+			}
+			type = envar_set;
+		} else {
+			value = NULL;
+			vlen = 0;
+			type = envar_keep;
+		}
+		new_envar(rule, name, len, value, vlen, type);
+		free(mem);
+	}
 	return 0;
 }
 
@@ -862,6 +911,7 @@ _parse_exit(input_buf_ptr ibuf, struct rush_rule *rule,
 	    struct stmt_env *env)
 {
 	const char *val = env->val;
+	int error_fd;
 	if (c_isdigit(val[0])) {
 		char *p;
 		unsigned long n = strtoul(val, &p, 10);
@@ -872,19 +922,24 @@ _parse_exit(input_buf_ptr ibuf, struct rush_rule *rule,
 			return 1;
 		}
 		val = skipws(p);
-		rule->error_fd = n;
+		error_fd = n;
 	} else
-		rule->error_fd = 2;
-	if (val[0] == '@' && val[1] != '@') {
-		if (string_to_error_index(val + 1) == -1) {
-			logmsg(LOG_NOTICE,
-			       _("%s:%d: Unknown message reference"),
-			       ibuf->file, ibuf->line);
-			return 1;			
-		} else
-			rule->error_msg = xstrdup(val);
+		error_fd = 2;
+	if (val[0] == '@') {
+		if (val[1] != '@')
+			rule->error = new_error(error_fd, val + 1, 1);
+		else {
+			int n = string_to_error_index(val + 1);
+			if (n == -1) {
+				logmsg(LOG_NOTICE,
+				       _("%s:%d: Unknown message reference"),
+				       ibuf->file, ibuf->line);
+				return 1;
+			}
+			rule->error = new_standard_error(error_fd, n);
+		}
 	} else
-		rule->error_msg = copy_string(val);
+		rule->error = new_error(error_fd, val, 1);
 	return 0;
 }
 
@@ -1209,9 +1264,9 @@ static int
 _parse_include(input_buf_ptr ibuf, struct rush_rule *rule,
 	       struct stmt_env *env)
 {
-	int rc;
 	char *name;
 	struct stat st;
+	CFSTREAM *cf;
 	
 	name = expand_tilde(env->val, rush_pw->pw_dir);
 
@@ -1241,11 +1296,15 @@ _parse_include(input_buf_ptr ibuf, struct rush_rule *rule,
 	if (S_ISDIR(st.st_mode)) {
 		char *file = make_file_name(name, rush_pw->pw_name);
 		free(name);
+		if (access(file, F_OK)) {
+			return 0;
+		}
 		name = file;
-	} 
-	rc = init_input_buf(&env->ret_buf, name);
+	}
+	cf = cfstream_open_file(name);
+	init_input_buf(&env->ret_buf, ibuf, cf, name, 1);
 	free(name);
-	return rc;
+	return 0;
 }
 
 static int
@@ -1291,8 +1350,14 @@ _parse_map_ar(input_buf_ptr ibuf, struct rush_rule *rule,
 	if (check_argc(ibuf, env, 5, 6))
 		return 1;
 
-	node = new_transform_node(rule, transform_map, env->index,
-				  env->progmod);
+	node = new_transform_node(rule, transform_map);
+	if (env->progmod)
+		node->target.type = target_program;
+	else {
+		node->target.type = target_arg;
+		node->target.v.arg = env->index;
+	}
+
 	node->v.map.file = xstrdup(env->argv[0]);
 	node->v.map.delim = xstrdup(env->argv[1]);
 	node->v.map.key = xstrdup(env->argv[2]);
@@ -1322,9 +1387,10 @@ static int
 _parse_delete_ar(input_buf_ptr ibuf, struct rush_rule *rule,
 		 struct stmt_env *env)
 {
-	struct transform_node *node = new_transform_node(rule,
-							 transform_delarg,
-							 env->index, 0);
+	struct transform_node *node =
+		new_transform_node(rule, transform_delete);
+	node->target.type = target_arg;
+	node->target.v.arg = env->index;
 	node->v.arg_end = env->index;
 	return 0;
 }
@@ -1365,7 +1431,9 @@ _parse_delete(input_buf_ptr ibuf, struct rush_rule *rule,
 		return 1;
 	}
 	
-	node = new_transform_node(rule, transform_delarg, from, 0);
+	node = new_transform_node(rule, transform_delete);
+	node->target.type = target_arg;
+	node->target.v.arg = from;
 	node->v.arg_end = to;
 	return 0;
 }
@@ -1374,10 +1442,10 @@ static int
 _parse_set(input_buf_ptr ibuf, struct rush_rule *rule,
 	   struct stmt_env *env)
 {
-	struct transform_node *node = new_transform_node(rule,
-							 transform_setcmd,
-							 0, 0);
-	node->pattern = xstrdup(env->val);
+	struct transform_node *node = new_transform_node(rule, transform_set);
+	node->target.type = target_command;
+	node->v.xf.pattern = xstrdup(env->val);
+	node->v.xf.trans = NULL;
 	return 0;
 }
 	
@@ -1385,11 +1453,15 @@ static int
 _parse_set_ar(input_buf_ptr ibuf, struct rush_rule *rule,
 	      struct stmt_env *env)
 {
-	struct transform_node *node = new_transform_node(rule,
-							 transform_setarg,
-							 env->index,
-							 env->progmod);
-	node->pattern = xstrdup(env->val);
+	struct transform_node *node = new_transform_node(rule, transform_set);
+	if (env->progmod)
+		node->target.type = target_program;
+	else {
+		node->target.type = target_arg;
+		node->target.v.arg = env->index;
+	}
+	node->v.xf.pattern = xstrdup(env->val);
+	node->v.xf.trans = NULL;
 	return 0;
 }
 
@@ -1397,11 +1469,11 @@ static int
 _parse_setvar(input_buf_ptr ibuf, struct rush_rule *rule,
 	      struct stmt_env *env)
 {
-	struct transform_node *node = new_transform_node(rule,
-							 transform_setvar,
-							 0, 0);
-	node->v.varname = xstrdup(env->argv[0]);
-	node->pattern = xstrdup(env->argv[1]);
+	struct transform_node *node = new_transform_node(rule, transform_set);
+	node->target.type = target_var;
+	node->target.v.name = xstrdup(env->argv[0]);
+	node->v.xf.pattern = xstrdup(env->argv[1]);
+	node->v.xf.trans = NULL;
 	return 0;
 }	
 
@@ -1409,11 +1481,10 @@ static int
 _parse_unsetvar(input_buf_ptr ibuf, struct rush_rule *rule,
 		struct stmt_env *env)
 {
-	struct transform_node *node = new_transform_node(rule,
-							 transform_unsetvar,
-							 0, 0);
-	node->v.varname = xstrdup(env->argv[0]);
-	node->pattern = NULL;
+	struct transform_node *node =
+		new_transform_node(rule, transform_delete);
+	node->target.type = target_var;
+	node->target.v.name = xstrdup(env->argv[0]);
 	return 0;
 }	
 
@@ -1669,10 +1740,22 @@ parse_input_buf(input_buf_ptr ibuf)
 
 		rc = tok->parser(ibuf, rule, &env);
 		err |= rc;
-		if (rc == 0 && tok->flags & TOK_NEWBUF && env.ret_buf) {
-			env.ret_buf->next = ibuf;
-			ibuf = env.ret_buf;
-			debug(3, _("Parsing %s"), ibuf->file);
+		if (rc == 0) {
+			if (tok->flags & TOK_NEWBUF && env.ret_buf) {
+				env.ret_buf->next = ibuf;
+				ibuf = env.ret_buf;
+				debug(3, _("Parsing %s"), ibuf->file);
+			}
+			if (env.node) {
+				if (rule->test_node) {
+					struct test_node *np =
+						new_test_node(test_and);
+					np->v.arg[0] = rule->test_node;
+					np->v.arg[1] = env.node;
+					rule->test_node = np;
+				} else
+					rule->test_node = env.node;
+			}
 		}
 		if (tok->flags & (TOK_ARGN|TOK_ASSC)) 
 			argcv_free(env.argc, env.argv);
@@ -1682,24 +1765,11 @@ parse_input_buf(input_buf_ptr ibuf)
 		die(config_error, NULL, _("errors parsing config file"));
 }
 
-#ifdef RUSH_DEFAULT_CONFIG
-const char default_entry[] = 
-RUSH_DEFAULT_CONFIG
-;	
-#endif
-
 void
-parse_config()
+cfparse_old(CFSTREAM *cf, char const *filename, int line)
 {
 	input_buf_ptr buf;
 
-	if (init_input_buf(&buf, rush_config_file) == 0) {
-		parse_input_buf(buf);
-#ifdef RUSH_DEFAULT_CONFIG
-	} else {
-		debug(1, _("Falling back to the default configuration"));
-		init_input_string(&buf, default_entry);
-		parse_input_buf(buf);
-#endif
-	}
+	init_input_buf(&buf, NULL, cf, filename, line - 1);
+	parse_input_buf(buf);
 }

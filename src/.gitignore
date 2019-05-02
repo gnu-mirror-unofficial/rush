@@ -5,3 +5,8 @@ rushwho
 rlopt.h
 rushopt.h
 rwopt.h
+cfgram.h
+cfgram.c
+cflex.c
+y.output
+y.tab.c

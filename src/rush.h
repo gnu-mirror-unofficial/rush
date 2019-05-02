@@ -93,71 +93,82 @@ struct rush_map {
 	unsigned val_field;
 	char *defval;
 };
-	
+
+enum transform_target_type {
+	target_command,      /* Command line */
+	target_program,      /* Executable program name */
+	target_arg,          /* Single command line argument */
+	target_var,          /* Variable */
+	target_env           /* Environment variable */
+};
+
+struct transform_target {
+	enum transform_target_type type;
+	union {
+		char *name;
+		int arg;
+	} v;
+};
+
 enum transform_node_type {
-	transform_cmdline,
-	transform_arg,
+	transform_set,
+	transform_delete,
 	transform_map,
-	transform_delarg,
-	transform_setcmd,
-	transform_setarg,
-	transform_setvar,
-	transform_unsetvar,
 };
 
 struct transform_node {
 	struct transform_node *next;
 	enum transform_node_type type;
-	int arg_no;
-	int progmod;
-	char *pattern;
+	struct transform_target target;
 	union {
-		transform_t trans;
-		struct rush_map map;
-		int arg_end;
-		char *varname;
+		struct {
+			char *pattern;
+			transform_t trans;
+		} xf;
+		struct rush_map map;    /* For transform_map */
+		int arg_end;            /* For tranform_delete, if target.type
+					   is target_arg */
 	} v;
 };
+
+enum test_type {
+	test_cmpn,
+	test_cmps,
+	test_in,
+	test_member,
+	test_and,
+	test_or,
+	test_not
+};
 
-/* Comparison operator */
 enum cmp_op {
 	cmp_eq,
 	cmp_ne,
 	cmp_lt,
 	cmp_le,
 	cmp_gt,
-	cmp_ge
+	cmp_ge,
+	cmp_match,
+	cmp_in
 };
 
-enum test_type {
-	test_cmdline,
-	test_arg,
-	test_argc,
-	test_uid,
-	test_gid,
-	test_user,
-	test_group,
-};
-
-struct test_numeric_node {
-	enum cmp_op op;
-	unsigned long val; /* FIXME: Should be uintmax_t? */
-};
-
-struct test_arg_node {
-	int arg_no;
-	regex_t regex;
-};
+typedef unsigned long rush_num_t;
 
 struct test_node {
-	struct test_node *next;
 	enum test_type type;
-	int negate;
 	union {
-		regex_t regex;
-		struct test_arg_node arg;
-		struct test_numeric_node num;
-		char **strv;
+		struct {
+			enum cmp_op op;
+			char *larg;
+			union {
+				char *str;
+				char **strv;
+				regex_t rx;
+				rush_num_t num;
+			} rarg;
+		} cmp;
+		char **groups;
+		struct test_node *arg[2];
 	} v;
 };
 
@@ -167,12 +178,32 @@ struct rush_sockaddr {
 };
 
 enum rush_three_state { rush_undefined = -1, rush_false, rush_true };
+typedef enum rush_three_state rush_bool_t;
 
 struct rush_i18n {
 	char *text_domain;           /* Gettext domain, if any */
 	char *localedir;             /* Locale directory, if any */
 	char *locale;
 };	
+
+struct rush_error {     /* Rush error object */
+	int fd;         /* File descriptor to write to */
+	int idx;        /* Index of the standard error message, or -1 for
+			   user-defined message */
+};
+
+enum envar_type {
+	envar_set,
+	envar_unset,
+	envar_keep
+};
+
+struct envar {
+	struct envar *next;
+	enum envar_type type;
+	char *name;
+	char *value;
+};
 
 struct rush_rule {
 	struct rush_rule *next;      /* Next config in the list */
@@ -186,17 +217,17 @@ struct rush_rule {
 	int line;                         /* and line number. */
 	
 	/* Match parameters */
-	struct test_node *test_head, *test_tail;
+	struct test_node *test_node;
 	
 	/* Transformation parameters: */
 	struct transform_node *transform_head, *transform_tail;
 
 	/* Environment modification: */
-	char **env;
+	int clrenv;
+	struct envar *envar_head, *envar_tail;
 
 	/* If not NULL, print this message on ERROR_FD and exit */
-	char *error_msg;
-	int error_fd;
+	struct rush_error *error;
 
 	struct rush_i18n i18n;
 	
@@ -248,6 +279,11 @@ struct rush_request {
 	int backref_cur;
 	size_t backref_count;
 
+	/* Constructed environment */
+	char **env;
+	size_t env_count;
+	size_t env_max;
+
 	/* Temporary variable storage */
 	char **var_kv;
 	size_t var_count;
@@ -278,14 +314,17 @@ extern struct passwd *rush_pw;
 void die(enum error_type type, struct rush_i18n *i18n, const char *fmt, ...)
 	 RUSH_NORETURN RUSH_PRINTFLIKE(3,4);
 void logmsg(int prio, const char *fmt, ...)  RUSH_PRINTFLIKE(2,3);
+void vlogmsg(int prio, const char *fmt, va_list ap);
 
+enum {
+	lrec_ok = 0,
+	lrec_error = 1,
+	lrec_badval = 2
+};
+limits_record_t limits_record_create(void);
+int limits_record_add(limits_record_t lrec, char *str, char **endp);
 int parse_limits(limits_record_t *plrec, char *str, char **endp);
 int set_user_limits(const char *name, struct limits_rec *lrec);
-
-void parse_config(void);
-
-void set_error_msg(enum error_type type, char *text);
-int string_to_error_index(const char *name);
 
 transform_t compile_transform_expr (const char *expr, int cflags);
 char *transform_string (struct transform *tf, const char *input);
@@ -319,8 +358,19 @@ int cfck_keyword(const char *name);
 /* map.c */
 char *map_string(struct rush_map *map, struct rush_request *req);
 char *rush_expand_string(const char *string, struct rush_request *req);
+char **rush_request_getvar(struct rush_request *req, char const *varname);
+void rush_request_delvar(struct rush_request *req, char const *varname);
 
 /* dump.c */
 void dump_request(struct rush_request *req, FILE *fp);
+
+/* rush_error management */
+void set_error_msg(enum error_type type, char *text);
+int string_to_error_index(const char *name);
+
+struct rush_error *new_standard_error(int fd, int idx);
+struct rush_error *new_error(int fd, char const *text, int unescape);
+char const *rush_error_msg(struct rush_error const *err,
+			   struct rush_i18n const *i18n);
 
 

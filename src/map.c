@@ -117,6 +117,13 @@ var_command(struct rush_request *req)
 	return req->cmdline;
 }
 
+static const char *
+var_argc(struct rush_request *req)
+{
+	static char buf[INT_BUFSIZE_BOUND(uintmax_t)];
+	return umaxtostr(req->argc, buf);
+}
+
 struct vardef {
 	char *name;
 	const char *(*expand)(struct rush_request *);
@@ -131,16 +138,75 @@ static struct vardef request_vars[] = {
 	{ "gecos",   var_gecos },
 	{ "program", var_program },
 	{ "command", var_command },
+	{ "argc",    var_argc },
 	{ NULL }
 };
+
+char **
+rush_request_getvar(struct rush_request *req, char const *varname)
+{
+	size_t i;
+	struct vardef *vd;
+	char const *s;
+	
+	if (req->var_kv) {
+		for (i = 0; i < req->var_count; i += 2)
+			if (strcmp(req->var_kv[i], varname) == 0)
+				return &req->var_kv[i+1];
+	}
+
+	s = NULL;
+	for (vd = request_vars; vd->name; vd++) {
+		if (strcmp(vd->name, varname) == 0) {
+			s = vd->expand(req);
+			break;
+		}
+	}
+	
+	while (req->var_count + 3 >= req->var_max)
+		req->var_kv = x2nrealloc(req->var_kv, &req->var_max,
+					 sizeof(req->var_kv[0]));
+	req->var_kv[req->var_count++] = xstrdup(varname);
+	req->var_kv[req->var_count++] = s ? strdup(s) : NULL;
+	req->var_kv[req->var_count] = NULL;
+
+	return &req->var_kv[req->var_count - 1];
+}	
+
+void
+rush_request_delvar(struct rush_request *req, char const *varname)
+{
+	size_t i;
+	
+	for (i = 0; i < req->var_count; i += 2) {
+		if (strcmp(req->var_kv[i], varname) == 0) {
+			free(req->var_kv[i]);
+			free(req->var_kv[i+1]);
+			memmove(req->var_kv + i, req->var_kv + i + 2,
+				(req->var_count - (i + 2) + 1)
+				* sizeof req->var_kv[0]);
+			req->var_count -= 2;
+			break;
+		}
+	}
+}
 
 static int
 getvar(char **ret, const char *var, size_t len, void *clos)
 {
-	const char *s = NULL;
 	struct rush_request *req = clos;
+	const char *s = NULL;
+	char *p;
 	
-	if (c_isdigit(*var)) {
+	if (*var == '-') {
+		unsigned long n;
+		errno = 0;
+		n = strtoul(var + 1, NULL, 10);
+		if (errno || n == 0 || n > req->argc)
+			return WRDSE_UNDEF;
+		n = req->argc - n;
+		s = req->argv[n];
+	} else if (c_isdigit(*var)) {
 		unsigned long n;
 		errno = 0;
 		n = strtoul(var, NULL, 10);
@@ -155,17 +221,29 @@ getvar(char **ret, const char *var, size_t len, void *clos)
 				break;
 			}
 		}
+		
+		if (!s && req->env_count) {
+			/* Look up in the environment */
+			int i;
+
+			for (i = 0; req->env[i]; i++) {
+				if (strlen(req->env[i]) > len
+				    && req->env[i][len] == '='
+				    && memcmp(req->env[i], var, len) == 0) {
+					s = req->env[i] + len + 1;
+					break;
+				}
+			}
+		}
 	}
 
-	if (s) {
-		char *p = strdup(s);
-		if (!p)
-			return WRDSE_NOSPACE;
-		*ret = p;
-		return WRDSE_OK;
-	}
-
-	return WRDSE_UNDEF;
+	if (!s) 
+		return WRDSE_UNDEF;
+	p = strdup(s);
+	if (!p)
+		return WRDSE_NOSPACE;
+	*ret = p;
+	return WRDSE_OK;
 }
 
 char *

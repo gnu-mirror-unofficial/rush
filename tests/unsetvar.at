@@ -23,7 +23,7 @@ rule first
   setvar[FOO] bar
   fall-through
 
-rule inetrmediate
+rule intermediate
   unsetvar[count]
   fall-through
   

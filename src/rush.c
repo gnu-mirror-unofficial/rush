@@ -15,6 +15,7 @@
    along with GNU Rush.  If not, see <http://www.gnu.org/licenses/>. */
 
 #include <rush.h>
+#include <cf.h>
 
 extern char **environ;
 
@@ -77,7 +78,73 @@ string_to_error_index(const char *name)
 			return i;
 	return -1;
 }
+
+struct rush_error *
+new_standard_error(int fd, int idx)
+{
+	struct rush_error *err = xmalloc(sizeof(*err));
+	err->fd = fd;
+	err->idx = idx;
+	return err;
+}
+
+static inline char *
+error_text_ptr(struct rush_error const *err)
+{
+	return (char*)(err + 1);
+}
+
+struct rush_error *
+new_error(int fd, char const *text, int unescape)
+{
+	struct rush_error *err;
+	size_t len = strlen(text);
+	int add_nl = len > 0 && text[len-1] != '\n';
+	int c;
+	char *p;
 	
+	err = xmalloc(sizeof(*err) + strlen(text) + (add_nl ? 1 : 0) + 1);
+	err->fd = fd;
+	err->idx = -1;
+	p = error_text_ptr(err);
+	while ((c = *text++) != 0) {
+		if (unescape && c == '\\' && *text) {
+			int c1 = wordsplit_c_unquote_char(*text);
+			if (c1) 
+				c = c1;
+			else
+				c = *text;
+			text++;
+		}	
+		*p++ = c;
+	}
+	if (add_nl)
+		*p++ = '\n';
+	*p = 0;
+	
+	return err;
+}
+
+char const *
+rush_error_msg(struct rush_error const *err, struct rush_i18n const *i18n)
+{	
+	const char *msg;
+	if (err->idx >= 0) {
+		msg = error_msg[err->idx].text;
+		if (error_msg[err->idx].custom) {
+			/* If it is a customized version, translate it via
+			   user-supplied i18n */
+			if (i18n) 
+				msg = user_gettext(i18n->locale,
+						   i18n->text_domain,
+						   i18n->localedir,
+						   msg);
+		} else
+			msg = gettext(msg);
+	} else
+		msg = gettext(error_text_ptr(err));
+	return msg;
+}
 
 void
 send_msg(const char *msg, size_t len)
@@ -164,8 +231,41 @@ xalloc_die()
         die(system_error, NULL, _("Not enough memory"));
 }
 
+static rush_bool_t
+eval_cmpn(struct test_node *node,
+	  struct rush_rule *rule, struct rush_request *req)
+{
+	char *str = rush_expand_string(node->v.cmp.larg, req);
+	char *p;
+	unsigned long n;
+
+	errno = 0;
+	n = strtoul(str, &p, 0);
+	if (errno || *p)
+		die(system_error, NULL, _("%s: not a number"), str);
+	free(str);
+	switch (node->v.cmp.op) {
+	case cmp_eq:
+		return n == node->v.cmp.rarg.num;
+	case cmp_ne:
+		return n != node->v.cmp.rarg.num;
+	case cmp_lt:
+		return n < node->v.cmp.rarg.num;
+	case cmp_le:
+		return n <= node->v.cmp.rarg.num;
+	case cmp_gt:
+		return n > node->v.cmp.rarg.num;
+	case cmp_ge:
+		return n >= node->v.cmp.rarg.num;
+	default:
+		die(system_error, NULL,
+		    _("INTERNAL ERROR at %s:%d: unrecognized opcode %d"),
+		    __FILE__, __LINE__, node->v.cmp.op);
+	}
+}
+
 static int
-test_regex(struct rush_request *req, regex_t *rx, char const *subj)
+eval_regex(struct rush_request *req, regex_t *rx, char const *subj)
 {
 	int rc;
 	struct rush_backref *bref = &req->backref[!req->backref_cur];
@@ -185,134 +285,117 @@ test_regex(struct rush_request *req, regex_t *rx, char const *subj)
 	return rc;
 }
 
-static int
-test_request_cmdline(struct test_node *node, struct rush_request *req)
+static rush_bool_t
+eval_cmps(struct test_node *node,
+	  struct rush_rule *rule, struct rush_request *req)
 {
-	return test_regex(req, &node->v.regex, req->cmdline);
+	char *str = rush_expand_string(node->v.cmp.larg, req);
+	rush_bool_t res = rush_false;
+	
+	switch (node->v.cmp.op) {
+	case cmp_eq:
+		res = strcmp(str, node->v.cmp.rarg.str) == 0;
+		break;
+	case cmp_ne:
+		res = strcmp(str, node->v.cmp.rarg.str) != 0;
+		break;
+	case cmp_match:
+		res = ! eval_regex(req, &node->v.cmp.rarg.rx, str);
+		break;
+	default:
+		die(system_error, NULL,
+		    _("INTERNAL ERROR at %s:%d: unrecognized opcode %d"),
+		    __FILE__, __LINE__, node->v.cmp.op);
+	}
+	free(str);
+	return res;
 }
 
-#define ARG_NO(n,argc) (((n) < 0) ? (argc) + (n) : (n))
-
-static int
-test_request_arg(struct test_node *node, struct rush_request *req)
+static rush_bool_t
+eval_in(struct test_node *node,
+	struct rush_rule *rule, struct rush_request *req)
 {
-        int n = ARG_NO(node->v.arg.arg_no, req->argc);
-        if (n < 0 || n >= req->argc)
-                return 1;
-        return test_regex(req, &node->v.arg.regex, req->argv[n]);
+	size_t i;
+	rush_bool_t res = rush_false;
+	char *str = rush_expand_string(node->v.cmp.larg, req);
+
+	for (i = 0; node->v.cmp.rarg.strv[i]; i++)
+		if (strcmp(str, node->v.cmp.rarg.strv[i]) == 0) {
+			res = rush_true;
+			break;
+		}
+	free(str);
+	return res;
 }
-
-static int
-test_num_p(struct test_numeric_node *node, unsigned long val)
+	
+static rush_bool_t
+groupmember(char const *gname, struct passwd const *pw)
 {
-        switch (node->op) {
-        case cmp_eq:
-                return val == node->val;
-        case cmp_ne:
-                return val != node->val;
-        case cmp_lt:
-                return val < node->val;
-        case cmp_le:
-                return val <= node->val;
-        case cmp_gt:
-                return val > node->val;
-        case cmp_ge:
-                return val >= node->val;
-        }
-        return 0;
-}
-
-static int
-test_request_argc(struct test_node *node, struct rush_request *req)
-{
-        return !test_num_p(&node->v.num, req->argc);
-}
-
-static int
-test_request_uid(struct test_node *node, struct rush_request *req)
-{
-        return !test_num_p(&node->v.num, req->pw->pw_uid);
-}
-
-static int
-test_request_gid(struct test_node *node, struct rush_request *req)
-{
-        return !test_num_p(&node->v.num, req->pw->pw_gid);
-}
-
-static int
-groupcmp(char *gname, struct passwd *pw)
-{
-        struct group *grp;
-        grp = getgrnam(gname);
+        struct group *grp = getgrnam(gname);
         if (grp) {
 		char **p;
-
+		
 		if (pw->pw_gid == grp->gr_gid)
-                        return 0;
+                        return rush_true;
 
 		for (p = grp->gr_mem; *p; p++) {
 			if (strcmp(*p, pw->pw_name) == 0)
-				return 0;
+				return rush_true;
 		}
         }
-        return 1;
+        return rush_false;
 }
 
-static int
-test_request_group(struct test_node *node, struct rush_request *req)
+static rush_bool_t
+eval_member(struct test_node *node,
+	    struct rush_rule *rule, struct rush_request *req)
 {
-        char **p;
-        
-        for (p = node->v.strv; *p; p++) 
-                if (groupcmp(*p, req->pw) == 0)
-                        return 0;
-        return 1;
+	size_t i;
+
+	for (i = 0; node->v.groups[i]; i++) {
+		if (groupmember(node->v.groups[i], req->pw))
+			return rush_true;
+	}
+	return rush_false;
 }
 
-static int
-test_request_user(struct test_node *node, struct rush_request *req)
+rush_bool_t
+test_eval(struct test_node *node,
+	  struct rush_rule *rule, struct rush_request *req)
 {
-        char **p;
-        
-        for (p = node->v.strv; *p; p++) 
-                if (strcmp(*p, req->pw->pw_name) == 0)
-                        return 0;
-        return 1;
+	switch (node->type) {
+	case test_cmpn:
+		return eval_cmpn(node, rule, req);
+		
+	case test_cmps:
+		return eval_cmps(node, rule, req);
+
+	case test_in:
+		return eval_in(node, rule, req);
+
+	case test_member:
+		return eval_member(node, rule, req);
+		
+	case test_and:
+		if (!test_eval(node->v.arg[0], rule, req))
+			return 0;
+		return test_eval(node->v.arg[1], rule, req);
+		
+	case test_or:
+		if (test_eval(node->v.arg[0], rule, req))
+			return 1;
+		return test_eval(node->v.arg[1], rule, req);
+
+	case test_not:
+		return ! test_eval(node->v.arg[0], rule, req);
+
+	default:
+		die(system_error, NULL,
+		    _("INTERNAL ERROR at %s:%d: unrecognized node type %d"),
+		    __FILE__, __LINE__, node->type);
+	}
 }
-
-static int (*test_request[])(struct test_node *, struct rush_request *) = {
-        [test_cmdline]     = test_request_cmdline,
-        [test_arg]         = test_request_arg,
-        [test_argc]        = test_request_argc,
-        [test_uid]         = test_request_uid,
-        [test_gid]         = test_request_gid,
-        [test_user]        = test_request_user,
-        [test_group]       = test_request_group,
-};
-
-static int
-run_tests(struct rush_rule *rule, struct rush_request *req)
-{
-        struct test_node *node;
-        for (node = rule->test_head; node; node = node->next) {
-                int res;
-                
-                if (node->type >= sizeof(test_request)/sizeof(test_request[0]))
-                        die(system_error,
-			    &req->i18n,
-                            _("%s:%d: INTERNAL ERROR: node type out of range"),
-                            __FILE__, __LINE__);
-
-                res = test_request[node->type](node, req);
-                if (node->negate)
-                        res = !res;
-                if (res) 
-                        return 1;
-        }
-        return 0;
-}
-
+
 char *
 make_file_name(const char *dir, const char *name)
 {
@@ -358,172 +441,120 @@ expand_dir(const char *dir, struct rush_request *req)
 	return exp;
 }
 
-/* Find variable NAME in environment ENV.
-   On success, store the index of the ENV slot in *IDX,
-   the offset of the value (position right past '=') in *VALOFF, and
-   return 0 (IDX and/or VALOFF can be NULL, if that info is not needed).
-   Return -1 if NAME was not found. */
-static int
-find_env_pos(char **env, char *name, int *idx, int *valoff)
+void
+request_set_env(struct rush_request *req)
 {
-        int nlen = strcspn(name, "+=");
-        int i;
+	size_t i;
 
-        for (i = 0; env[i]; i++) {
-                size_t elen = strcspn(env[i], "=");
-                if (elen == nlen && memcmp(name, env[i], nlen) == 0) {
-			if (idx)
-				*idx = i;
-			if (valoff)
-				*valoff = elen + 1;
-			return 0;
+	for (i = 0; environ[i]; i++)
+		;
+	req->env_count = i;
+	req->env_max = i + 1;
+	req->env = xcalloc(req->env_max, sizeof(req->env[0]));
+
+	for (i = 0; i < req->env_count; i++)
+		req->env[i] = xstrdup(environ[i]);
+	req->env[i] = NULL;
+}
+
+static ssize_t
+getenvind(struct rush_request *req, char const *name, char **pval)
+{
+	size_t i;
+	for (i = 0; i < req->env_count; i++) {
+		char const *p;
+		char *q;
+
+		for (p = name, q = req->env[i]; *p == *q; p++, q++)
+			;
+		if (*p == 0 && *q == '=') {
+			if (pval)
+				*pval = q + 1;
+			return i;
 		}
-        }
-        return -1;
+	}
+	return -1;
 }
 
-/* Find variable NAME in environment ENV.
-   On success, return pointer to the variable assignment (if VAL is 0),
-   or to the value (if VAL is 1).
-   Return NULL if NAME is not present in ENV. */
-static char *
-find_env_ptr(char **env, char *name, int val)
+static rush_bool_t
+keep_envar(struct rush_rule *rule, char const *var)
 {
-	int i, j;
-	if (find_env_pos(env, name, &i, &j))
-		return NULL;
-	return val ? env[i] + j : env[i];
+	struct envar *ev;
+	int len = strcspn(var, "=");
+	for (ev = rule->envar_head; ev; ev = ev->next) {
+		if (ev->type == envar_keep && strncmp(ev->name, var, len) == 0)
+			return rush_true;
+	}
+	return rush_false;
 }
 
-/* Return 1 if ENV contains a matching unset statement for variable NAME. */
-static int
-var_is_unset(char **env, const char *name)
+static void
+env_setup(struct rush_rule *rule, struct rush_request *req)
 {
-        volatile int i;
-        int nlen = strcspn(name, "=");
+	struct envar *ev;
+	size_t i;
+	
+	if (rule->clrenv) {
+		size_t keep_count = 0;
+		for (i = 0; i < req->env_count; i++) {
+			if (keep_envar(rule, req->env[i])) {
+				if (i > keep_count) {
+					req->env[keep_count] = req->env[i];
+					req->env[i] = NULL;
+				}
+				keep_count++;
+			} else {
+				free(req->env[i]);
+				req->env[i] = NULL;
+			}
+		}
+		req->env_count = keep_count;
+	}
 
-        for (i = 0; env[i]; i++) {
-                if (env[i][0] == '-') {
-                        size_t elen = strcspn(env[i] + 1, "=");
-                        if (elen == nlen
-                            && memcmp(name, env[i] + 1, nlen) == 0) {
-                                if (env[i][nlen + 1])
-                                        return strcmp(name + nlen,
-                                                      env[i] + 1 + nlen) == 0;
-                                else
-                                        return 1;
-                        }
-                }
-        }
-        return 0;
-}
-
-static char *
-env_concat(char *name, size_t namelen, char *a, char *b)
-{
-        char *res;
-        size_t len;
-        
-        if (a && b) {
-                res = xmalloc(namelen + 1 + strlen(a) + strlen(b) + 1);
-                strcpy(res + namelen + 1, a);
-                strcat(res + namelen + 1, b);
-        } else if (a) {
-                len = strlen(a);
-                if (c_ispunct(a[len-1]))
-                        len--;
-                res = xmalloc(namelen + 1 + len + 1);
-                memcpy(res + namelen + 1, a, len);
-                res[namelen + 1 + len] = 0;
-        } else /* if (a == NULL) */ {
-                if (c_ispunct(b[0]))
-                        b++;
-		len = strlen(b);
-                res = xmalloc(namelen + 1 + len + 1);
-                strcpy(res + namelen + 1, b);
-        }
-        memcpy(res, name, namelen);
-        res[namelen] = '=';
-        return res;
-}
-        
-static char **
-env_setup(char **env)
-{
-        char **old_env = environ;
-        char **new_env;
-        int count, i, j, n;
-        
-        if (!env)
-                return old_env;
-
-        if (strcmp(env[0], "-") == 0) {
-                old_env = NULL;
-                env++;
-        }
-        
-        /* Count new environment size */
-        count = 0;
-        if (old_env)
-                for (i = 0; old_env[i]; i++)
-                        count++;
-    
-        for (i = 0; env[i]; i++)
-                count++;
-
-        /* Allocate the new environment. */
-        new_env = xcalloc(count + 1, sizeof new_env[0]);
-
-        /* Populate the environment. */
-        n = 0;
-        
-        if (old_env)
-                for (i = 0; old_env[i]; i++) {
-                        if (!var_is_unset(env, old_env[i]))
-                                new_env[n++] = old_env[i];
-                }
-
-        for (i = 0; env[i]; i++) {
-                char *p;
-                
-                if (env[i][0] == '-')
-                        /* Skip unset directives. */
-                        continue;
-
-		/* Find the slot for the variable.  Use next available
-		   slot if there's no such variable in new_env */
-		if (find_env_pos(new_env, env[i], &j, NULL))
-			j = n;
+	for (ev = rule->envar_head; ev; ev = ev->next) {
+		char *val;
+		ssize_t n;
+		size_t len;
 		
-		if ((p = strchr(env[i], '='))) {
-                        if (p == env[i])
-                                continue; /* Ignore erroneous entry */
-                        if (p[-1] == '+') {
-				new_env[j] = env_concat(env[i],
-							p - env[i] - 1,
-							find_env_ptr(environ,
-								     env[i],
-								     1),
-							p + 1);
-			} else if (p[1] == '+') {
-                                new_env[j] = env_concat(env[i],
-							p - env[i],
-							p + 2,
-							find_env_ptr(environ,
-								     env[i],
-								     1));
-			} else
-                                new_env[j] = env[i];
-                } else if ((p = find_env_ptr(environ, env[i], 0)))
-			new_env[j] = p;
-		else
-			continue;
-		/* Adjust environment size */
-		if (j == n)
-			++n;
+		switch (ev->type) {
+		case envar_keep:
+			/* Skip it */
+			break;
+		case envar_unset:
+			n = getenvind(req, ev->name, &val);
+			if (n == -1)
+				continue;
+			if (ev->value && strcmp(ev->value, val))
+				continue;
+			free(req->env[n]);
+			memmove(req->env + n, req->env + n + 1,
+				(req->env_count - n) * sizeof(req->env[0]));
+			req->env_count--;
+			break;
+
+		case envar_set:
+			val = rush_expand_string(ev->value, req);
+			n = getenvind(req, ev->name, NULL);
+			if (n == -1) {
+				if (req->env_count + 1 >= req->env_max)
+					req->env = x2nrealloc(req->env,
+							      &req->env_max,
+							      sizeof(req->env[0]));
+				n = req->env_count++;
+				req->env[req->env_count] = NULL;
+			}
+			free(req->env[n]);
+			len = strlen(ev->name) + strlen(val) + 2;
+			req->env[n] = xmalloc(len);
+			strcat(strcat(strcpy(req->env[n], ev->name), "="), val);
+			free(val);
+		}
+	}
+        if (__debug_p(2)) {
+                logmsg(LOG_DEBUG, _("Final environment:"));
+                for (i = 0; req->env[i]; i++)
+                        logmsg(LOG_DEBUG, "%4zu: %s", i, req->env[i]);
         }
-        new_env[n] = NULL;
-        return new_env;
 }
 
 static void
@@ -549,6 +580,9 @@ rebuild_cmdline(struct rush_request *req)
         req->cmdline = argcv_string(req->argc, req->argv);
 }
 
+
+#define ARG_NO(n,argc) (((n) < 0) ? (argc) + (n) : (n))
+
 static int
 get_arg_no(int index, struct rush_request *req)
 {
@@ -563,249 +597,150 @@ get_arg_no(int index, struct rush_request *req)
 }
 
 static void
-assign_string(char **pstr, char *val)
+rush_transform(struct transform_node *node, struct rush_request *req)
 {
-	debug(2, _("Transform: \"%s\" -> \"%s\""), *pstr ? *pstr : "", val);
-	free(*pstr);
-	*pstr = val;
-}
-
-static int
-transform_cmdline_fun(struct rush_request *req, struct transform_node *node,
-		      char *val, char **return_val)
-{
-	char *p;
+	char **target_ptr;
+	char *target_src;
+	char *newval = NULL;
+	int arg_no;
+	void (*postprocess)(struct rush_request *) = NULL;
 	
-	debug(2, "%s", _("Transforming command line"));
-	if (node->pattern) {
-		char *val = rush_expand_string(node->pattern, req);
-		p = transform_string(node->v.trans, val);
-		free(val);
-	} else
-		p = transform_string(node->v.trans, req->cmdline);
-	assign_string(&req->cmdline, p);
-	debug(2, _("Command line: %s"), req->cmdline);
-	return 0;
-}
+	switch (node->target.type) {
+	case target_command:
+		/* Command line */
+		target_ptr = &req->cmdline;
+		target_src = req->cmdline;
+		postprocess = reparse_cmdline;
+		debug(2, "%s", _("Transforming command line"));
+		break;
+		
+	case target_program:
+		/* Executable program name */
+		target_ptr = &req->prog;
+		target_src = PROGFILE(req);
+		debug(2, _("Transforming program name (%s)"), target_src);
+		break;
 
-static int
-transform_setcmd_fun(struct rush_request *req, struct transform_node *node,
-		     char *val, char **return_val)
-{
-	debug(2, "%s", _("Setting command line"));
-	assign_string(&req->cmdline, xstrdup(val));
-	debug(2, _("Command line: %s"), req->cmdline);
-	return 0;
-}
+	case target_arg:
+		/* Single command line argument */
+		arg_no = get_arg_no(node->target.v.arg, req);
+		target_ptr = &req->argv[arg_no];
+		target_src = req->argv[arg_no];
+		postprocess = rebuild_cmdline;
+		debug(2, _("Transforming argv[%d]"), arg_no);
+		break;
 
-static int
-transform_arg_fun(struct rush_request *req, struct transform_node *node,
-		  char *val, char **return_val)
-{
-	char *p = transform_string(node->v.trans, val);
-	assign_string(return_val, p);
-	return 1;
-}
-
-static int
-transform_map_fun(struct rush_request *req, struct transform_node *node,
-		  char *val, char **return_val)
-{
-	char *p;
-	debug(2,
-	      _("Transformation map: %s, %s, %s, %u, %u, %s"),
-	      node->v.map.file,
-	      node->v.map.delim,
-	      node->v.map.key,
-	      node->v.map.key_field,
-	      node->v.map.val_field,
-	      node->v.map.defval);
-	p = map_string(&node->v.map, req);
-	if (p) {
-		assign_string(return_val, p);
-		return 1;
+	case target_var:
+		/* Variable */
+		target_ptr = rush_request_getvar(req, node->target.v.name);
+		target_src = *target_ptr;
+		debug(2, _("Transforming variable %s=%s"),
+		      node->target.v.name, target_src ? target_src : "(null)");
+		break;
+		
+	case target_env:
+		/* Environment variable */
+		die(system_error, NULL,
+		    _("environment transformation is not yet implemented"));
 	}
-	return 0;
-}
 
-static int
-transform_delarg_fun(struct rush_request *req, struct transform_node *node,
-		     char *val, char **return_val)
-{
-	int i, arg_no, arg_end;
-	
-	arg_no = get_arg_no(node->arg_no, req);
-	arg_end = get_arg_no(node->v.arg_end, req);
-	if (arg_end < arg_no) {
-		int x = arg_end;
-		arg_end = arg_no;
-		arg_no = x;
-	}
-	debug(2, _("Deleting arguments %d-%d"), arg_no, arg_end);
-	if (arg_no == 0 || arg_end == 0)
-		die(config_error,
-		    &req->i18n, _("Deleting argv[0] is prohibited"));
-	for (i = arg_no; i <= arg_end; i++) 
-		free(req->argv[i]);
-	i = arg_end - arg_no + 1;
-	memmove(req->argv + arg_no,
-		req->argv + arg_end + 1,
-		(req->argc - i) * sizeof(req->argv[0]));
-	req->argc -= i;
-	return 1;
-}
-
-static int
-transform_setarg_fun(struct rush_request *req, struct transform_node *node,
-		     char *val, char **return_val)
-{
-	assign_string(return_val, xstrdup(val));
-	return 1;
-}
-
-static int
-transform_setvar_fun(struct rush_request *req, struct transform_node *node,
-		     char *val, char **return_val)
-{
-	size_t i;
-
-	if (req->var_kv) {
-		for (i = 0; i < req->var_count; i += 2)
-			if (strcmp(req->var_kv[i], node->v.varname) == 0)
-				break;
-	} else
-		i = req->var_count;
-
-	if (i < req->var_count) {
-		free(req->var_kv[i + 1]);
-		if (val)
-			req->var_kv[i + 1] = xstrdup(val);
-		else {
-			free(req->var_kv[i]);
-			memmove(req->var_kv + i, req->var_kv + i + 2,
-				(req->var_count - i - 1) * sizeof(req->var_kv[0]));
-			req->var_count -= 2;
+	switch (node->type) {
+	case transform_set:
+		if (node->v.xf.pattern) {
+			newval = rush_expand_string(node->v.xf.pattern, req);
+			target_src = newval;
 		}
-	} else if (val) {
-		while (req->var_count + 3 >= req->var_max)
-			req->var_kv = x2nrealloc(req->var_kv, &req->var_max,
-						 sizeof(req->var_kv[0]));
-		req->var_kv[req->var_count++] = xstrdup(node->v.varname);
-		req->var_kv[req->var_count++] = xstrdup(val);
-		req->var_kv[req->var_count] = NULL;
+
+		if (node->v.xf.trans) {
+			char *p = transform_string(node->v.xf.trans, target_src);
+			free(newval);
+			newval = p;
+		}
+		break;
+
+	case transform_map:
+		debug(2, _("Transformation map: %s, %s, %s, %u, %u, %s"),
+		      node->v.map.file,
+		      node->v.map.delim,
+		      node->v.map.key,
+		      node->v.map.key_field,
+		      node->v.map.val_field,
+		      node->v.map.defval);
+		newval = map_string(&node->v.map, req);
+		if (!newval)
+			return;
+		break;
+
+	default:
+		die(system_error, NULL,
+		    _("INTERNAL ERROR at %s:%d: invalid node type %d"),
+		    __FILE__, __LINE__, node->type);
+		break;
 	}
-	return 1;
+	
+	free(*target_ptr);
+	*target_ptr = newval;
+
+	if (postprocess)
+		postprocess(req);
 }
-
-/* Transform flags */
-#define XFORM_DFL         0x00 /* Default: nothing */
-#define XFORM_CMDLINE     0x01 /* Function operates on entire command line */
-#define XFORM_VALUE       0x02 /* Function needs value */
-#define XFORM_CHARGV      0x04 /* Function can change argv */
 
-struct transform_function
+static void
+rush_transform_delete(struct transform_node *node, struct rush_request *req)
 {
-	int flags;
-	int (*func)(struct rush_request *req, struct transform_node *node,
-		    char *val, char **return_val);
-};
+	int arg_no, arg_end, i;
+	
+	switch (node->target.type) {
+	case target_arg:
+		/* Single command line argument */
+		arg_no = get_arg_no(node->target.v.arg, req);
+		arg_end = get_arg_no(node->v.arg_end, req);
+		if (arg_end < arg_no) {
+			int x = arg_end;
+			arg_end = arg_no;
+			arg_no = x;
+		}
+		debug(2, _("Deleting arguments %d-%d"), arg_no, arg_end);
+		if (arg_no == 0 || arg_end == 0)
+			die(config_error,
+			    &req->i18n, _("Deleting argv[0] is prohibited"));
+		for (i = arg_no; i <= arg_end; i++) 
+			free(req->argv[i]);
+		i = arg_end - arg_no + 1;
+		memmove(req->argv + arg_no,
+			req->argv + arg_end + 1,
+			(req->argc - i) * sizeof(req->argv[0]));
+		req->argc -= i;
+		rebuild_cmdline(req);
+		break;
 
-static struct transform_function transform_funtab[] = {
-	[transform_cmdline] = {
-		XFORM_CMDLINE,
-		transform_cmdline_fun
-	},
-	[transform_setcmd]  = {
-		XFORM_CMDLINE|XFORM_VALUE,
-		transform_setcmd_fun
-	},
-	[transform_arg]     = {
-		XFORM_VALUE,
-		transform_arg_fun
-	},
-	[transform_map]     = {
-		XFORM_VALUE,
-		transform_map_fun
-	},
-	[transform_delarg]  = {
-		XFORM_CHARGV,
-		transform_delarg_fun
-	},
-	[transform_setarg]  = {
-		XFORM_VALUE,
-		transform_setarg_fun
-	},
-	[transform_setvar] = {
-		XFORM_VALUE,
-		transform_setvar_fun
-	},
-	[transform_unsetvar] = {
-		XFORM_DFL,
-		transform_setvar_fun
-	}		
-};	
-static int transform_count =
-	sizeof(transform_funtab)/sizeof(transform_funtab[0]);
+	case target_var:
+		rush_request_delvar(req, node->target.v.name);
+		break;
+		
+	case target_env:
+		/* Environment variable */
+		die(system_error, NULL,
+		    _("environment transformation is not yet implemented"));
+
+	default:
+		die(system_error, NULL,
+		    _("INTERNAL ERROR at %s:%d: invalid target type %d"),
+		    __FILE__, __LINE__, node->type);
+	}
+}
 
 static void
 run_transforms(struct rush_rule *rule, struct rush_request *req)
 {
         struct transform_node *node;
-	char *val, **target;
-	char *mem = NULL;
-        int args_transformed = 0;
-	int res;
-	int flags;
 	
         for (node = rule->transform_head; node; node = node->next) {
-		if (node->type < 0 || node->type >= transform_count)
-			die(system_error, &req->i18n,
-			    _("%s:%d: internal error"), __FILE__, __LINE__);
-
-		val = NULL;
-		target = NULL;
-		flags = transform_funtab[node->type].flags;
-		
-		if ((flags & XFORM_CMDLINE) && args_transformed) {
-			rebuild_cmdline(req);
-			args_transformed = 0;
-		}
-		
-		if (flags & XFORM_VALUE) {
-			if (node->progmod) {
-				target = &req->prog;
-				val = PROGFILE(req);
-				debug(2, _("Modifying program name (%s)"), val);
-				flags &= ~XFORM_CHARGV;
-			} else {
-				int arg_no = get_arg_no(node->arg_no, req);
-				target = &req->argv[arg_no];
-				val = *target;
-				flags |= XFORM_CHARGV;
-				debug(2, _("Modifying argv[%d]"), arg_no);
-			}
-			if (node->pattern) {
-				mem = rush_expand_string(node->pattern, req);
-				val = mem;
-			} else {
-				mem = NULL;
-			}
-		}
-		res = transform_funtab[node->type].func(req, node,
-							val, target);
-		if (flags & XFORM_CHARGV)
-			args_transformed = res;
-		if (flags & XFORM_CMDLINE)
-			reparse_cmdline(req);
-		if (mem) {
-			free(mem);
-			mem = NULL;
-		}
-	}
-
-        if (args_transformed) 
-                rebuild_cmdline(req);
-
+		if (node->type == transform_delete)
+			rush_transform_delete(node, req);
+		else
+			rush_transform(node, req);
+	}			
         if (__debug_p(2)) {
                 int i;
 		logmsg(LOG_DEBUG, _("Program name: %s"), PROGFILE(req));
@@ -954,19 +889,10 @@ setowner(struct rush_request *req)
 static void
 run_rule(struct rush_rule *rule, struct rush_request *req)
 {
-        char **new_env;
-		
         debug(2, _("Rule %s at %s:%d matched"),
 	      rule->tag, rule->file, rule->line);
 
-        new_env = env_setup(rule->env);
-        if (__debug_p(2)) {
-                int i;
-                logmsg(LOG_DEBUG, _("Final environment:"));
-                for (i = 0; new_env[i]; i++)
-                        logmsg(LOG_DEBUG, "% 4d: %s", i, new_env[i]);
-        }
-        environ = new_env;
+	env_setup(rule, req);
         
 	if (rule->i18n.text_domain)
 		req->i18n.text_domain = rule->i18n.text_domain;
@@ -975,37 +901,13 @@ run_rule(struct rush_rule *rule, struct rush_request *req)
 	if (rule->i18n.locale)
 		req->i18n.locale = rule->i18n.locale;
 
-        if (rule->error_msg) {
-		const char *msg = rule->error_msg;
-		int custom = 1;
-		
+        if (rule->error) {
+		const char *msg = rush_error_msg(rule->error, &rule->i18n);
                 debug(2, _("Error message: %s"), msg);
-		if (msg[0] == '@') {
-			int n;
-			
-			if (msg[1] == '@')
-				msg++;
-			else if ((n = string_to_error_index(msg + 1)) == -1) 
-				logmsg(LOG_NOTICE,
-				       _("Unknown message reference: %s\n"),
-				       msg);
-			else {
-				msg = error_msg[n].text;
-				custom = error_msg[n].custom;
-			}
-		} 
-
-		if (custom) 
-			msg = user_gettext(rule->i18n.locale,
-					   rule->i18n.text_domain,
-					   rule->i18n.localedir,
-					   msg);
-		else
-			msg = gettext(msg);
-                if (write(rule->error_fd, msg, strlen(msg)) < 0)
+                if (write(rule->error->fd, msg, strlen(msg)) < 0)
                         die(system_error, &req->i18n, 
                             _("Error sending diagnostic message to descriptor %d: %s"),
-                            rule->error_fd, strerror(errno));
+                            rule->error->fd, strerror(errno));
                 exit(1);
         }
                         
@@ -1096,7 +998,7 @@ run_rule(struct rush_rule *rule, struct rush_request *req)
 	
         umask(req->umask);
 
-        execve(PROGFILE(req), req->argv, new_env);
+        execve(PROGFILE(req), req->argv, req->env);
         die(system_error, &req->i18n, _("%s:%d: %s: cannot execute %s: %s"),
             rule->file, rule->line, rule->tag,
             req->cmdline, strerror(errno));
@@ -1156,7 +1058,7 @@ main(int argc, char **argv)
         debug(2, _("user %s, uid %lu"), rush_pw->pw_name,
 	      (unsigned long) rush_pw->pw_uid);
 
-        parse_config();
+        cfparse();
 
 	if (!command) {
 		if (lint_option && !interactive) 
@@ -1180,13 +1082,15 @@ main(int argc, char **argv)
 	}
 
 	req.cmdline = xstrdup(command);
-
+	
 	if (wordsplit(req.cmdline, &ws, WRDSF_DEFFLAGS))
 		die(system_error, NULL,
 		    _("wordsplit(%s) failed: %s"),
 		    req.cmdline, wordsplit_strerror(&ws));
 	wordsplit_get_words(&ws, &req.argc, &req.argv);
 	wordsplit_free(&ws);
+
+	request_set_env(&req);
 	
         req.pw = rush_pw;
 	req.umask = 022;
@@ -1199,7 +1103,7 @@ main(int argc, char **argv)
 	for (rule = rule_head; rule; rule = rule->next) {
 		if (req.interactive != rule->interactive)
 			continue;
-                if (run_tests(rule, &req))
+                if (rule->test_node && !test_eval(rule->test_node, rule, &req))
 			continue;
                 if (debug_level) {
 			if (req.interactive)

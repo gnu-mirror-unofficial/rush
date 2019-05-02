@@ -201,6 +201,14 @@ getlimit(char **ptr, rlim_t *rlim, int mul)
         return 0;
 }
 
+limits_record_t
+limits_record_create(void)
+{
+        struct limits_rec *lrec = xmalloc(sizeof(*lrec));
+        lrec->set = 0;
+	return lrec;
+}
+
 /* Parse limits string and fill appropriate fields in lrec.
  
    The string consists of _commands_, optionally separated by any amount
@@ -229,94 +237,145 @@ getlimit(char **ptr, rlim_t *rlim, int mul)
                                             (negative = high priority)
  */
 int
+limits_record_add(limits_record_t lrec, char *str, char **endp)
+{
+	char *p;
+	
+	switch (*str++) {
+	case 'a':
+	case 'A':
+		/* RLIMIT_AS - max address space (KB) */
+		if (getlimit(&str, &lrec->limit_as, 1024)) {
+			*endp = str;
+			return lrec_badval;
+		}
+		lrec->set |= SET_LIMIT_AS;
+		break;
+	case 't':
+	case 'T':
+		/* RLIMIT_CPU - max CPU time (MIN) */
+		if (getlimit(&str, &lrec->limit_cpu, 60)) {
+			*endp = str;
+			return lrec_badval;
+		}
+		lrec->set |= SET_LIMIT_CPU;
+		break;
+	case 'd':
+	case 'D':
+		/* RLIMIT_DATA - max data size (KB) */
+		if (getlimit(&str, &lrec->limit_data, 1024)) {
+			*endp = str;
+			return lrec_badval;
+		}
+		lrec->set |= SET_LIMIT_DATA;
+		break;
+	case 'f':
+	case 'F':
+		/* RLIMIT_FSIZE - Maximum filesize (KB) */
+		if (getlimit(&str, &lrec->limit_fsize, 1024)) {
+			*endp = str;
+			return lrec_badval;
+		}
+		lrec->set |= SET_LIMIT_FSIZE;
+		break;
+	case 'u':
+	case 'U':
+		/* RLIMIT_NPROC - max number of processes */
+		if (getlimit(&str, &lrec->limit_nproc, 1)) {
+			*endp = str;
+			return lrec_badval;
+		}
+		lrec->set |= SET_LIMIT_NPROC;
+		break;
+	case 'c':
+	case 'C':
+		/* RLIMIT_CORE - max core file size (KB) */
+		if (getlimit(&str, &lrec->limit_core, 1024)) {
+			*endp = str;
+			return lrec_badval;
+		}
+		lrec->set |= SET_LIMIT_CORE;
+		break;
+	case 'm':
+	case 'M':
+		/* RLIMIT_MEMLOCK - max locked-in-memory
+		 * address space (KB)
+		 */
+		if (getlimit(&str, &lrec->limit_memlock, 1024)) {
+			*endp = str;
+			return lrec_badval;
+		}
+		lrec->set |= SET_LIMIT_MEMLOCK;
+		break;
+	case 'n':
+	case 'N':
+		/* RLIMIT_NOFILE - max number of open files */
+		if (getlimit(&str, &lrec->limit_nofile, 1)) {
+			*endp = str;
+			return lrec_badval;
+		}
+		lrec->set |= SET_LIMIT_NOFILE;
+		break;
+	case 'r':
+	case 'R':
+		/* RLIMIT_RSS - max resident set size (KB) */
+		if (getlimit(&str, &lrec->limit_rss, 1024)) {
+			*endp = str;
+			return lrec_badval;
+		}
+		lrec->set |= SET_LIMIT_RSS;
+		break;
+	case 's':
+	case 'S':
+		/* RLIMIT_STACK - max stack size (KB) */
+		if (getlimit(&str, &lrec->limit_stack, 1024)) {
+			*endp = str;
+			return lrec_badval;
+		}
+		lrec->set |= SET_LIMIT_STACK;
+		break;
+	case 'l':
+	case 'L': 
+		lrec->limit_logins = strtoul(str, &p, 10);
+		if (p == str) {
+			*endp = p;
+			return lrec_badval;
+		}
+		lrec->set |= SET_LIMIT_LOGINS;
+		break;
+	case 'p':
+	case 'P':
+		lrec->limit_prio = strtol(str, &p, 10);
+		if (p == str) {
+			*endp = p;
+			return lrec_badval;
+		}
+		if (lrec->limit_prio > 0)
+			lrec->set |= SET_LIMIT_PRIO;
+		break;
+	default:
+		*endp = str-1;
+		return lrec_error;
+	}
+	return 0;
+}
+
+int
 parse_limits(limits_record_t *plrec, char *str, char **endp)
 {
         int c;
-        struct limits_rec *lrec = xmalloc (sizeof (*lrec));
-        *plrec = lrec;
-        lrec->set = 0;
-        while ((c = *str++)) {
+        struct limits_rec *lrec = limits_record_create();
+	int rc;
+	while ((c = *str++)) {
                 if (ISWS(c))
                         continue;
-                switch (c) {
-                case 'a':
-                case 'A':
-                        /* RLIMIT_AS - max address space (KB) */
-                        if (!getlimit(&str, &lrec->limit_as, 1024))
-                                lrec->set |= SET_LIMIT_AS;
-                        break;
-                case 't':
-                case 'T':
-                        /* RLIMIT_CPU - max CPU time (MIN) */
-                        if (!getlimit(&str, &lrec->limit_cpu, 60))
-                                lrec->set |= SET_LIMIT_CPU;
-                        break;
-                case 'd':
-                case 'D':
-                        /* RLIMIT_DATA - max data size (KB) */
-                        if (!getlimit(&str, &lrec->limit_data, 1024))
-                                lrec->set |= SET_LIMIT_DATA;
-                        break;
-                case 'f':
-                case 'F':
-                        /* RLIMIT_FSIZE - Maximum filesize (KB) */
-                        if (!getlimit(&str, &lrec->limit_fsize, 1024))
-                                lrec->set |= SET_LIMIT_FSIZE;
-                        break;
-                case 'u':
-                case 'U':
-                        /* RLIMIT_NPROC - max number of processes */
-                        if (!getlimit(&str, &lrec->limit_nproc, 1))
-                                lrec->set |= SET_LIMIT_NPROC;
-                        break;
-                case 'c':
-                case 'C':
-                        /* RLIMIT_CORE - max core file size (KB) */
-                        if (!getlimit(&str, &lrec->limit_core, 1024))
-                                lrec->set |= SET_LIMIT_CORE;
-                        break;
-                case 'm':
-                case 'M':
-                        /* RLIMIT_MEMLOCK - max locked-in-memory
-                         * address space (KB)
-                         */
-                        if (!getlimit(&str, &lrec->limit_memlock, 1024)) 
-                                lrec->set |= SET_LIMIT_MEMLOCK;
-                        break;
-                case 'n':
-                case 'N':
-                        /* RLIMIT_NOFILE - max number of open files */
-                        if (!getlimit(&str, &lrec->limit_nofile, 1))
-                                lrec->set |= SET_LIMIT_NOFILE;
-                        break;
-                case 'r':
-                case 'R':
-                        /* RLIMIT_RSS - max resident set size (KB) */
-                        if (!getlimit(&str, &lrec->limit_rss, 1024))
-                                lrec->set |= SET_LIMIT_RSS;
-                        break;
-                case 's':
-                case 'S':
-                        /* RLIMIT_STACK - max stack size (KB) */
-                        if (!getlimit(&str, &lrec->limit_stack, 1024))
-                                lrec->set |= SET_LIMIT_STACK;
-                        break;
-                case 'l':
-                case 'L':
-                        lrec->limit_logins = strtoul(str, &str, 10);
-			lrec->set |= SET_LIMIT_LOGINS;
-                        break;
-                case 'p':
-                case 'P':
-                        lrec->limit_prio = strtol(str, &str, 10);
-                        if (lrec->limit_prio > 0)
-                                lrec->set |= SET_LIMIT_PRIO;
-                        break;
-                default:
-                        *endp = str-1;
-                        return 1;
-                }
+		rc = limits_record_add(lrec, str, endp);
+		if (rc) {
+			free(lrec);
+			return rc;
+		}
         }
+        *plrec = lrec;
         return 0;
 }
 

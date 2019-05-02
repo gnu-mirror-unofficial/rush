@@ -311,7 +311,7 @@ dump_request(struct rush_request *req, FILE *fp)
 		else if (strcmp(ws.ws_wordv[i], "locale") == 0)
 			dump_string(req->i18n.locale, "locale", &dmp);
 		else if (strcmp(ws.ws_wordv[i], "environ") == 0)
-			dump_argv(environ, "environ", 1, &dmp);
+			dump_argv(req->env, "environ", 1, &dmp);
 		else if (strcmp(ws.ws_wordv[i], "vars") == 0)
 			dump_vars(req, "vars", &dmp);
 		else

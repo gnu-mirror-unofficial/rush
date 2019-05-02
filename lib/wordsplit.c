@@ -805,25 +805,32 @@ wordsplit_finish (struct wordsplit *wsp)
       n++;
     }
 
-  if (n == 0 && (wsp->ws_flags & WRDSF_INCREMENTAL))
+  if (n == 0)
     {
-      /* The loop above have eliminated all nodes. Restart the
-	 processing, if there's any input left. */
-      if (wsp->ws_endp < wsp->ws_len)
+      /* The loop above have eliminated all nodes. */
+      if (wsp->ws_flags & WRDSF_INCREMENTAL)
 	{
-	  int rc;
-	  if (wsp->ws_flags & WRDSF_SHOWDBG)
-	    wsp->ws_debug (_("Restarting"));
-	  rc = wordsplit_process_list (wsp, skip_delim (wsp));
-	  if (rc)
-	    return rc;
+	  /* Restart the processing, if there's any input left. */
+	  if (wsp->ws_endp < wsp->ws_len)
+	    {
+	      int rc;
+	      if (wsp->ws_flags & WRDSF_SHOWDBG)
+		wsp->ws_debug (_("Restarting"));
+	      rc = wordsplit_process_list (wsp, skip_delim (wsp));
+	      if (rc)
+		return rc;
+	    }
+	  else
+	    {
+	      wsp->ws_error = WRDSE_EOF;
+	      return WRDSE_EOF;
+	    }
+	  goto again;
 	}
-      else
-	{
-	  wsp->ws_error = WRDSE_EOF;
-	  return WRDSE_EOF;
-	}
-      goto again;
+
+      if (wordsplit_add_segm (wsp, 0, 0, _WSNF_EMPTYOK))
+	return wsp->ws_errno;
+      n = 1;
     }
 
   if (alloc_space (wsp, n + 1))
@@ -2412,6 +2419,7 @@ wordsplit_process_list (struct wordsplit *wsp, size_t start)
 	    }
 	}
     }
+
   return wsp->ws_errno;
 }
 
