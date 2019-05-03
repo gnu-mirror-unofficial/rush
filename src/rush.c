@@ -25,6 +25,7 @@ unsigned sleep_time = 5;
 unsigned debug_level;
 int debug_option;
 char *dump_option;
+int parser_traces;
 struct rush_rule *rule_head, *rule_tail;
 struct passwd *rush_pw;
 
@@ -1026,6 +1027,8 @@ main(int argc, char **argv)
         openlog(program_name, LOG_NDELAY|LOG_PID, LOG_AUTHPRIV);
 
 	get_options(argc, argv);
+	cfgram_debug(parser_traces > 0);
+	cflex_debug(parser_traces > 1);
 
 	if (argc == optind + 1) {
 		if (lint_option)

@@ -626,11 +626,20 @@ strlist     : arglist
 void
 yyerror(char const *fmt, ...)
 {
+	abort();
 	va_list ap;
 	va_start(ap, fmt);
-	vlogmsg(LOG_ERR, fmt, ap);
+	vcferror(&curloc, fmt, ap);
 	va_end(ap);
 	errors = 1;
+}
+
+void
+cfgram_debug(int v)
+{
+#ifdef YYDEBUG
+	yydebug = v;
+#endif
 }
 
 void

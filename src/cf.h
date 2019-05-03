@@ -45,7 +45,6 @@ struct cfloc {
 
 void cfpoint_format(struct cfpoint const *cfp, struct stringbuf *sb);
 void cfloc_format(struct cfloc const *cfl, struct stringbuf *sb);
-void cfloc_format(struct cfloc const *cfl, struct stringbuf *sb);
 void cfloc_print(struct cfloc const *cfl, FILE *fp);
 
 struct cfnumber {
@@ -80,6 +79,9 @@ cfstream_getc(CFSTREAM *cf)
 	return c;
 }
 
+void cflex_debug(int v);
+void cfgram_debug(int v);
+
 void cflex_setup(CFSTREAM *cf, char const *filename, int line);
 int cflex_include(char const *filename, struct cfloc const *loc);
 
@@ -129,8 +131,8 @@ void global_attrib_set(struct global_attrib *glatt,
 		       struct cfloc const *loc);
 
 
-
 extern int re_flags;
+extern struct cfloc curloc;
 
 void trimws(char *s);
 size_t trimslash(char *s);

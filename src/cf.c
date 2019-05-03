@@ -104,7 +104,6 @@ cfloc_print(struct cfloc const *cfl, FILE *fp)
 	struct stringbuf sb;
 	stringbuf_init(&sb);
 	cfloc_format(cfl, &sb);
-	stringbuf_finish(&sb);
 	fwrite(sb.buffer, sb.pos, 1, fp);
 	stringbuf_free(&sb);
 }

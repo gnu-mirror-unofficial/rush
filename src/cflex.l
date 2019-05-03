@@ -32,7 +32,7 @@ new_source_file_name(char const *f)
 	return file->filename;
 }
 
-static struct cfloc curloc;
+struct cfloc curloc;
 
 #define YY_USER_ACTION	(curloc.end.column += yyleng);
 
@@ -377,6 +377,14 @@ cflex_setup(CFSTREAM *cf, char const *filename, int line)
 	curloc_init(filename, line);
 	input_stream = cf;
 	YY_FLUSH_BUFFER;
+}
+
+void
+cflex_debug(int v)
+{
+#ifdef FLEX_DEBUG
+	yy_flex_debug = v;
+#endif
 }
 
 int

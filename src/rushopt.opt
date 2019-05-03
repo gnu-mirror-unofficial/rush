@@ -1,4 +1,4 @@
-/* This file is part of GNU Rush.                  
+/* This file is part of GNU Rush.
    Copyright (C) 2008-2019 Sergey Poznyakoff
 
    GNU Rush is free software; you can redistribute it and/or modify
@@ -14,10 +14,10 @@
    You should have received a copy of the GNU General Public License
    along with GNU Rush.  If not, see <http://www.gnu.org/licenses/>. */
 
-#include <error.h>   
-   
+#include <error.h>
+
 OPTIONS_BEGIN(gnu, "rush",
-              [<rush - a restricted user shell.>],
+	      [<rush - a restricted user shell.>],
 	      [<[FILE]>])
 
 OPTION(debug,d,NUMBER,
@@ -32,6 +32,12 @@ OPTION(test,t,,
 ALIAS(lint)
 BEGIN
 	lint_option = 1;
+END
+
+OPTION(trace,x,,
+       [<Print grammar and lexical analyzer traces>])
+BEGIN
+       parser_traces++;
 END
 
 OPTION(user,u,NAME,
@@ -55,8 +61,8 @@ END
 OPTION(,i,,
        [<Force interactive shell.>])
 BEGIN
-        lint_option = 1;
-        interactive = 1;
+	lint_option = 1;
+	interactive = 1;
 END
 
 OPTION(dump,D,KEYWORDS,
@@ -64,7 +70,7 @@ OPTION(dump,D,KEYWORDS,
 BEGIN
 	dump_option = optarg;
 	lint_option = 1;
-END	
+END
 
 OPTION(security-check,C,CHECK,
        [<Add or remove configuration security check.>])
@@ -81,7 +87,7 @@ BEGIN
 	printf("%s\n", RUSH_DEFAULT_CONFIG);
 	exit(0);
 #else
-	error(1, 0, _("No default configuration"));	
+	error(1, 0, _("No default configuration"));
 #endif
 END
 
