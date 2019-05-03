@@ -190,6 +190,20 @@ cfstream_close(CFSTREAM *cf)
 	free(cf);
 }
 
+void
+cfstream_rewind(CFSTREAM *cf)
+{
+	if (cf->fd >= 0) {
+		if (lseek(cf->fd, 0, SEEK_SET) != 0)
+			die(system_error, NULL,
+			    "lseek: %s",
+			    strerror(errno));
+		cf->level = 0;
+	} else
+		cf->level = cf->size;
+	cf->pos = 0;
+}
+
 static inline size_t
 cfstream_buf_avail(CFSTREAM *cf)
 {
@@ -221,12 +235,6 @@ cfstream_avail(CFSTREAM *cf)
 	return avail;
 }
 
-static inline size_t
-cfstream_buf_free(CFSTREAM *cf)
-{
-	return cf->size - cf->level;
-}
-
 static inline char const *
 cfstream_buf_ptr(CFSTREAM *cf)
 {
@@ -244,6 +252,9 @@ cfstream_read(CFSTREAM *cf, char *bufptr, size_t bufsize)
 {
 	size_t nrd = 0;
 
+	if (!cf)
+		return 0;
+
 	while (nrd < bufsize) {
 		size_t n = bufsize - nrd;
 		size_t avail = cfstream_avail(cf);
@@ -259,12 +270,6 @@ cfstream_read(CFSTREAM *cf, char *bufptr, size_t bufsize)
 	return nrd;
 }
 
-void
-cfstream_putback(CFSTREAM *cf)
-{
-	if (cf->pos > 0)
-		cf->pos--;
-}
 
 const char default_entry[] = ""
 #ifdef RUSH_DEFAULT_CONFIG
@@ -272,288 +277,26 @@ RUSH_DEFAULT_CONFIG
 #endif
 ;
 
-static char abc[] = {
-	[0] = 'v',
-	[1] = 'e',
-	[2] = 'r',
-	[3] = 's',
-	[4] = 'i',
-	[5] = 'o',
-	[6] = 'n',
-	[7] = ' ',
-	[8] = '\t',
-	[9] = '\n',
-	[10] = '#',
-	[11] = '.',
-	[12] = '0',
-	[13] = '1',
-	[14] = '2',
-	[15] = '3',
-	[16] = '4',
-	[17] = '5',
-	[18] = '6',
-	[19] = '7',
-	[20] = '8',
-	[21] = '9',
-	[22] = 0
-};
-
-static inline int
-char2abc(int c)
-{
-	char *p = strchr(abc, c);
-	if (p)
-		return p - abc;
-	return 22;
-}
-
-enum {
-	state_error = 0,
-	state_initial = 1,
-	state_final = 14,
-	state_major = 10,
-	state_minor = 12,
-	state_old_format = 18,
-	NUM_STATES = 19
-};
-
-static int transition[][sizeof(abc)] = {
-	[1] = {
-		[0] = 2,
-		[1] = 18,
-		[2] = 18,
-		[3] = 18,
-		[4] = 18,
-		[5] = 18,
-		[6] = 18,
-		[7] = 16,
-		[8] = 16,
-		[9] = 1,
-		[10] = 17,
-		[11] = 18,
-		[12] = 18,
-		[13] = 18,
-		[14] = 18,
-		[15] = 18,
-		[16] = 18,
-		[17] = 18,
-		[18] = 18,
-		[19] = 18,
-		[20] = 18,
-		[21] = 18,
-		[22] = 17
-	},
-	[2] = {
-		[1] = 3,
-	},
-	[3] = {
-		[2] = 4,
-	},
-	[4] = {
-		[3] = 5,
-	},
-	[5] = {
-		[4] = 6,
-	},
-	[6] = {
-		[5] = 7,
-	},
-	[7] = {
-		[6] = 8
-	},
-	[8] = {
-		[7] = 9,
-		[8] = 9,
-	},
-	[9] = {
-		// whitespace
-		[7] = 9,
-		[8] = 9,
-		[12] = 10,
-		[13] = 10,
-		[14] = 10,
-		[15] = 10,
-		[16] = 10,
-		[17] = 10,
-		[18] = 10,
-		[19] = 10,
-		[20] = 10,
-		[21] = 10,
-	},
-	[10] = {
-		// major number
-		[11] = 11,
-		[12] = 10,
-		[13] = 10,
-		[14] = 10,
-		[15] = 10,
-		[16] = 10,
-		[17] = 10,
-		[18] = 10,
-		[19] = 10,
-		[20] = 10,
-		[21] = 10,
-	},
-
-	[11] = {
-		[12] = 12,
-		[13] = 12,
-		[14] = 12,
-		[15] = 12,
-		[16] = 12,
-		[17] = 12,
-		[18] = 12,
-		[19] = 12,
-		[20] = 12,
-		[21] = 12,
-	},
-
-	[12] = {
-		// minor number
-		[7] = 13,
-		[8] = 13,
-		[9] = 14,
-		[10] = 15,
-		[12] = 12,
-		[13] = 12,
-		[14] = 12,
-		[15] = 12,
-		[16] = 12,
-		[17] = 12,
-		[18] = 12,
-		[19] = 12,
-		[20] = 12,
-		[21] = 12,
-	},
-
-	[13] = {
-		// optional whitespace after minor number
-		[7] = 13,
-		[8] = 13,
-		[9] = 14,
-		[10] = 15,
-	},
-	[14] = {
-		// Final state
-	},
-	[15] = {
-		// comment after minor
-		[0] = 15,
-		[1] = 15,
-		[2] = 15,
-		[3] = 15,
-		[4] = 15,
-		[5] = 15,
-		[6] = 15,
-		[7] = 15,
-		[8] = 15,
-		[9] = 14,
-		[10] = 15,
-		[11] = 15,
-		[12] = 15,
-		[13] = 15,
-		[14] = 15,
-		[15] = 15,
-		[16] = 15,
-		[17] = 15,
-		[18] = 15,
-		[19] = 15,
-		[20] = 15,
-		[21] = 15,
-	},
-	[16] = {
-		// Initial whitespace
-		[0] = 2,
-		[7] = 16,
-		[8] = 16,
-		[9] = 1,
-	},
-	[17] = {
-		// comment
-		[0] = 17,
-		[1] = 17,
-		[2] = 17,
-		[3] = 17,
-		[4] = 17,
-		[5] = 17,
-		[6] = 17,
-		[7] = 17,
-		[8] = 17,
-		[9] = 1,
-		[10] = 17,
-		[11] = 17,
-		[12] = 17,
-		[13] = 17,
-		[14] = 17,
-		[15] = 17,
-		[16] = 17,
-		[17] = 17,
-		[18] = 17,
-		[19] = 17,
-		[20] = 17,
-		[21] = 17,
-	},
-	[18] = {
-		// exit (old format)
-	}
-};
-
 void
 cfparse(void)
 {
 	CFSTREAM *cf;
-	char const *config_file_name;
-	int line;
-	int state;
-	int major = 0;
-	int minor = 0;
+	char const *filename;
 
 	if (access(rush_config_file, F_OK) == 0) {
 		cf = cfstream_open_file(rush_config_file);
-		config_file_name = rush_config_file;
+		filename = rush_config_file;
 	} else if (default_entry[0]) {
 		cf = cfstream_open_mem(default_entry,
 				       sizeof(default_entry) - 1);
-		config_file_name = "<built-in>";
+		filename = "<built-in>";
 	} else {
-		die(usage_error, NULL, _("configuration file does not exist and no default is provided"));
+		die(usage_error, NULL,
+		    _("configuration file does not exist and no default is provided"));
 	}
-
-	line = 1;
-	state = state_initial;
-
-	while (1) {
-		int ch;
-
-		ch = cfstream_getc(cf);
-		if (ch == 0)
-			die(config_error,
-			    NULL, _("unrecognized config file format"));
-		if (ch == '\n')
-			line++;
-		state = transition[state][char2abc(ch)];
-		switch (state) {
-		case state_major:
-			major = major * 10 + ch - '0';
-			break;
-		case state_minor:
-			minor = minor * 10 + ch - '0';
-			break;
-		case state_error:
-			die(config_error,
-			    NULL, _("unrecognized config file format"));
-		case state_old_format:
-			cfstream_putback(cf);
-			cfparse_old(cf, config_file_name, line);
-			return;
-		case state_final:
-			cfparse_versioned(cf, config_file_name,
-					  line, major, minor);
-			return;
-		default:
-			break;
-		}
-	}
+	cflex_setup(cf, filename, 1);
+	if (yyparse())
+		die(config_error, NULL, _("errors in configuration file"));
 }
 
 int

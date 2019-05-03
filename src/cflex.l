@@ -92,14 +92,25 @@ static void straychar(int);
 %}
 %option nounput
 %option noinput
-%x ARGS INMATCH QSTR VAR
+%x NORMAL ARGS INMATCH QSTR VAR
 %%
-<INITIAL,INMATCH,ARGS>{
+<INITIAL>{
+rush[ \t]+2\.0[ \t]*$ {
+	BEGIN(NORMAL);
+	return tok(PREFACE);
+  }
+#.*\n       { advance_line(1); }
+\n+         { advance_line(yyleng); }
+[ \t]+      reset_loc();
+.           return tok(BOGUS);
+}
+
+<NORMAL,INMATCH,ARGS>{
 #.*\n       { advance_line(1);
-	      BEGIN(INITIAL);
+	      BEGIN(NORMAL);
 	      return tok(EOL); }
 \n+         { advance_line(yyleng);
-	      BEGIN(INITIAL);
+	      BEGIN(NORMAL);
 	      return tok(EOL); }
 [ \t]+      reset_loc();
 }
@@ -119,7 +130,7 @@ static void straychar(int);
 "member"    { BEGIN(ARGS); return tok(MEMBER); }
 }
 
-<INITIAL>{
+<NORMAL>{
 "rule"      { BEGIN(ARGS); return tok(RULE); }
 "global"    { return tok(GLOBAL); }
 "set"       { BEGIN(ARGS); return tok(SET); }
@@ -275,13 +286,14 @@ static void straychar(int);
 [^}\"\$%]+                      { stringbuf_add_array(&sb, yytext, yyleng); }
 }
 
-<INITIAL,INMATCH,ARGS,VAR,QSTR>.   { straychar(yytext[0]); return tok(BOGUS); }
+<NORMAL,INMATCH,ARGS,VAR,QSTR>.   { straychar(yytext[0]); return tok(BOGUS); }
 %%
 void
 straychar(int c)
 {
 	static char *start_name[] = {
-		[INITIAL] = "looking for rule",
+		[INITIAL] = "looking for rush version clause",
+		[NORMAL] = "looking for rule",
 		[INMATCH] = "scanning match arguments",
 		[ARGS] = "scanning arguments",
 		[QSTR] = "scanning quoted string",
@@ -471,3 +483,17 @@ trimslash(char *s)
 		s[--len] = 0;
 	return len;
 }
+
+int
+parse_old_rc(void)
+{
+	CFSTREAM *cf = input_stream;
+	char const *filename = curloc.beg.filename;
+	
+	YY_FLUSH_BUFFER;
+	input_stream = NULL;
+
+	cfstream_rewind(cf);
+	return cfparse_old(cf, filename, 1);
+}
+

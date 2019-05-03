@@ -48,6 +48,7 @@ static void add_name_list(struct name_entry *head, enum envar_type type);
 %token <str> IDENT
 %token <num> NUMBER
 
+%token PREFACE
 %token RULE
 %token GLOBAL
 %token EOL
@@ -85,14 +86,14 @@ static void add_name_list(struct name_entry *head, enum envar_type type);
 %type <arglist> arglist
 
 %%
-rcfile     : rulelist
+rcfile     : PREFACE EOL rulelist
              {
 		     if (errors)
 			     YYERROR;
 	     }
-           | EOL rulelist
-             {
-		     if (errors)
+           | BOGUS
+	     {
+		     if (parse_old_rc())
 			     YYERROR;
 	     }
 	   ;
@@ -626,7 +627,6 @@ strlist     : arglist
 void
 yyerror(char const *fmt, ...)
 {
-	abort();
 	va_list ap;
 	va_start(ap, fmt);
 	vcferror(&curloc, fmt, ap);
@@ -640,18 +640,6 @@ cfgram_debug(int v)
 #ifdef YYDEBUG
 	yydebug = v;
 #endif
-}
-
-void
-cfparse_versioned(CFSTREAM *cf, char const *filename, int line,
-		  int major, int minor)
-{
-	if (!(major == 2 && minor == 0))
-		die(config_error, NULL,
-		    _("unsupported configuration file version"));
-	cflex_setup(cf, filename, line);
-	if (yyparse())
-		die(config_error, NULL, _("errors in configuration file"));
 }
 
 struct rush_rule *

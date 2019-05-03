@@ -70,6 +70,7 @@ CFSTREAM *cfstream_open_file(char const *filename);
 CFSTREAM *cfstream_open_mem(char const *buffer, size_t len);
 ssize_t cfstream_read(CFSTREAM *, char *, size_t);
 void cfstream_close(CFSTREAM *);
+void cfstream_rewind(CFSTREAM *cf);
 static inline int
 cfstream_getc(CFSTREAM *cf)
 {
@@ -85,14 +86,13 @@ void cfgram_debug(int v);
 void cflex_setup(CFSTREAM *cf, char const *filename, int line);
 int cflex_include(char const *filename, struct cfloc const *loc);
 
-void cfparse_old(CFSTREAM *cf, char const *filename, int line);
-void cfparse_versioned(CFSTREAM *cf, char const *filename, int line,
-		       int major, int minor);
+int cfparse_old(CFSTREAM *cf, char const *filename, int line);
 
 int yylex(void);
 int yyparse(void);
 
 void cfparse(void);
+int parse_old_rc(void);
 
 struct rush_rule *new_rush_rule(void);
 struct transform_node *new_transform_node(struct rush_rule *rule,

@@ -1195,7 +1195,7 @@ find_token(const char *name, int *plen)
 	return NULL;
 }
 
-void
+int
 parse_input_buf(input_buf_ptr ibuf)
 {
 	char *buf = NULL;
@@ -1360,15 +1360,14 @@ parse_input_buf(input_buf_ptr ibuf)
 			argcv_free(env.argc, env.argv);
 	}
 	free(buf);
-	if (err)
-		die(config_error, NULL, _("errors parsing config file"));
+	return err;
 }
 
-void
+int
 cfparse_old(CFSTREAM *cf, char const *filename, int line)
 {
 	input_buf_ptr buf;
 
 	init_input_buf(&buf, NULL, cf, filename, line - 1);
-	parse_input_buf(buf);
+	return parse_input_buf(buf);
 }
