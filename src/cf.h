@@ -100,8 +100,48 @@ struct envar *new_envar(struct rush_rule *rule,
 			char const *name, size_t nlen,
 			char const *value, size_t vlen,
 			enum envar_type type);
+
+typedef int (*rule_attrib_setter_t) (struct rush_rule *rule,
+				     char const *arg, struct cfloc const *loc);
+rule_attrib_setter_t rule_attrib_lookup(char const *name);
+
+struct argval {
+	struct argval *next;
+	struct cfloc loc;
+	int isnum;
+	char *strval;
+	int intval;
+};
+
+void arglist_free(struct argval *arg);
+
+typedef int (*global_attrib_setter_t) (int argc, struct argval *arghead);
+
+struct global_attrib {
+	char const *name;
+	char *argt;
+	global_attrib_setter_t setter;
+};
+
+struct global_attrib *global_attrib_lookup(const char *name);
+void global_attrib_set(struct global_attrib *glatt,
+		       int argc, struct argval *arghead,
+		       struct cfloc const *loc);
+
+
 
 extern int re_flags;
+
+void trimws(char *s);
+size_t trimslash(char *s);
+int attrib_umask(struct rush_rule *rule, char const *arg, struct cfloc const *loc);
+int attrib_chroot(struct rush_rule *rule, char const *arg, struct cfloc const *loc);
+int attrib_chdir(struct rush_rule *rule, char const *arg, struct cfloc const *loc);
+int attrib_fork(struct rush_rule *rule, char const *arg, struct cfloc const *loc);
+int attrib_acct(struct rush_rule *rule, char const *arg, struct cfloc const *loc);
+int attrib_post_socket(struct rush_rule *rule, char const *arg,
+		       struct cfloc const *loc);
+int parse_file_mode(const char *val, mode_t *mode, struct cfloc const *loc);
 
 
 

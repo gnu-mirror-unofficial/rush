@@ -115,12 +115,13 @@ static void straychar(int);
 ">"         return tok(GT);
 ">="        return tok(GE);
 "~"         return tok('~');
-"in"        return tok(IN);
-"member"    return tok(MEMBER);
+"in"        { BEGIN(ARGS); return tok(IN); }
+"member"    { BEGIN(ARGS); return tok(MEMBER); }
 }
 
 <INITIAL>{
-"rule"      { return tok(RULE); }
+"rule"      { BEGIN(ARGS); return tok(RULE); }
+"global"    { return tok(GLOBAL); }
 "set"       { BEGIN(ARGS); return tok(SET); }
 "unset"     { BEGIN(ARGS); return tok(UNSET); }
 "match"     { BEGIN(INMATCH); return tok(MATCH); }
@@ -134,14 +135,24 @@ static void straychar(int);
 "delete"    { BEGIN(ARGS); return tok(DELETE); }
 "exit"      { BEGIN(ARGS); return tok(EXIT); }
 "map"       { BEGIN(ARGS); return tok(MAP); }
-[A-Za-z_][A-Za-z_0-9-]* { /* FIXME: */ BEGIN(ARGS); return tok(KEYWORD); }
+[A-Za-z_][A-Za-z_0-9-]* {
+	if ((yylval.attrib = rule_attrib_lookup(yytext))) {
+	        BEGIN(ARGS);
+		return tok(ATTRIB);
+	} else if ((yylval.global_attrib = global_attrib_lookup(yytext))) {
+		BEGIN(ARGS);
+		return tok(GLATTRIB);
+	} else {
+  	        return tok(BOGUS);
+        }
+		}
 }
 
 <ARGS,INMATCH>{
 [0-9]+                        { yylval.num.strval = xstrdup(yytext);
 				yylval.num.intval = atoi(yytext);
 				return tok(NUMBER); }
-[A-Za-z_][A-Za-z_0-9-]*       { yylval.str = xstrdup(yytext);
+[A-Za-z_+-][A-Za-z_0-9-]*     { yylval.str = xstrdup(yytext);
 				return tok(IDENT); }
 \$[A-Za-z_][A-Za-z_0-9-]*     { yylval.str = xstrdup(yytext);
 				return tok(STRING);  }
@@ -151,6 +162,13 @@ static void straychar(int);
 				stringbuf_init(&sb);
 				stringbuf_add_array(&sb, yytext, yyleng);
 				pushstart(VAR); }
+\$[0-9]|\$\{[0-9]+\}          { yylval.str = xstrdup(yytext);
+				return tok(STRING); }
+\$\{[0-9]+:?[-+=\?]           {
+				stringbuf_init(&sb);
+				stringbuf_add_array(&sb, yytext, yyleng);
+				pushstart(VAR); }
+
 %[0-9]                   { yylval.str = xstrdup(yytext);
 			   return tok(STRING); }
 \"[^\\\"\n]*\"           { yylval.str = xmalloc(yyleng-1);
@@ -427,4 +445,21 @@ int
 yywrap(void)
 {
 	return inpctx_pop();
+}
+
+void
+trimws(char *s)
+{
+	size_t len = strlen(s);
+	while (len > 0 && ISWS(s[len-1])) 
+		s[--len] = 0;
+}
+
+size_t
+trimslash(char *s)
+{
+	size_t len = strlen(s);
+	while (len > 0 && s[len-1] == '\\')
+		s[--len] = 0;
+	return len;
 }

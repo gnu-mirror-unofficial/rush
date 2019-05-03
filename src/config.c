@@ -38,35 +38,6 @@ eow(char *p)
 	return p;
 }
 
-static void
-trimws(char *s)
-{
-	size_t len = strlen(s);
-	while (len > 0 && ISWS(s[len-1])) 
-		s[--len] = 0;
-}
-
-size_t
-trimslash(char *s)
-{
-	size_t len = strlen(s);
-	while (len > 0 && s[len-1] == '\\')
-		s[--len] = 0;
-	return len;
-}
-
-
-static int
-parse_file_mode(const char *val, mode_t *mode)
-{
-	char *q;
-	unsigned int n = strtoul(val, &q, 8);
-	if (*q || (n & ~0777))
-		return 1;
-	*mode = n;
-	return 0;
-}
-
 static int
 parsegid(char *val, gid_t *pgid)
 {
@@ -112,8 +83,7 @@ parseuid(char *val, uid_t *puid)
 
 struct input_buf {
 	CFSTREAM *cf;
-	char *file;
-	int line;
+	struct cfloc loc;
 	struct input_buf *next;
 };
 
@@ -125,10 +95,10 @@ init_input_buf(input_buf_ptr *ibufptr, input_buf_ptr next,
 {
 	input_buf_ptr ibuf;
 	
-	ibuf = xmalloc(sizeof(*ibuf));
+	ibuf = xcalloc(1, sizeof(*ibuf));
 	ibuf->cf = cf;
-	ibuf->file = xstrdup(filename);
-	ibuf->line = line;
+	ibuf->loc.beg.filename = xstrdup(filename);
+	ibuf->loc.beg.line = line;
 	ibuf->next = next;
 	*ibufptr = ibuf;
 }
@@ -139,8 +109,9 @@ free_input_buf(input_buf_ptr *ibufptr)
 	if (ibufptr && *ibufptr) {
 		input_buf_ptr ibuf = *ibufptr;
 		cfstream_close(ibuf->cf);
-		/* FIXME: We cannot free ibuf->file, because it is stored
-		   in rule->tag. Need a hash table for it. */
+		/* FIXME: We cannot free ibuf->loc.beg.file,
+		   because it is stored in rule->tag.
+		   Need a hash table for it. */
 		free(ibuf);
 		*ibufptr = NULL;
 	}
@@ -162,7 +133,7 @@ read_line_plain(input_buf_ptr ibuf, char **pbuf, size_t *psize)
 			buf = x2realloc(buf, &size);
 		buf[len] = c;
 		if (c == '\n') {
-			ibuf->line++;
+			ibuf->loc.beg.line++;
 			if (len > 0 && buf[len-1] == '\\') {
 				len--;
 			} else 
@@ -189,13 +160,14 @@ read_line(input_buf_ptr *ibufptr, char **pbuf, size_t *psize)
 			return p;
 		else {
 			input_buf_ptr next = (*ibufptr)->next;
-			debug(3, _("Finished parsing %s"), (*ibufptr)->file);
+			debug(3, _("Finished parsing %s"),
+			      (*ibufptr)->loc.beg.filename);
 			free_input_buf(ibufptr);
 			*ibufptr = next;
 			if (next)
 				debug(3,
 				      _("Resuming parsing %s from line %d"),
-				      next->file, next->line);
+				      next->loc.beg.filename, next->loc.beg.line);
 		}
 	} while (*ibufptr);
 	return NULL;
@@ -234,78 +206,6 @@ copy_string(const char *src)
 	return dest;
 }
 
-int
-absolute_dir_p(const char *dir)
-{
-	const char *p;
-	enum { state_init, state_dot, state_double_dot } state = state_init;
-
-	if (dir[0] != '/')
-		return 0;
-	for (p = dir; *p; p++) {
-		switch (*p) {
-		case '.':
-			switch (state) {
-			case state_init:
-				state = state_dot;
-				break;
-			case state_dot:
-				state = state_double_dot;
-				break;
-			case state_double_dot:
-				state = state_init;
-			}
-			break;
-			
-		case '/':
-			if (state != state_init) 
-				return 0;
-			break;
-
-		default:
-			state = state_init;
-		}
-	}
-	return state == state_init;
-}
-	
-int
-check_dir(const char *dir, input_buf_ptr ibuf)
-{
-	struct stat st;
-
-	if (dir[0] == '~') {
-		if (dir[1] && !absolute_dir_p(dir + 1)) {
-			logmsg(LOG_NOTICE,
-			       "%s:%d: %s",
-			       ibuf->file, ibuf->line,
-			       _("not an absolute directory name"));
-			return 1;
-		}
-		return 0;
-	} else if (!absolute_dir_p(dir)) {
-		logmsg(LOG_NOTICE,
-		       "%s:%d: %s",
-		       ibuf->file, ibuf->line,
-		       _("not an absolute directory name"));
-		return 1;
-	}
-
-	if (stat(dir, &st)) {
-		logmsg(LOG_NOTICE,
-		       _("%s:%d: cannot stat %s: %s"),
-		       ibuf->file, ibuf->line, dir,
-		       strerror(errno));
-		return 1;
-	} else if (!S_ISDIR(st.st_mode)) {
-		logmsg(LOG_NOTICE,
-		       _("%s:%d: %s is not a directory"),
-		       ibuf->file, ibuf->line, dir);
-		return 1;
-	}
-	return 0;
-}
-	
 int
 parse_cmp_op(enum cmp_op *op, char **pstr)
 {
@@ -359,9 +259,7 @@ numstrtonum(input_buf_ptr ibuf, char *val,
 	
 	node->v.cmp.rarg.num = strtoul(val, &q, 10);
 	if (*q) {
-		logmsg(LOG_NOTICE,
-		       _("%s:%d: invalid number: %s"),
-		       ibuf->file, ibuf->line, val);
+		cferror(&ibuf->loc, _("invalid number: %s"), val);
 		return 1;
 	}
 	return 0;
@@ -374,9 +272,7 @@ parse_numtest(input_buf_ptr ibuf, struct test_node *numtest,
 {
 	if (parse_cmp_op(&numtest->v.cmp.op, &val)
 	    && val[strcspn(val, " \t")]) {
-		logmsg(LOG_NOTICE,
-		       _("%s:%d: invalid opcode"),
-		       ibuf->file, ibuf->line);
+		cferror(&ibuf->loc, "%s", _("invalid opcode"));
 		return 1;
 	}
 	return valtonum(ibuf, val, numtest);
@@ -398,8 +294,7 @@ regexp_error(input_buf_ptr ibuf, regex_t *regex, int rc)
 {
 	char errbuf[512];
 	regerror(rc, regex, errbuf, sizeof(errbuf));
-	logmsg(LOG_NOTICE, _("%s:%d: invalid regexp: %s"),
-	       ibuf->file, ibuf->line, errbuf);
+	cferror(&ibuf->loc, _("invalid regexp: %s"), errbuf);
 }
 
 static int
@@ -430,16 +325,16 @@ _parse_re_flags(input_buf_ptr ibuf, struct rush_rule *rule,
 		
 		if (strcmp(p, "extended") == 0) 
 			flag = REG_EXTENDED;
-		else if (strcmp(fv[i], "basic") == 0) {
+		else if (strcmp(p, "basic") == 0) {
 			flag = REG_EXTENDED;
 			enable = !enable;
-		} else if (strcmp(fv[i], "icase") == 0
-			 || strcmp(fv[i], "ignore-case") == 0)
+		} else if (strcmp(p, "icase") == 0
+			 || strcmp(p, "ignore-case") == 0)
 			flag = REG_ICASE;
 		else {
-			logmsg(LOG_NOTICE,
-			       _("%s:%d: unknown regexp flag: %s"),
-			       ibuf->file, ibuf->line, p);
+			cferror(&ibuf->loc,
+				_("unknown regexp flag: %s"),
+				p);
 			return 1;
 		}
 
@@ -455,15 +350,11 @@ static int
 check_argc(input_buf_ptr ibuf, struct stmt_env *env, int min, int max)
 {
 	if (env->argc < min) {
-		logmsg(LOG_NOTICE,
-		       _("%s:%d: too few arguments"),
-		       ibuf->file, ibuf->line);
+		cferror(&ibuf->loc, "%s", _("too few arguments"));
 		return 1;
 	}
 	if (env->argc > max) {
-		logmsg(LOG_NOTICE,
-		       _("%s:%d: too many arguments"),
-		       ibuf->file, ibuf->line);
+		cferror(&ibuf->loc, "%s", _("too many arguments"));
 		return 1;
 	}
 	return 0;
@@ -534,9 +425,7 @@ uidtonum(input_buf_ptr ibuf, char *str, struct test_node *node)
 	uid_t uid;
 	
 	if (parseuid(str, &uid)) {
-		logmsg(LOG_NOTICE,
-		       _("%s:%d: no such user: %s"),
-		       ibuf->file, ibuf->line, str);
+		cferror(&ibuf->loc, _("no such user: %s"), str);
 		return 1;
 	}
 	node->v.cmp.rarg.num = uid;
@@ -561,9 +450,7 @@ gidtonum(input_buf_ptr ibuf, char *str, struct test_node *node)
 	gid_t gid;
 	
 	if (parsegid(str, &gid)) {
-		logmsg(LOG_NOTICE,
-		       _("%s:%d: no such group: %s"),
-		       ibuf->file, ibuf->line, str);
+		cferror(&ibuf->loc, _("no such group: %s"), str);
 		return 1;
 	}
 	node->v.cmp.rarg.num = gid;
@@ -636,23 +523,14 @@ static int
 _parse_umask(input_buf_ptr ibuf, struct rush_rule *rule,
 	     struct stmt_env *env)
 {
-	return parse_file_mode(env->val, &rule->mask);
+	return attrib_umask(rule, env->val, &ibuf->loc);
 }
 
 static int
 _parse_chroot(input_buf_ptr ibuf, struct rush_rule *rule,
 	      struct stmt_env *env)
 {
-	char *chroot_dir = xstrdup(env->val);
-	if (trimslash(chroot_dir) == 0) {
-		logmsg(LOG_NOTICE,
-		       _("%s:%d: invalid chroot directory"),
-		       ibuf->file, ibuf->line);
-		return 1;
-	} else if (check_dir(chroot_dir, ibuf))
-		return 1;
-	rule->chroot_dir = chroot_dir;
-	return 0;
+	return attrib_chroot(rule, env->val, &ibuf->loc);
 }
 
 static int
@@ -662,9 +540,7 @@ _parse_limits(input_buf_ptr ibuf, struct rush_rule *rule,
 	char *q;
 			
 	if (parse_limits(&rule->limits, env->val, &q)) {
-		logmsg(LOG_NOTICE,
-		       _("%s:%d: unknown limit: %s"),
-		       ibuf->file, ibuf->line, q);
+		cferror(&ibuf->loc, _("unknown limit: %s"), q);
 		return 1;
 	}
 	return 0;
@@ -680,9 +556,9 @@ _parse_transform_common(input_buf_ptr ibuf, struct rush_rule *rule,
 	if (check_argc(ibuf, env, 1, 3))
 		return NULL;
 	else if (env->argc == 3 && strcmp(env->argv[1], "~")) {
-		logmsg(LOG_NOTICE,
-		       _("%s:%d: expected ~ as the second argument, but found %s"),
-		       ibuf->file, ibuf->line, env->argv[2]);
+		cferror(&ibuf->loc,
+			_("expected ~ as the second argument, but found %s"),
+			env->argv[2]);
 		return NULL;
 	}
 	node = new_transform_node(rule, transform_set);
@@ -738,15 +614,7 @@ static int
 _parse_chdir(input_buf_ptr ibuf, struct rush_rule *rule,
 	     struct stmt_env *env)
 {
-	char *home_dir = rule->home_dir = xstrdup(env->val);
-	if (trimslash(home_dir) == 0) {
-		logmsg(LOG_NOTICE,
-		       _("%s:%d: invalid home directory"),
-		       ibuf->file, ibuf->line);
-		return 1;
-	} 
-	rule->home_dir = home_dir;
-	return 0;
+	return attrib_chdir(rule, env->val, &ibuf->loc);
 }
 
 static int
@@ -858,9 +726,7 @@ _parse_sleep_time(input_buf_ptr ibuf, struct rush_rule *rule,
 	char *q;
 	sleep_time = strtoul(env->val, &q, 10);
 	if (*q) {
-		logmsg(LOG_NOTICE,
-		       _("%s:%d: invalid time: %s"),
-		       ibuf->file, ibuf->line, env->val);
+		cferror(&ibuf->loc, _("invalid time: %s"), env->val);
 		return 1;
 	}
 	return 0;
@@ -916,9 +782,7 @@ _parse_exit(input_buf_ptr ibuf, struct rush_rule *rule,
 		char *p;
 		unsigned long n = strtoul(val, &p, 10);
 		if (!ISWS(p[0]) || n > getmaxfd()) {
-			logmsg(LOG_NOTICE,
-			       _("%s:%d: invalid file descriptor"),
-			       ibuf->file, ibuf->line);
+			cferror(&ibuf->loc, "%s", _("invalid file descriptor"));
 			return 1;
 		}
 		val = skipws(p);
@@ -931,9 +795,8 @@ _parse_exit(input_buf_ptr ibuf, struct rush_rule *rule,
 		else {
 			int n = string_to_error_index(val + 1);
 			if (n == -1) {
-				logmsg(LOG_NOTICE,
-				       _("%s:%d: Unknown message reference"),
-				       ibuf->file, ibuf->line);
+				cferror(&ibuf->loc, "%s",
+					_("Unknown message reference"));
 				return 1;
 			}
 			rule->error = new_standard_error(error_fd, n);
@@ -944,292 +807,47 @@ _parse_exit(input_buf_ptr ibuf, struct rush_rule *rule,
 }
 
 static int
-get_bool(const char *val, int *res)
-{
-	if (strcmp (val, "yes") == 0
-	    || strcmp (val, "on") == 0
-	    || strcmp (val, "t") == 0
-	    || strcmp (val, "true") == 0
-	    || strcmp (val, "1") == 0)
-		*res = 1;
-	else if (strcmp (val, "no") == 0
-		 || strcmp (val, "off") == 0
-		 || strcmp (val, "nil") == 0
-		 || strcmp (val, "false") == 0
-		 || strcmp (val, "0") == 0)
-		*res = 0;
-	else
-		return 1;
-	return 0;
-}
-
-static int
 _parse_fork(input_buf_ptr ibuf, struct rush_rule *rule,
 	    struct stmt_env *env)
 {
-	int yes;
-	if (get_bool(env->val, &yes)) {
-		logmsg(LOG_NOTICE,
-		       _("%s:%d: expected boolean value, but found `%s'"),
-		       ibuf->file, ibuf->line, env->val);
-		return 1;
-	}
-	rule->fork = yes ? rush_true : rush_false;
-	return 0;
+	return attrib_fork(rule, env->val, &ibuf->loc);
 }
 
 static int
 _parse_acct(input_buf_ptr ibuf, struct rush_rule *rule,
 	    struct stmt_env *env)
 {
-	int yes;
-	if (get_bool(env->val, &yes)) {
-		logmsg(LOG_NOTICE,
-		       _("%s:%d: expected boolean value, but found `%s'"),
-		       ibuf->file, ibuf->line, env->val);
-		return 1;
-	}
-	rule->acct = yes ? rush_true : rush_false;
-	return 0;
+	return attrib_acct(rule, env->val, &ibuf->loc);
 }
 
 static int
 _parse_acct_file_mode(input_buf_ptr ibuf, struct rush_rule *rule,
 		      struct stmt_env *env)
 {
-	return parse_file_mode(env->val, &rushdb_file_mode);
+	return parse_file_mode(env->val, &rushdb_file_mode, &ibuf->loc);
 }
 
 static int
 _parse_acct_dir_mode(input_buf_ptr ibuf, struct rush_rule *rule,
 		     struct stmt_env *env)
 {
-	return parse_file_mode(env->val, &rushdb_dir_mode);
+	return parse_file_mode(env->val, &rushdb_dir_mode, &ibuf->loc);
 }
 
 static int
 _parse_acct_umask(input_buf_ptr ibuf, struct rush_rule *rule,
 		  struct stmt_env *env)
 {
-	return parse_file_mode(env->val, &rushdb_dir_mode);
+	return parse_file_mode(env->val, &rushdb_umask, &ibuf->loc);
 }
 
 
 static int
-copy_part(const char *cstr, const char *p, char **pbuf)
-{
-	size_t len = p - cstr;
-	char *buf = malloc(len + 1);
-	if (!buf) {
-		free(buf);
-		return 1;
-	}
-	memcpy(buf, cstr, len);
-	buf[len] = 0;
-	*pbuf = buf;
-	return 0;
-}
-
-static int
-parse_conn(const char *cstr, char **pport, char **ppath)
-{
-	const char *p = strchr (cstr, ':');
-
-	if (!p) {
-		*pport = NULL;
-		*ppath = strdup(cstr);
-		return *ppath == NULL;
-	} else if (copy_part(cstr, p, ppath))
-		return 1;
-	else
-		cstr = p + 1;
-	*pport = strdup(cstr);
-	return *pport == NULL;
-}
-
-struct socket_family {
-	char *name;
-	size_t len;
-	int family;
-};
-
-static struct socket_family socket_family[] = {
-#define DEF(s, f) { #s, sizeof(#s)-1, f }
-	DEF(inet, AF_INET),
-	DEF(unix, AF_UNIX),
-	DEF(local, AF_UNIX),
-	{ NULL }
-#undef DEF
-};
-
-static struct socket_family *
-find_family(const char *s, size_t len)
-{
-	struct socket_family *fp;
-	for (fp = socket_family; fp->name; fp++)
-		if (len == fp->len)
-			return fp;
-	return NULL;
-}
-
-static int
-parse_url(input_buf_ptr ibuf, const char *cstr, 
-	  int *pfamily, char **pport, char **ppath)
-{
-	const char *p;
-	
-	p = strchr(cstr, ':');
-	if (p) {
-		struct socket_family *fp = find_family(cstr, p - cstr);
-
-		if (!fp) {
-			logmsg(LOG_NOTICE,
-			       _("%s:%d: unknown address family"),
-			       ibuf->file, ibuf->line);
-			return 1;
-		}
-
-		*pfamily = fp->family;
-		
-		cstr = p + 1;
-		if (cstr[0] == '/') {
-			if (cstr[1] == '/') {
-				return parse_conn(cstr + 2, pport, ppath);
-			} else if (*pfamily == AF_UNIX) {
-				*pport = NULL;
-				*ppath = strdup(cstr);
-				return *ppath == NULL;
-			}
-		} else {
-			logmsg(LOG_NOTICE,
-			       _("%s:%d: malformed URL"),
-			       ibuf->file, ibuf->line);
-			return 1;
-		}
-	} else {
-		*pfamily = AF_UNIX;
-		*pport = NULL;
-		*ppath = strdup(cstr);
-		return *ppath == NULL;
-	}
-	return 0;
-}
-
-static int
-make_socket(input_buf_ptr ibuf, int family,
-	    char *port, char *path, struct rush_sockaddr *pa)
-{
-	union {
-		struct sockaddr sa;
-		struct sockaddr_un s_un;
-		struct sockaddr_in s_in;
-	} addr;
-	socklen_t socklen;
-	short pnum;
-	long num;
-	char *p;
-	
-	switch (family) {
-	case AF_UNIX:
-		if (port) {
-			logmsg(LOG_NOTICE,
-			       _("%s:%d: port is meaningless for UNIX sockets"),
-			       ibuf->file, ibuf->line);
-			return 1;
-		}
-		if (strlen(path) > sizeof addr.s_un.sun_path) {
-			errno = EINVAL;
-			logmsg(LOG_NOTICE,
-			       _("%s:%d: UNIX socket name too long"),
-				ibuf->file, ibuf->line);
-			return 1;
-		}
-		
-		addr.sa.sa_family = PF_UNIX;
-		socklen = sizeof(addr.s_un);
-		strcpy(addr.s_un.sun_path, path);
-		break;
-
-	case AF_INET:
-		addr.sa.sa_family = PF_INET;
-		socklen = sizeof(addr.s_in);
-
-		num = pnum = strtol(port, &p, 0);
-		if (*p == 0) {
-			if (num != pnum) {
-				logmsg(LOG_NOTICE,
-				       _("%s:%d: bad port number"),
-					ibuf->file, ibuf->line);
-				return -1;
-			}
-			pnum = htons(pnum);
-		} else {
-			struct servent *sp = getservbyname(port, "tcp");
-			if (!sp) {
-				logmsg(LOG_NOTICE,
-				       _("%s:%d: unknown service name"),
-				       ibuf->file, ibuf->line);
-				return -1;
-			}
-			pnum = sp->s_port;
-		}
-
-		if (!path)
-			addr.s_in.sin_addr.s_addr = INADDR_ANY;
-		else {
-			struct hostent *hp = gethostbyname(path);
-			if (!hp) {
-				logmsg(LOG_NOTICE,
-				       _("%s:%d: unknown host name %s"),
-				       ibuf->file, ibuf->line, path);
-				return 1;
-			}
-			addr.sa.sa_family = hp->h_addrtype;
-			switch (hp->h_addrtype) {
-			case AF_INET:
-				memmove(&addr.s_in.sin_addr, hp->h_addr, 4);
-				addr.s_in.sin_port = pnum;
-				break;
-
-			default:
-				logmsg(LOG_NOTICE,
-				       _("%s:%d: unsupported address family"),
-				       ibuf->file, ibuf->line);
-				return 1;
-			}
-		}
-		break;
-
-	default:
-		logmsg(LOG_NOTICE,
-		       _("%s:%d: unsupported address family"),
-		       ibuf->file, ibuf->line);
-		return 1;
-	}
-	pa->len = socklen;
-	pa->sa = xmalloc(socklen);
-	memcpy(pa->sa, &addr.sa, socklen);
-	return 0;
-}
-		
-static int
 _parse_post_socket(input_buf_ptr ibuf, struct rush_rule *rule,
 		   struct stmt_env *env)
 {
-	int family;
-	char *path;
-	char *port;
-	int rc;
-	
-	if (parse_url(ibuf, env->val,  &family, &port, &path))
-		return 1;
-	rc = make_socket(ibuf, family, port ? port : "tcpmux", path,
-			 &rule->post_sockaddr);
-	free(port);
-	free(path);
-	return rc;
+	return attrib_post_socket(rule, env->val, &ibuf->loc);
 }
-
 
 static int
 _parse_text_domain(input_buf_ptr ibuf, struct rush_rule *rule,
@@ -1271,9 +889,7 @@ _parse_include(input_buf_ptr ibuf, struct rush_rule *rule,
 	name = expand_tilde(env->val, rush_pw->pw_dir);
 
 	if (trimslash(name) == 0) {
-		logmsg(LOG_NOTICE,
-		       _("%s:%d: invalid include file name"),
-		       ibuf->file, ibuf->line);
+		cferror(&ibuf->loc, "%s", _("invalid include file name"));
 		free(name);
 		return 1;
 	}
@@ -1286,10 +902,8 @@ _parse_include(input_buf_ptr ibuf, struct rush_rule *rule,
 			env->ret_buf = NULL;
 			return 0;
 		}
-		logmsg(LOG_NOTICE,
-		       _("%s:%d: cannot stat file %s: %s"),
-		       ibuf->file, ibuf->line,
-		       name, strerror(errno));
+		cferror(&ibuf->loc, _("cannot stat file %s: %s"),
+			name, strerror(errno));
 		free(name);
 		return 1;
 	}
@@ -1316,9 +930,8 @@ _parse_include_security(input_buf_ptr ibuf, struct rush_rule *rule,
 	
 	for (i = 0; i < env->argc; i++) {
 		if (cfck_keyword(env->argv[i])) {
-			logmsg(LOG_NOTICE,
-			       _("%s:%d: unknown keyword: %s"),
-			       ibuf->file, ibuf->line, env->argv[i]);
+			cferror(&ibuf->loc, _("unknown keyword: %s"),
+				env->argv[i]);
 			rc++;
 		}
 	}
@@ -1364,17 +977,13 @@ _parse_map_ar(input_buf_ptr ibuf, struct rush_rule *rule,
 	
 	n = node->v.map.key_field = strtoul(env->argv[3], &p, 10);
 	if (*p || n != node->v.map.key_field) {
-		logmsg(LOG_NOTICE,
-		       _("%s:%d: key field is not a number"),
-		       ibuf->file, ibuf->line);
+		cferror(&ibuf->loc, "%s", _("key field is not a number"));
 		return 1;
 	}
 
 	n = node->v.map.val_field = strtoul(env->argv[4], &p, 10);
 	if (*p || n != node->v.map.val_field) {
-		logmsg(LOG_NOTICE,
-		       _("%s:%d: value field is not a number"),
-		       ibuf->file, ibuf->line);
+		cferror(&ibuf->loc, "%s", _("value field is not a number"));
 		return 1;
 	}
 
@@ -1418,16 +1027,12 @@ _parse_delete(input_buf_ptr ibuf, struct rush_rule *rule,
 
 	from = get_arg_index(env->argv[0], &p);
 	if (*p) {
-		logmsg(LOG_NOTICE,
-		       _("%s:%d: %s: not a number"),
-		       ibuf->file, ibuf->line, env->argv[0]);
+		cferror(&ibuf->loc, _("%s: not a number"), env->argv[0]);
 		return 1;
 	}
 	to = get_arg_index(env->argv[1], &p);
 	if (*p) {
-		logmsg(LOG_NOTICE,
-		       _("%s:%d: %s: not a number"),
-		       ibuf->file, ibuf->line, env->argv[1]);
+		cferror(&ibuf->loc, _("%s: not a number"), env->argv[1]);
 		return 1;
 	}
 	
@@ -1493,9 +1098,7 @@ _parse_newgroup(input_buf_ptr ibuf, struct rush_rule *rule,
 		struct stmt_env *env)
 {
 	if (parsegid(env->val, &rule->gid)) {
-		logmsg(LOG_NOTICE,
-		       _("%s:%d: no such group: %s"),
-		       ibuf->file, ibuf->line, env->val);
+		cferror(&ibuf->loc, _("no such group: %s"), env->val);
 		return 1;
 	}
 	return 0;
@@ -1601,7 +1204,7 @@ parse_input_buf(input_buf_ptr ibuf)
 	struct rush_rule *rule = NULL;
 	unsigned rule_num = 0;
 
-	debug(3, _("Parsing %s"), ibuf->file);
+	debug(3, _("Parsing %s"), ibuf->loc.beg.filename);
 	while (read_line(&ibuf, &buf, &size)) {
 		char *kw, *val;
 		char *p;
@@ -1613,7 +1216,8 @@ parse_input_buf(input_buf_ptr ibuf)
 		memset(&env, 0, sizeof env);
 
 		p = skipws(buf);
-		debug(3, "%s:%d: %s", ibuf->file, ibuf->line, p);
+		debug(3, "%s:%d: %s",
+		      ibuf->loc.beg.filename, ibuf->loc.beg.line, p);
 		if (p[0] == 0 || p[0] == '#')
 			continue;
 		kw = p;
@@ -1637,16 +1241,14 @@ parse_input_buf(input_buf_ptr ibuf)
 				rule->tag[0] = '#';
 				strcpy(rule->tag + 1, s);
 			}
-			rule->file = ibuf->file;
-			rule->line = ibuf->line;
+			rule->file = ibuf->loc.beg.filename;
+			rule->line = ibuf->loc.beg.line;
 			continue;
 		}
 
 		tok = find_token(kw, &len);
 		if (!tok) {
-			logmsg(LOG_NOTICE,
-			       _("%s:%d: unknown statement: %s"),
-			       ibuf->file, ibuf->line, kw);
+			cferror(&ibuf->loc, _("unknown statement: %s"), kw);
 			err = 1;
 			continue;
 		}
@@ -1681,18 +1283,16 @@ parse_input_buf(input_buf_ptr ibuf)
 			} else
 				env.index = strtol(kw + 1, &q, 10);
 			if (*q != ']') {
-				logmsg(LOG_NOTICE,
-				       _("%s:%d: missing ]"),
-				       ibuf->file, ibuf->line);
+				cferror(&ibuf->loc, "%s", _("missing ]"));
 				err = 1;
 				continue;
 			}
 		}
 		
 		if (tok->flags & (TOK_ARG | TOK_ARGN) && !(val && *val)) {
-			logmsg(LOG_NOTICE,
-			       _("%s:%d: invalid statement: missing value"),
-			       ibuf->file, ibuf->line);
+			cferror(&ibuf->loc,
+				"%s",
+				_("invalid statement: missing value"));
 			err = 1;
 			continue;
 		}
@@ -1712,10 +1312,9 @@ parse_input_buf(input_buf_ptr ibuf)
 			
 			ws.ws_comment = "#";
 			if (wordsplit(val, &ws, flags)) {
-				logmsg(LOG_NOTICE,
-				       _("%s:%d: failed to parse value: %s"),
-				       ibuf->file, ibuf->line,
-				       wordsplit_strerror(&ws));
+				cferror(&ibuf->loc,
+					_("failed to parse value: %s"),
+					wordsplit_strerror(&ws));
 				err = 1;
 				continue;
 			}				
@@ -1730,9 +1329,9 @@ parse_input_buf(input_buf_ptr ibuf)
 		
 		if (tok->flags & TOK_RUL) {
 			if (!rule) {
-				logmsg(LOG_NOTICE,
-				       _("%s:%d: statement cannot be used outside a rule"),
-				       ibuf->file, ibuf->line);
+				cferror(&ibuf->loc,
+					"%s",
+					_("statement cannot be used outside a rule"));
 				err = 1;
 				continue;
 			}
@@ -1744,7 +1343,7 @@ parse_input_buf(input_buf_ptr ibuf)
 			if (tok->flags & TOK_NEWBUF && env.ret_buf) {
 				env.ret_buf->next = ibuf;
 				ibuf = env.ret_buf;
-				debug(3, _("Parsing %s"), ibuf->file);
+				debug(3, _("Parsing %s"), ibuf->loc.beg.filename);
 			}
 			if (env.node) {
 				if (rule->test_node) {
