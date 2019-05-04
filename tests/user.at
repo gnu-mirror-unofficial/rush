@@ -14,64 +14,39 @@
 # You should have received a copy of the GNU General Public License
 # along with GNU Rush.  If not, see <http://www.gnu.org/licenses/>.
 
-AT_SETUP([command])
-AT_KEYWORDS([command])
+AT_SETUP([user])
+AT_KEYWORDS([user])
 
 AT_RUSH_TEST([
 rush 2.0
 rule
-  match \$command ~ "echo[[:space:]]+foo$"
+  match \$user == $MY_USER
 ],
-[cmdline,argv,prog,interactive,fork,acct],
-
-[/usr/bin/echo foo],
+[cmdline,argv,prog],
+[ls /],
 [0],
 [{
-    "cmdline":"/usr/bin/echo foo",
+    "cmdline":"ls /",
     "argv":[[
-        "/usr/bin/echo",
-        "foo"
+        "ls",
+        "/"
     ]],
-    "prog":null,
-    "interactive":0,
-    "fork":-1,
-    "acct":-1
+    "prog":null
 }
 ],
-[],
-
-[/usr/bin/echo foo bar],
-[1],
-[],
-[rush: Error: no matching rule for "/usr/bin/echo foo bar", user $MY_USER
-])
+[])
 
 AT_RUSH_TEST([
 rush 2.0
 rule
-  match \$command == "/bin/ls"
+  match \$user != $MY_USER
 ],
-[cmdline,argv,prog,interactive,fork,acct],
-
-[/bin/ls],
-[0],
-[{
-    "cmdline":"/bin/ls",
-    "argv":[[
-        "/bin/ls"
-    ]],
-    "prog":null,
-    "interactive":0,
-    "fork":-1,
-    "acct":-1
-}
-],
-[],
-
-[/bin/ls /],
+[cmdline,argv,prog],
+[ls /],
 [1],
 [],
-[rush: Error: no matching rule for "/bin/ls /", user $MY_USER
+[rush: Error: no matching rule for "ls /", user $MY_USER
 ])
 
 AT_CLEANUP
+

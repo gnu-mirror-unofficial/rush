@@ -30,14 +30,18 @@ rush_SOURCES=\
  rushopt.h\
  socket.c\
  transform.c\
- cflex.l cfgram.y cf.h cf.c
+ cflex.l\
+ cfgram.y\
+ cfgram.h\
+ cf.h\
+ cf.c
 
 rushlast_SOURCES=rushlast.c rlopt.h
 rushwho_SOURCES=rushwho.c rwopt.h
 rushlast.c: rlopt.h
 rushwho.c: rwopt.h
-EXTRA_DIST = rush-po rushopt.opt rlopt.opt rwopt.opt getopt.m4 defconf.sed
-AM_CPPFLAGS=-I$(top_srcdir)/gnu -I$(top_builddir)/gnu -I$(top_srcdir)/lib
+EXTRA_DIST = rush-po rushopt.opt rlopt.opt rwopt.opt getopt.m4 defconf.sed cfgram.output
+AM_CPPFLAGS=-I$(top_srcdir) -I$(top_srcdir)/gnu -I$(top_builddir)/gnu -I$(top_srcdir)/lib
 LDADD=../lib/librush.a ../gnu/libgnu.a @LTLIBINTL@
 
 AM_INSTALLCHECK_STD_OPTIONS_EXEMPT=rush-po
@@ -75,7 +79,7 @@ SUFFIXES=.opt .c .h
 .opt.h:
 	$(AM_V_GEN)m4 -s $(srcdir)/getopt.m4 $< | sed '1d' > $@
 
-AM_YFLAGS=-dt
+AM_YFLAGS=-dtv
 AM_LFLAGS=-d
 cflex.c: cfgram.h
 cfgram.h: cfgram.c

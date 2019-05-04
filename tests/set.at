@@ -18,8 +18,9 @@ AT_SETUP([set])
 AT_KEYWORDS([set])
 
 AT_RUSH_TEST([
+rush 2.0
 rule
-  set ls /
+  set command "ls /"
 ],
 [cmdline,argv,prog],
 [echo],
@@ -36,8 +37,9 @@ rule
 [])
 
 AT_RUSH_TEST([
+rush 2.0
 rule
-  set[0] /usr/bin/\$0 
+  set [0] "/usr/bin/\$0" 
 ],
 [cmdline,argv,prog],
 [ls /],
@@ -54,8 +56,9 @@ rule
 [])
 
 AT_RUSH_TEST([
+rush 2.0
 rule
-  set[1] /chroot\${1} 
+  set [1] "/chroot\${1}" 
 ],
 [cmdline,argv,prog],
 [ls /],
@@ -72,8 +75,9 @@ rule
 [])
 
 AT_RUSH_TEST([
+rush 2.0
 rule
-  set[^] /usr/bin/ls
+  set program "/usr/bin/ls"
 ],
 [cmdline,argv,prog],
 [ls /],
@@ -90,8 +94,9 @@ rule
 [])
 
 AT_RUSH_TEST([
+rush 2.0
 rule
-  set[$] /tmp
+  set [-1] "/tmp"
 ],
 [cmdline,argv,prog],
 [ls /],

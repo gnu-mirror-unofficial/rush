@@ -39,27 +39,50 @@ $(srcdir)/package.m4: $(top_srcdir)/configure.ac
 ## ------------ ##
 
 TESTSUITE_AT = \
-  argc.at\
-  backref.at\
-  chdir.at\
-  command.at\
-  delete.at\
-  env.at\
-  error.at\
-  fallthrough.at\
-  interactive.at\
-  gid.at\
-  map.at\
-  match.at\
-  matchprog.at\
-  newgrp.at\
-  set.at\
-  setvar.at\
   testsuite.at\
-  transform.at\
+  null.at\
+  argc.at\
+  command.at\
+  matcharg.at\
+  matchprog.at\
   uid.at\
-  unsetvar.at\
-  umask.at
+  user.at\
+  in.at\
+  gid.at\
+  group.at\
+  and.at\
+  or.at\
+  compound.at\
+  set.at\
+  delete.at\
+  transform.at\
+  map.at\
+  umask.at\
+  newgrp.at\
+  chdir.at\
+  interactive.at\
+  fallthrough.at\
+  error.at\
+  legacy/argc.at\
+  legacy/backref.at\
+  legacy/chdir.at\
+  legacy/command.at\
+  legacy/delete.at\
+  legacy/env.at\
+  legacy/error.at\
+  legacy/fallthrough.at\
+  legacy/interactive.at\
+  legacy/gid.at\
+  legacy/map.at\
+  legacy/match.at\
+  legacy/matchprog.at\
+  legacy/newgrp.at\
+  legacy/set.at\
+  legacy/setvar.at\
+  legacy/transform.at\
+  legacy/uid.at\
+  legacy/unsetvar.at\
+  legacy/umask.at
 
 TESTSUITE = $(srcdir)/testsuite
 M4=m4

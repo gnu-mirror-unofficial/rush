@@ -1,3 +1,19 @@
+/* This file is part of GNU Rush.                  
+   Copyright (C) 2008-2019 Sergey Poznyakoff
+
+   GNU Rush is free software; you can redistribute it and/or modify
+   it under the terms of the GNU General Public License as published by
+   the Free Software Foundation; either version 3, or (at your option)
+   any later version.
+
+   GNU Rush is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License for more details.
+
+   You should have received a copy of the GNU General Public License
+   along with GNU Rush.  If not, see <http://www.gnu.org/licenses/>. */
+
 %{
 #include <rush.h>
 #include <cf.h>
@@ -21,7 +37,7 @@ static void add_name_list(struct name_entry *head, enum envar_type type);
 	regex_t regex;
 	struct rush_rule rule;
 	struct test_node *node;
-	struct {
+	struct strlist {
 		char **argv;
 		size_t argc;
 	} strlist;
@@ -44,30 +60,30 @@ static void add_name_list(struct name_entry *head, enum envar_type type);
 	} arglist;
 }
 
-%token <str> STRING
-%token <str> IDENT
-%token <num> NUMBER
+%token <str> STRING "string"
+%token <str> IDENT "identifier"
+%token <num> NUMBER "number"
 
-%token PREFACE
-%token RULE
-%token GLOBAL
-%token EOL
-%token SET
-%token MAP
-%token UNSET
-%token MATCH
-%token FALLTHROUGH
-%token INCLUDE
-%token LIMITS
-%token CLRENV
-%token SETENV
-%token UNSETENV
-%token KEEPENV
-%token DELETE
-%token EXIT
-%token <attrib> ATTRIB
-%token <global_attrib> GLATTRIB
-%token BOGUS
+%token PREFACE "\"rush VERSION\""
+%token RULE "\"rule\""
+%token GLOBAL "\"global\""
+%token EOL "end of line"
+%token SET "\"set\""
+%token MAP "\"map\""
+%token UNSET "\"unset\""
+%token MATCH "\"match\""
+%token FALLTHROUGH "\"fallthrough\""
+%token INCLUDE "\"input\""
+%token LIMITS "\"limits\""
+%token CLRENV "\"clrenv\""
+%token SETENV "\"setenv\""
+%token UNSETENV "\"unsetenv\""
+%token KEEPENV "\"keepenv\""
+%token DELETE "\"delete\""
+%token EXIT "\"exit\""
+%token <attrib> ATTRIB "rule attribute"
+%token <global_attrib> GLATTRIB "global attribute"
+%token BOGUS "erroneous token"
 
 %left OR
 %left AND
@@ -75,7 +91,7 @@ static void add_name_list(struct name_entry *head, enum envar_type type);
 %nonassoc EQ NE LT LE GT GE '~' IN MEMBER
 
 %type <intval> fdescr index
-%type <str> literal string value defval
+%type <str> literal string value defval ruleid
 %type <regex> regex
 %type <node> expr compound_cond simple_cond
 %type <range> range
@@ -86,7 +102,7 @@ static void add_name_list(struct name_entry *head, enum envar_type type);
 %type <arglist> arglist
 
 %%
-rcfile     : PREFACE EOL rulelist
+rcfile     : PREFACE EOL content
              {
 		     if (errors)
 			     YYERROR;
@@ -98,8 +114,12 @@ rcfile     : PREFACE EOL rulelist
 	     }
 	   ;
 
+content    : /* empty */
+           | rulelist
+           ;
+
 rulelist   : rule
-	   | rulelist rule
+ 	   | rulelist rule
 	   ;
 
 rule       : rulehdr rulebody
@@ -155,11 +175,18 @@ arg        : literal
 	     }
 	   ;
 
-rulehdr    : RULE IDENT EOL
+rulehdr    : RULE ruleid EOL
 	     {
 		     current_rule = new_rush_rule();
 		     current_rule->tag = $2;
 	     }
+	   ;
+
+ruleid     : /* empty */
+             {
+		     $$ = NULL;
+	     }
+           | string
 	   ;
 
 rulebody   : stmt
@@ -175,6 +202,12 @@ stmt       : match_stmt EOL
 	   | include_stmt EOL
 	   | flowctl_stmt EOL
 	   | attrib_stmt EOL
+           | error { skiptoeol(); } EOL
+             {
+		     restorenormal();
+		     yyerrok;
+		     yyclearin;
+	     }
 	   ;
 
 /* ******************
@@ -235,7 +268,7 @@ expr       : string '~' regex
 	     }
 	   | string NE literal
 	     {
-		     $$ = new_test_node(test_cmpn);
+		     $$ = new_test_node(test_cmps);
 		     $$->v.cmp.op = cmp_ne;
 		     $$->v.cmp.larg = $1;
 		     $$->v.cmp.rarg.str = $3;
@@ -343,6 +376,16 @@ set_stmt   : SET index value
 		     node->v.xf.pattern = NULL;
 		     node->v.xf.trans = compile_transform_expr($4, re_flags);
 	     }
+	   | SET index string '~' value
+	     {
+		     struct transform_node *node;
+
+		     node = new_transform_node(current_rule, transform_set);
+		     node->target.type = target_arg;
+		     node->target.v.arg = $2;
+		     node->v.xf.pattern = $3;
+		     node->v.xf.trans = compile_transform_expr($5, re_flags);
+	     }
 	   | SET IDENT value
 	     {
 		     struct transform_node *node;
@@ -378,6 +421,24 @@ set_stmt   : SET index value
 		     }
 		     node->v.xf.pattern = NULL;
 		     node->v.xf.trans = compile_transform_expr($4, re_flags);
+	     }
+	   | SET IDENT string '~' value
+	     {
+		     struct transform_node *node;
+
+		     node = new_transform_node(current_rule, transform_set);
+		     if (strcmp($2, "command") == 0) {
+			     node->target.type = target_command;
+			     free($2);
+		     } else if (strcmp($2, "program") == 0) {
+			     node->target.type = target_program;
+			     free($2);
+		     } else {
+			     node->target.type = target_var;
+			     node->target.v.name = $2;
+		     }
+		     node->v.xf.pattern = $3;
+		     node->v.xf.trans = compile_transform_expr($5, re_flags);
 	     }
 	   | UNSET IDENT
 	     {
@@ -608,18 +669,19 @@ attrib_stmt : ATTRIB string
 	      }
 	    ;
 
-strlist     : arglist
+strlist     : '(' { cflex_pushargs(); } arglist ')'
 	      {
 		     int i;
 		     struct argval *arg;
 
-		     $$.argc = $1.argc;
-		     $$.argv = xcalloc($1.argc + 1, sizeof($$.argv[0]));
-		     for (i = 0, arg = $1.head; i < $1.argc; i++, arg = arg->next) {
+		     cflex_popargs();
+		     $$.argc = $3.argc;
+		     $$.argv = xcalloc($3.argc + 1, sizeof($$.argv[0]));
+		     for (i = 0, arg = $3.head; i < $3.argc; i++, arg = arg->next) {
 			     $$.argv[i] = arg->strval;
 			     arg->strval = NULL;
 		     }
-		     arglist_free($1.head);
+		     arglist_free($3.head);
 	      }
 	    ;
 

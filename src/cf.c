@@ -1,3 +1,19 @@
+/* This file is part of GNU Rush.                  
+   Copyright (C) 2008-2019 Sergey Poznyakoff
+
+   GNU Rush is free software; you can redistribute it and/or modify
+   it under the terms of the GNU General Public License as published by
+   the Free Software Foundation; either version 3, or (at your option)
+   any later version.
+
+   GNU Rush is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License for more details.
+
+   You should have received a copy of the GNU General Public License
+   along with GNU Rush.  If not, see <http://www.gnu.org/licenses/>. */
+
 #include <rush.h>
 #include <cf.h>
 
@@ -116,6 +132,7 @@ vcferror(struct cfloc const *loc, char const *fmt, va_list ap)
 	cfloc_format(loc, &sb);
 	stringbuf_add_array(&sb, ": ", 2);
 	stringbuf_add_string(&sb, fmt);
+	stringbuf_finish(&sb);
 	vlogmsg(LOG_ERR, sb.buffer, ap);
 	stringbuf_free(&sb);
 }

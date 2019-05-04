@@ -14,15 +14,15 @@
 # You should have received a copy of the GNU General Public License
 # along with GNU Rush.  If not, see <http://www.gnu.org/licenses/>.
 
-AT_SETUP([command])
-AT_KEYWORDS([command])
+AT_SETUP([match arg])
+AT_KEYWORDS([match arg])
 
 AT_RUSH_TEST([
 rush 2.0
 rule
-  match \$command ~ "echo[[:space:]]+foo$"
+  match \$1 ~ "^fo+\$"
 ],
-[cmdline,argv,prog,interactive,fork,acct],
+[cmdline,argv,prog],
 
 [/usr/bin/echo foo],
 [0],
@@ -32,46 +32,16 @@ rule
         "/usr/bin/echo",
         "foo"
     ]],
-    "prog":null,
-    "interactive":0,
-    "fork":-1,
-    "acct":-1
+    "prog":null
 }
 ],
 [],
 
-[/usr/bin/echo foo bar],
+[/usr/bin/echo for],
 [1],
 [],
-[rush: Error: no matching rule for "/usr/bin/echo foo bar", user $MY_USER
-])
-
-AT_RUSH_TEST([
-rush 2.0
-rule
-  match \$command == "/bin/ls"
-],
-[cmdline,argv,prog,interactive,fork,acct],
-
-[/bin/ls],
-[0],
-[{
-    "cmdline":"/bin/ls",
-    "argv":[[
-        "/bin/ls"
-    ]],
-    "prog":null,
-    "interactive":0,
-    "fork":-1,
-    "acct":-1
-}
-],
-[],
-
-[/bin/ls /],
-[1],
-[],
-[rush: Error: no matching rule for "/bin/ls /", user $MY_USER
+[rush: Error: no matching rule for "/usr/bin/echo for", user $MY_USER
 ])
 
 AT_CLEANUP
+

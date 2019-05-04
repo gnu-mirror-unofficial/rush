@@ -624,6 +624,13 @@ rush_transform(struct transform_node *node, struct rush_request *req)
 
 	case target_arg:
 		/* Single command line argument */
+		if (node->target.v.arg == req->argc) {
+			req->argv = xrealloc(req->argv,
+					     (req->argc + 2)
+					      * sizeof(req->argv[0]));
+			req->argc++;
+			req->argv[req->argc] = NULL;
+		}
 		arg_no = get_arg_no(node->target.v.arg, req);
 		target_ptr = &req->argv[arg_no];
 		target_src = req->argv[arg_no];

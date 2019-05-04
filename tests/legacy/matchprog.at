@@ -1,5 +1,5 @@
 # This file is part of GNU Rush. 
-# Copyright (C) 2019 Sergey Poznyakoff
+# Copyright (C) 2008-2019 Sergey Poznyakoff
 #
 # GNU Rush is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -14,15 +14,14 @@
 # You should have received a copy of the GNU General Public License
 # along with GNU Rush.  If not, see <http://www.gnu.org/licenses/>.
 
-AT_SETUP([command])
-AT_KEYWORDS([command])
+AT_SETUP([match program name])
+AT_KEYWORDS([matchprog])
 
 AT_RUSH_TEST([
-rush 2.0
 rule
-  match \$command ~ "echo[[:space:]]+foo$"
+  match[^] /usr/bin/.*
 ],
-[cmdline,argv,prog,interactive,fork,acct],
+[cmdline,argv,prog],
 
 [/usr/bin/echo foo],
 [0],
@@ -32,46 +31,17 @@ rule
         "/usr/bin/echo",
         "foo"
     ]],
-    "prog":null,
-    "interactive":0,
-    "fork":-1,
-    "acct":-1
+    "prog":null
 }
 ],
 [],
 
-[/usr/bin/echo foo bar],
+[echo foo],
 [1],
 [],
-[rush: Error: no matching rule for "/usr/bin/echo foo bar", user $MY_USER
+[rush: Error: no matching rule for "echo foo", user $MY_USER
 ])
 
-AT_RUSH_TEST([
-rush 2.0
-rule
-  match \$command == "/bin/ls"
-],
-[cmdline,argv,prog,interactive,fork,acct],
-
-[/bin/ls],
-[0],
-[{
-    "cmdline":"/bin/ls",
-    "argv":[[
-        "/bin/ls"
-    ]],
-    "prog":null,
-    "interactive":0,
-    "fork":-1,
-    "acct":-1
-}
-],
-[],
-
-[/bin/ls /],
-[1],
-[],
-[rush: Error: no matching rule for "/bin/ls /", user $MY_USER
-])
 
 AT_CLEANUP
+

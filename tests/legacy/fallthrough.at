@@ -1,5 +1,5 @@
 # This file is part of GNU Rush. 
-# Copyright (C) 2019 Sergey Poznyakoff
+# Copyright (C) 2016-2019 Sergey Poznyakoff
 #
 # GNU Rush is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -14,77 +14,52 @@
 # You should have received a copy of the GNU General Public License
 # along with GNU Rush.  If not, see <http://www.gnu.org/licenses/>.
 
-AT_SETUP([delete])
-AT_KEYWORDS([delete])
+AT_SETUP([fall-through])
+AT_KEYWORDS([fallthrough fall-through])
 
 AT_RUSH_TEST([
-rush 2.0
 rule
-  delete 1
+    env - USER=$MY_USER STATUS='Fall-through working'
+    fall-through
+    
+rule
+    set[0] newcommand
 ],
-[cmdline,argv,prog],
-[echo foo bar],
+[cmdline,environ],
+[command],
 [0],
 [{
-    "cmdline":"echo bar",
-    "argv":[[
-        "echo",
-        "bar"
-    ]],
-    "prog":null
-}
-],
-[])
-
-AT_RUSH_TEST([
-rush 2.0
-rule
-  delete -1
-],
-[cmdline,argv,prog],
-[echo foo bar],
-[0],
-[{
-    "cmdline":"echo foo",
-    "argv":[[
-        "echo",
-        "foo"
-    ]],
-    "prog":null
-}
-],
-[])
-
-AT_RUSH_TEST([
-rush 2.0
-rule
-  delete 2 4
-],
-[cmdline,argv,prog],
-[echo foo bar baz quux wum],
-[0],
-[{
-    "cmdline":"echo foo wum",
-    "argv":[[
-        "echo",
-        "foo",
-        "wum"
-    ]],
-    "prog":null
+    "cmdline":"newcommand",
+    "environ":[[
+        "STATUS=Fall-through working",
+        "USER=$MY_USER"
+    ]]
 }
 ],
 [])
 
 AT_RUSH_TEST([
 rule
-  delete[0]
+    chdir /tmp
+    fall-through
+    
+rule
+    set[0] newcommand
+    interactive
 ],
-[cmdline,argv,prog],
-[echo foo bar],
-[1],
-[],
-[rush: Error: Deleting argv[[0]] is prohibited
-])
+[cmdline,interactive,home_dir],
+[interactive],
+[0],
+[{
+    "cmdline":"newcommand",
+    "interactive":1,
+    "home_dir":null    
+}
+],
+[])
 
 AT_CLEANUP
+
+
+
 

@@ -14,61 +14,18 @@
 # You should have received a copy of the GNU General Public License
 # along with GNU Rush.  If not, see <http://www.gnu.org/licenses/>.
 
-AT_SETUP([match program name])
-AT_KEYWORDS([matchprog])
+AT_SETUP([null])
+AT_KEYWORDS([null])
 
 AT_RUSH_TEST([
 rush 2.0
-rule
-  match \$0 ~ "/usr/bin/.*"
 ],
-[cmdline,argv,prog],
 
+[all],
 [/usr/bin/echo foo],
-[0],
-[{
-    "cmdline":"/usr/bin/echo foo",
-    "argv":[[
-        "/usr/bin/echo",
-        "foo"
-    ]],
-    "prog":null
-}
-],
-[],
-
-[echo foo],
 [1],
 [],
-[rush: Error: no matching rule for "echo foo", user $MY_USER
+[rush: Error: no matching rule for "/usr/bin/echo foo", user $MY_USER
 ])
-
-AT_RUSH_TEST([
-rush 2.0
-rule
-  match \$program ~ "/usr/bin/.*"
-],
-[cmdline,argv,prog],
-
-[/usr/bin/echo foo],
-[0],
-[{
-    "cmdline":"/usr/bin/echo foo",
-    "argv":[[
-        "/usr/bin/echo",
-        "foo"
-    ]],
-    "prog":null
-}
-],
-[],
-
-[echo foo],
-[1],
-[],
-[rush: Error: no matching rule for "echo foo", user $MY_USER
-])
-
 
 AT_CLEANUP
-

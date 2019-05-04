@@ -1,5 +1,5 @@
 # This file is part of GNU Rush. 
-# Copyright (C) 2019 Sergey Poznyakoff
+# Copyright (C) 2016-2019 Sergey Poznyakoff
 #
 # GNU Rush is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -14,64 +14,74 @@
 # You should have received a copy of the GNU General Public License
 # along with GNU Rush.  If not, see <http://www.gnu.org/licenses/>.
 
-AT_SETUP([command])
-AT_KEYWORDS([command])
+AT_SETUP([delete])
+AT_KEYWORDS([delete])
 
 AT_RUSH_TEST([
-rush 2.0
 rule
-  match \$command ~ "echo[[:space:]]+foo$"
+  delete[1]
 ],
-[cmdline,argv,prog,interactive,fork,acct],
-
-[/usr/bin/echo foo],
+[cmdline,argv,prog],
+[echo foo bar],
 [0],
 [{
-    "cmdline":"/usr/bin/echo foo",
+    "cmdline":"echo bar",
     "argv":[[
-        "/usr/bin/echo",
+        "echo",
+        "bar"
+    ]],
+    "prog":null
+}
+],
+[])
+
+AT_RUSH_TEST([
+rule
+  delete[$]
+],
+[cmdline,argv,prog],
+[echo foo bar],
+[0],
+[{
+    "cmdline":"echo foo",
+    "argv":[[
+        "echo",
         "foo"
     ]],
-    "prog":null,
-    "interactive":0,
-    "fork":-1,
-    "acct":-1
+    "prog":null
 }
 ],
-[],
-
-[/usr/bin/echo foo bar],
-[1],
-[],
-[rush: Error: no matching rule for "/usr/bin/echo foo bar", user $MY_USER
-])
+[])
 
 AT_RUSH_TEST([
-rush 2.0
 rule
-  match \$command == "/bin/ls"
+  delete 2 4
 ],
-[cmdline,argv,prog,interactive,fork,acct],
-
-[/bin/ls],
+[cmdline,argv,prog],
+[echo foo bar baz quux wum],
 [0],
 [{
-    "cmdline":"/bin/ls",
+    "cmdline":"echo foo wum",
     "argv":[[
-        "/bin/ls"
+        "echo",
+        "foo",
+        "wum"
     ]],
-    "prog":null,
-    "interactive":0,
-    "fork":-1,
-    "acct":-1
+    "prog":null
 }
 ],
-[],
+[])
 
-[/bin/ls /],
+AT_RUSH_TEST([
+rule
+  delete[0]
+],
+[cmdline,argv,prog],
+[echo foo bar],
 [1],
 [],
-[rush: Error: no matching rule for "/bin/ls /", user $MY_USER
+[rush: Error: Deleting argv[[0]] is prohibited
 ])
 
 AT_CLEANUP
+

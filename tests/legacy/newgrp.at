@@ -14,54 +14,21 @@
 # You should have received a copy of the GNU General Public License
 # along with GNU Rush.  If not, see <http://www.gnu.org/licenses/>.
 
-AT_SETUP([fall-through])
-AT_KEYWORDS([fallthrough fall-through])
+AT_SETUP([newgrp])
+AT_KEYWORDS([newgrp])
 
 AT_RUSH_TEST([
-rush 2.0
 rule
-    set [0] newcommand
-    fall-through
-    
-rule
-    set [1] list
+  newgrp 0
 ],
-[cmdline,argv],
+[gid],
 [command],
 [0],
 [{
-    "cmdline":"newcommand list",
-    "argv":[[
-        "newcommand",
-        "list"
-    ]]
-}
-],
-[])
-
-AT_RUSH_TEST([
-rush 2.0
-rule
-    chdir "/tmp"
-    fall-through
-    
-rule
-    set [0] newcommand
-    interactive true
-],
-[cmdline,interactive,home_dir],
-[interactive],
-[0],
-[{
-    "cmdline":"newcommand",
-    "interactive":1,
-    "home_dir":null    
+    "gid":0
 }
 ],
 [])
 
 AT_CLEANUP
-
-
-
 

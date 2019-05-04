@@ -14,64 +14,47 @@
 # You should have received a copy of the GNU General Public License
 # along with GNU Rush.  If not, see <http://www.gnu.org/licenses/>.
 
-AT_SETUP([command])
-AT_KEYWORDS([command])
+AT_SETUP([or])
+AT_KEYWORDS([match or])
 
 AT_RUSH_TEST([
 rush 2.0
 rule
-  match \$command ~ "echo[[:space:]]+foo$"
+  match \$0 == "/bin/ls" || \$0 == "/bin/stat"
 ],
-[cmdline,argv,prog,interactive,fork,acct],
+[cmdline,argv,prog],
 
-[/usr/bin/echo foo],
+[/bin/ls /usr/lib],
 [0],
 [{
-    "cmdline":"/usr/bin/echo foo",
+    "cmdline":"/bin/ls /usr/lib",
     "argv":[[
-        "/usr/bin/echo",
-        "foo"
+        "/bin/ls",
+        "/usr/lib"
     ]],
-    "prog":null,
-    "interactive":0,
-    "fork":-1,
-    "acct":-1
+    "prog":null
 }
 ],
 [],
 
-[/usr/bin/echo foo bar],
-[1],
-[],
-[rush: Error: no matching rule for "/usr/bin/echo foo bar", user $MY_USER
-])
-
-AT_RUSH_TEST([
-rush 2.0
-rule
-  match \$command == "/bin/ls"
-],
-[cmdline,argv,prog,interactive,fork,acct],
-
-[/bin/ls],
+[/bin/stat /usr/lib],
 [0],
 [{
-    "cmdline":"/bin/ls",
+    "cmdline":"/bin/stat /usr/lib",
     "argv":[[
-        "/bin/ls"
+        "/bin/stat",
+        "/usr/lib"
     ]],
-    "prog":null,
-    "interactive":0,
-    "fork":-1,
-    "acct":-1
+    "prog":null
 }
 ],
 [],
 
-[/bin/ls /],
+[/bin/find /usr/lib],
 [1],
 [],
-[rush: Error: no matching rule for "/bin/ls /", user $MY_USER
+[rush: Error: no matching rule for "/bin/find /usr/lib", user $MY_USER
 ])
 
 AT_CLEANUP
+

@@ -27,9 +27,8 @@ EOT
 
 WD=`pwd`
 cat > test.conf <<EOT
-rush 2.0
 rule
-    map [[0]] "$WD/passwd.rush" ":" "\${user}" 1 7 "/nologin"
+    map[[0]] $WD/passwd.rush : \${user} 1 7 /nologin
 EOT
 
 set -e
@@ -42,9 +41,8 @@ rush -C none -Dcmdline,argv,prog -c 'command arg' test.conf
 
 echo No match, no default
 cat > test.conf <<EOT
-rush 2.0
 rule
-    map [[0]] "$WD/passwd.rush" ":" "\${user}" 1 7
+    map[[0]] $WD/passwd.rush : \${user} 1 7
 EOT
 rush -C none -Dcmdline,argv,prog -c 'command arg' test.conf
 ],

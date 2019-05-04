@@ -1,3 +1,19 @@
+/* This file is part of GNU Rush.                  
+   Copyright (C) 2008-2019 Sergey Poznyakoff
+
+   GNU Rush is free software; you can redistribute it and/or modify
+   it under the terms of the GNU General Public License as published by
+   the Free Software Foundation; either version 3, or (at your option)
+   any later version.
+
+   GNU Rush is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License for more details.
+
+   You should have received a copy of the GNU General Public License
+   along with GNU Rush.  If not, see <http://www.gnu.org/licenses/>. */
+
 %{
 #include <rush.h>
 #include <sys/stat.h>
@@ -90,8 +106,6 @@ static void straychar(int);
 	(result) = cfstream_read(input_stream, buf, max_size)
 
 %}
-%option nounput
-%option noinput
 %x NORMAL ARGS INMATCH QSTR VAR
 %%
 <INITIAL>{
@@ -125,9 +139,8 @@ rush[ \t]+2\.0[ \t]*$ {
 "<="        return tok(LE);
 ">"         return tok(GT);
 ">="        return tok(GE);
-"~"         return tok('~');
-"in"        { BEGIN(ARGS); return tok(IN); }
-"member"    { BEGIN(ARGS); return tok(MEMBER); }
+"in"        return tok(IN);
+"member"    return tok(MEMBER);
 }
 
 <NORMAL>{
@@ -154,17 +167,21 @@ rush[ \t]+2\.0[ \t]*$ {
 		BEGIN(ARGS);
 		return tok(GLATTRIB);
 	} else {
-  	        return tok(BOGUS);
+		yylval.str = xstrdup(yytext);
+  	        return tok(IDENT);
         }
 		}
+.   { straychar(yytext[0]); skiptoeol(); }
 }
 
 <ARGS,INMATCH>{
-[0-9]+                        { yylval.num.strval = xstrdup(yytext);
+[+-]?[0-9]+                   { yylval.num.strval = xstrdup(yytext);
 				yylval.num.intval = atoi(yytext);
 				return tok(NUMBER); }
-[A-Za-z_+-][A-Za-z_0-9-]*     { yylval.str = xstrdup(yytext);
+[A-Za-z_][A-Za-z0-9_-]*       { yylval.str = xstrdup(yytext);
 				return tok(IDENT); }
+[A-Za-z_+-][A-Za-z0-9_-]*     { yylval.str = xstrdup(yytext);
+				return tok(STRING); }
 \$[A-Za-z_][A-Za-z_0-9-]*     { yylval.str = xstrdup(yytext);
 				return tok(STRING);  }
 \$\{[A-Za-z_][A-Za-z_0-9-]*\} { yylval.str = xstrdup(yytext);
@@ -216,6 +233,7 @@ rush[ \t]+2\.0[ \t]*$ {
 					      strtoul(yytext + yyleng - 2,
 						      NULL, 16));
 			   pushstart(QSTR); }
+"~"|"("|")"|"["|"]"        return tok(yytext[0]);
 }
 
 <QSTR>{
@@ -243,7 +261,8 @@ rush[ \t]+2\.0[ \t]*$ {
 			   stringbuf_add_char(&sb,
 					      strtoul(yytext + yyleng - 2,
 						      NULL, 16)); }
-\n   { yyerror("unescaped newline in quoted string"); return BOGUS; }
+\n   {  advance_line(1);
+	yyerror("unescaped newline in quoted string"); }
 }
 
 <VAR>{
@@ -286,7 +305,8 @@ rush[ \t]+2\.0[ \t]*$ {
 [^}\"\$%]+                      { stringbuf_add_array(&sb, yytext, yyleng); }
 }
 
-<NORMAL,INMATCH,ARGS,VAR,QSTR>.   { straychar(yytext[0]); return tok(BOGUS); }
+<INMATCH,ARGS,VAR,QSTR>.          { straychar(yytext[0]);
+				    return tok(BOGUS); }
 %%
 void
 straychar(int c)
@@ -306,6 +326,33 @@ straychar(int c)
 		yyerror("stray character %03o while %s", c,
 			start_name[YY_START]);
 	}
+}
+
+void
+skiptoeol(void)
+{
+	int c;
+	extern int yychar;
+
+	if (yychar == EOL)
+		return;
+	c = input();
+	if (c == EOF)
+		return;
+	do {
+		if (c == '\n') {
+			break;
+		}
+	} while ((c = input()) != EOF);
+	unput('\n');
+}
+
+void
+restorenormal(void)
+{
+	while (start_tos)
+		popstart();
+	BEGIN(NORMAL);
 }
 
 /* Input_Stream context stack */
@@ -465,6 +512,18 @@ int
 yywrap(void)
 {
 	return inpctx_pop();
+}
+
+void
+cflex_pushargs(void)
+{
+	pushstart(ARGS);
+}
+
+void
+cflex_popargs(void)
+{
+	popstart();
 }
 
 void

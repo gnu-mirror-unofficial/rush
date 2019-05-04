@@ -55,13 +55,23 @@ AT_INIT
 
 AT_TESTED([rush])
 
-AT_BANNER([Conditionals])
+m4_include([null.at])
+
+AT_BANNER([Simple Conditions])
 m4_include([argc.at])
 m4_include([command.at])
-m4_include([match.at])
+m4_include([matcharg.at])
 m4_include([matchprog.at])
 m4_include([uid.at])
+m4_include([user.at])
+m4_include([in.at])
 m4_include([gid.at])
+m4_include([group.at])
+
+AT_BANNER([Complex Conditions])
+m4_include([and.at])
+m4_include([or.at])
+m4_include([compound.at])
 
 AT_BANNER([Transformations])
 m4_include([set.at])
@@ -69,21 +79,47 @@ m4_include([delete.at])
 m4_include([transform.at])
 m4_include([map.at])
 
-AT_BANNER([Actions])
+AT_BANNER([Rule attributes])
 m4_include([umask.at])
 m4_include([newgrp.at])
-# FIXME: No way to test chroot & limits
 m4_include([chdir.at])
-m4_include([env.at])
-
-AT_BANNER([Features])
 m4_include([interactive.at])
+
+AT_BANNER([Flow control])
+
+AT_BANNER([Legacy configuration])
 m4_include([fallthrough.at])
-dnl FIXME:
-dnl m4_include([fork.at])
-dnl m4_include([acct.at])
-dnl m4_include([notification.at])
 m4_include([error.at])
-m4_include([backref.at])
-m4_include([setvar.at])
-m4_include([unsetvar.at])
+
+dnl AT_BANNER([Conditionals])
+m4_include([legacy/argc.at])
+m4_include([legacy/command.at])
+m4_include([legacy/match.at])
+m4_include([legacy/matchprog.at])
+m4_include([legacy/uid.at])
+m4_include([legacy/gid.at])
+
+dnl AT_BANNER([Transformations])
+m4_include([legacy/set.at])
+m4_include([legacy/delete.at])
+m4_include([legacy/transform.at])
+m4_include([legacy/map.at])
+
+dnl AT_BANNER([Actions])
+m4_include([legacy/umask.at])
+m4_include([legacy/newgrp.at])
+# FIXME: No way to test chroot & limits
+m4_include([legacy/chdir.at])
+m4_include([legacy/env.at])
+
+dnl AT_BANNER([Features])
+m4_include([legacy/interactive.at])
+m4_include([legacy/fallthrough.at])
+dnl FIXME:
+dnl m4_include([legacy/fork.at])
+dnl m4_include([legacy/acct.at])
+dnl m4_include([legacy/notification.at])
+m4_include([legacy/error.at])
+m4_include([legacy/backref.at])
+m4_include([legacy/setvar.at])
+m4_include([legacy/unsetvar.at])

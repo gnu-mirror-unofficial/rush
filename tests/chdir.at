@@ -18,8 +18,9 @@ AT_SETUP([chdir])
 AT_KEYWORDS([chdir])
 
 AT_RUSH_TEST([
+rush 2.0
 rule
-  chdir $PWD
+  chdir "$PWD"
 ],
 [home_dir],
 [command],

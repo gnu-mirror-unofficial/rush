@@ -1,5 +1,5 @@
 # This file is part of GNU Rush. 
-# Copyright (C) 2019 Sergey Poznyakoff
+# Copyright (C) 2008-2019 Sergey Poznyakoff
 #
 # GNU Rush is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -14,61 +14,21 @@
 # You should have received a copy of the GNU General Public License
 # along with GNU Rush.  If not, see <http://www.gnu.org/licenses/>.
 
-AT_SETUP([delete])
-AT_KEYWORDS([delete])
+AT_SETUP([gid])
+AT_KEYWORDS([gid])
 
 AT_RUSH_TEST([
-rush 2.0
 rule
-  delete 1
+  gid $MY_GROUP
 ],
 [cmdline,argv,prog],
-[echo foo bar],
+[ls /],
 [0],
 [{
-    "cmdline":"echo bar",
+    "cmdline":"ls /",
     "argv":[[
-        "echo",
-        "bar"
-    ]],
-    "prog":null
-}
-],
-[])
-
-AT_RUSH_TEST([
-rush 2.0
-rule
-  delete -1
-],
-[cmdline,argv,prog],
-[echo foo bar],
-[0],
-[{
-    "cmdline":"echo foo",
-    "argv":[[
-        "echo",
-        "foo"
-    ]],
-    "prog":null
-}
-],
-[])
-
-AT_RUSH_TEST([
-rush 2.0
-rule
-  delete 2 4
-],
-[cmdline,argv,prog],
-[echo foo bar baz quux wum],
-[0],
-[{
-    "cmdline":"echo foo wum",
-    "argv":[[
-        "echo",
-        "foo",
-        "wum"
+        "ls",
+        "/"
     ]],
     "prog":null
 }
@@ -77,13 +37,13 @@ rule
 
 AT_RUSH_TEST([
 rule
-  delete[0]
+  gid != $MY_GROUP
 ],
 [cmdline,argv,prog],
-[echo foo bar],
+[ls /],
 [1],
 [],
-[rush: Error: Deleting argv[[0]] is prohibited
+[rush: Error: no matching rule for "ls /", user $MY_USER
 ])
 
 AT_CLEANUP

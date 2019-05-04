@@ -18,8 +18,9 @@ AT_SETUP([interactive])
 AT_KEYWORDS([interactive])
 
 AT_RUSH_TEST([
+rush 2.0
 rule
-    interactive
+    interactive true
 ],
 [cmdline,argv,prog,interactive],
 [interactive],

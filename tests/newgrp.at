@@ -18,6 +18,7 @@ AT_SETUP([newgrp])
 AT_KEYWORDS([newgrp])
 
 AT_RUSH_TEST([
+rush 2.0
 rule
   newgrp 0
 ],

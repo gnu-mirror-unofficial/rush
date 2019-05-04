@@ -790,7 +790,7 @@ _parse_exit(input_buf_ptr ibuf, struct rush_rule *rule,
 	} else
 		error_fd = 2;
 	if (val[0] == '@') {
-		if (val[1] != '@')
+		if (val[1] == '@')
 			rule->error = new_error(error_fd, val + 1, 1);
 		else {
 			int n = string_to_error_index(val + 1);

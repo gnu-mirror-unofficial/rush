@@ -18,6 +18,7 @@ AT_SETUP([error])
 AT_KEYWORDS([error])
 
 AT_RUSH_TEST([
+rush 2.0
 rule
     exit "Forced error"
 ],
@@ -25,17 +26,31 @@ rule
 [command],
 [1],
 [],
-["Forced error"
+[Forced error
 ])
 
 AT_RUSH_TEST([
+rush 2.0
 rule
     exit 1 "Forced error"
 ],
 [cmdline],
 [command],
 [1],
-["Forced error"
+[Forced error
+],
+[])
+
+AT_RUSH_TEST([
+rush 2.0
+rule
+    exit 1 nologin-error
+],
+[cmdline],
+[command],
+[1],
+[You do not have interactive login access to this machine.
+Contact the systems administrator for further assistance.
 ],
 [])
 

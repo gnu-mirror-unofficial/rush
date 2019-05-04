@@ -8,5 +8,5 @@ rwopt.h
 cfgram.h
 cfgram.c
 cflex.c
-y.output
-y.tab.c
+*.output
+*.tab.c
