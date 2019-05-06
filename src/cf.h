@@ -103,6 +103,7 @@ void cflex_setup(CFSTREAM *cf, char const *filename, int line);
 int cflex_include(char const *filename, struct cfloc const *loc);
 void cflex_pushargs(void);
 void cflex_popargs(void);
+void cflex_normal(void);
 void skiptoeol(void);
 void restorenormal(void);
 

@@ -60,13 +60,15 @@ static void add_asgn_list(struct asgn *head, enum envar_type type);
 		struct argval *head;
 		struct argval *tail;
 	} arglist;
+	struct { unsigned major, minor; } version;
 }
 
 %token <str> STRING "string"
 %token <str> IDENT "identifier"
 %token <num> NUMBER "number"
 
-%token PREFACE "\"rush VERSION\""
+%token RUSH "rush"
+%token <version> T_VERSION
 %token RULE "\"rule\""
 %token GLOBAL "\"global\""
 %token EOL "end of line"
@@ -118,7 +120,11 @@ static void add_asgn_list(struct asgn *head, enum envar_type type);
 %type <arglist> arglist
 
 %%
-rcfile     : PREFACE eol content
+rcfile     : skipeol select
+           ;
+ 
+
+select     : preface content
 	     {
 		     if (errors)
 			     YYERROR;
@@ -129,6 +135,21 @@ rcfile     : PREFACE eol content
 			     YYERROR;
 	     }
 	   ;
+
+preface    : RUSH T_VERSION EOL
+             {
+		     if ($2.major == 2 && $2.minor == 0) {
+			     cflex_normal();
+		     } else {
+			     cferror(&@2, _("unsupported configuration file version"));
+			     YYERROR;
+		     }
+	     }
+           ;
+
+skipeol    : /* empty */
+           | eol
+           ;
 
 eol        : EOL
            | eol EOL
@@ -222,8 +243,9 @@ stmt       : match_stmt eol
 	   | include_stmt eol
 	   | flowctl_stmt eol
 	   | attrib_stmt eol
-	   | error { skiptoeol(); } eol
+	   | error
 	     {
+		     skiptoeol();
 		     restorenormal();
 		     yyerrok;
 		     yyclearin;

@@ -169,16 +169,18 @@ stringbuf_add_escape_hex(struct stringbuf *sb, char const *text, size_t leng)
 
 %}
 %x NORMAL ARGS INMATCH QSTR VAR
+%option nounput
 %%
 <INITIAL>{
-rush[ \t]+2\.0[ \t]*$ {
-	BEGIN(NORMAL);
-	return tok(PREFACE);
-  }
-#.*\n       { advance_line(1); }
-\n+         { advance_line(yyleng); }
-[ \t]+      reset_loc();
-.           return tok(BOGUS);
+"rush"     return RUSH;
+[0-9]+\.[0-9]+  { char *p;
+	          yylval.version.major = strtoul(yytext, &p, 10);
+		  yylval.version.minor = strtoul(p + 1, NULL, 10);
+		  return tok(T_VERSION); }
+#.*\n      { advance_line(1); return EOL; }
+\n+        { advance_line(yyleng); return EOL; }
+[ \t]+     reset_loc();
+.          return tok(BOGUS);
 }
 
 <NORMAL,INMATCH,ARGS>{
@@ -364,19 +366,9 @@ void
 skiptoeol(void)
 {
 	int c;
-	extern int yychar;
 
-	if (yychar == EOL)
-		return;
-	c = input();
-	if (c == EOF)
-		return;
-	do {
-		if (c == '\n') {
-			break;
-		}
-	} while ((c = input()) != EOF);
-	unput('\n');
+	while ((c = input()) != EOF && c != '\n')
+		;
 }
 
 void
@@ -476,6 +468,12 @@ cflex_debug(int v)
 #ifdef FLEX_DEBUG
 	yy_flex_debug = v;
 #endif
+}
+
+void
+cflex_normal(void)
+{
+	BEGIN(NORMAL);
 }
 
 int
