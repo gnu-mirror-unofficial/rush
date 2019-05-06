@@ -76,8 +76,9 @@ rule
 [])
 
 AT_RUSH_TEST([
+rush 2.0
 rule
-  delete[0]
+  delete 0
 ],
 [cmdline,argv,prog],
 [echo foo bar],
