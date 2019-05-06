@@ -1,5 +1,5 @@
 # This file is part of GNU Rush. 
-# Copyright (C) 2019 Sergey Poznyakoff
+# Copyright (C) 2016-2019 Sergey Poznyakoff
 #
 # GNU Rush is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -14,30 +14,36 @@
 # You should have received a copy of the GNU General Public License
 # along with GNU Rush.  If not, see <http://www.gnu.org/licenses/>.
 
-AT_SETUP([Back-reference expansion])
-AT_KEYWORDS([backref])
+AT_SETUP([quoted strings])
+AT_KEYWORDS([qstr string])
 
-AT_RUSH_TEST([
-rush 2.0
-rule chdir
-  match \$command ~ "^cd \"(.+)\" && (runcom .*)$"
-  chdir %1
-  set command = "%{2}"
-  fall-through
-
-rule runcom
-  match \$0 == runcom
-  set [0] = "./bin/runcom"
+AT_CHECK(
+[AT_DATA([test.cf],[rush 2.0
+rule
+  set t1 = "simple text"
+  set t2 = "simple\btext\040with e\163capes \%3"
+  set t3 = "multiline\
+ text\
+"
+  set t4 = "complex\r\n\
+multiline\r\n\
+text"
+  set t5 = "bad \&escape"
+])
+rush -C none -D vars -c "ls" test.cf
 ],
-[cmdline,home_dir],
-[cd "$PWD" && runcom test],
 [0],
 [{
-    "cmdline":"./bin/runcom test",
-    "home_dir":"$TESTDIR"
+    "vars":{
+        "t1":"simple text",
+        "t2":"simple\btext with escapes %3",
+        "t3":"multiline text",
+        "t4":"complex\r\nmultiline\r\ntext",
+        "t5":"bad \\&escape"
+    }
 }
 ],
-[])
+[rush: Error: test.cf:11.17-19: unrecognized escape \&
+])
 
 AT_CLEANUP
-

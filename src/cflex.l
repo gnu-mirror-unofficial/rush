@@ -105,6 +105,68 @@ static void straychar(int);
 #define YY_INPUT(buf,result,max_size)		\
 	(result) = cfstream_read(input_stream, buf, max_size)
 
+static void
+stringbuf_add_escape_dfl(struct stringbuf *sb, char const *text, size_t leng)
+{
+	int c = text[leng - 1];
+
+	stringbuf_add_array(sb, text, leng - 2);
+	switch (c) {
+	case 'a':
+		stringbuf_add_char(sb, '\a');
+		break;
+	case 'b':
+		stringbuf_add_char(sb, '\b');
+		break;
+	case 'f':
+		stringbuf_add_char(sb, '\f');
+		break;
+	case 'n':
+		stringbuf_add_char(sb, '\n');
+		break;
+	case 'r':
+		stringbuf_add_char(sb, '\r');
+		break;
+	case 't':
+		stringbuf_add_char(sb, '\t');
+		break;
+	case 'v':
+		stringbuf_add_char(sb, '\v');
+		break;
+	case '\\':
+	case '\"':
+		stringbuf_add_char(sb, c);
+		break;
+	case '\n':
+		advance_line(1);
+		break;
+	case '%':
+		stringbuf_add_array(sb, text + leng - 2, 2);
+		break;
+	default: {
+		struct cfloc loc;
+		loc.beg = loc.end = curloc.end;
+		loc.beg.column -= 2;
+		cferror(&loc, _("unrecognized escape \\%c"), c);
+		stringbuf_add_array(sb, text + leng - 2, 2);
+	}
+	}
+}
+
+static void
+stringbuf_add_escape_octal(struct stringbuf *sb, char const *text, size_t leng)
+{
+	stringbuf_add_array(sb, text, leng - 4);
+	stringbuf_add_char(sb, strtoul(text + leng - 3, NULL, 8));
+}
+
+static void
+stringbuf_add_escape_hex(struct stringbuf *sb, char const *text, size_t leng)
+{
+	stringbuf_add_array(sb, text, leng - 5);
+	stringbuf_add_char(sb, strtoul(text + leng - 2, NULL, 16));
+}
+
 %}
 %x NORMAL ARGS INMATCH QSTR VAR
 %%
@@ -203,44 +265,19 @@ rush[ \t]+2\.0[ \t]*$ {
 			   memcpy(yylval.str, yytext + 1, yyleng - 2);
 			   yylval.str[yyleng - 2] = 0;
 			   return tok(STRING); }
-\"[^\\\"\n]*\\[abfnrtv]  { stringbuf_init(&sb);
-			   stringbuf_add_array(&sb, yytext + 1, yyleng - 3);
-			   stringbuf_add_char(&sb,
-					      wordsplit_c_unquote_char(yytext[yyleng-1]));
-			   pushstart(QSTR); }
-\"[^\\\"\n]*\\\"         { stringbuf_init(&sb);
-			   stringbuf_add_array(&sb, yytext + 1, yyleng - 3);
-			   stringbuf_add_char(&sb, '"');
-			   pushstart(QSTR); }
-\"[^\\\"\n]*\\\\         { stringbuf_init(&sb);
-			   stringbuf_add_array(&sb, yytext + 1, yyleng - 3);
-			   stringbuf_add_char(&sb, '\\');
-			   pushstart(QSTR); }
-\"[^\\\"\n]*\\\n         { stringbuf_init(&sb);
-			   stringbuf_add_array(&sb, yytext + 1, yyleng - 3);
-			   advance_line(1);
-			   pushstart(QSTR); }
 \"[^\\\"\n]*\\[0-9]{3}   { stringbuf_init(&sb);
-			   stringbuf_add_array(&sb, yytext + 1, yyleng - 5);
-			   stringbuf_add_char(&sb,
-					      strtoul(yytext + yyleng - 3,
-						      NULL, 8));
+			   stringbuf_add_escape_octal(&sb,
+						      yytext + 1, yyleng - 1);
 			   pushstart(QSTR); }
 \"[^\\\"\n]*\\0[xX][a-fA-F0-9]{2} {
 			   stringbuf_init(&sb);
-			   stringbuf_add_array(&sb, yytext + 1, yyleng - 6);
-			   stringbuf_add_char(&sb,
-					      strtoul(yytext + yyleng - 2,
-						      NULL, 16));
+			   stringbuf_add_escape_hex(&sb,
+						    yytext + 1, yyleng - 1);
 			   pushstart(QSTR); }
-\"[^\\\"\n]*\\.          { struct cfloc loc;
-	                   loc.beg = loc.end = curloc.end;
-			   loc.beg.column -= 2;
-	                   cferror(&loc,
-				   _("unrecognized escape \\%c"),
-				   yytext[yyleng - 1]);
-			   stringbuf_init(&sb);
-			   stringbuf_add_array(&sb, yytext + 1, yyleng - 1);
+\"[^\\\"\n]*\\.|\"[^\\\"\n]*\\\n  {
+	                   stringbuf_init(&sb);
+			   stringbuf_add_escape_dfl(&sb,
+						    yytext + 1, yyleng - 1);
 			   pushstart(QSTR); }
 "=~"                       return tok(XF);
 .                          return yytext[0];
@@ -252,33 +289,10 @@ rush[ \t]+2\.0[ \t]*$ {
 			   yylval.str = sb.buffer;
 			   popstart();
 			   return tok(STRING); }
-[^\\\"\n]*\\[abfnrtv]    { stringbuf_add_array(&sb, yytext, yyleng - 2);
-			   stringbuf_add_char(&sb,
-					      wordsplit_c_unquote_char(yytext[yyleng-1]));
-			 }
-[^\\\"\n]*\\\"           { stringbuf_add_array(&sb, yytext, yyleng - 2);
-			   stringbuf_add_char(&sb, '"'); }
-[^\\\"\n]*\\\\           { stringbuf_add_array(&sb, yytext, yyleng - 2);
-			   stringbuf_add_char(&sb, '\\'); }
-[^\\\"\n]*\\\n           { stringbuf_add_array(&sb, yytext, yyleng - 2);
-			   advance_line(1); }
-[^\\\"\n]*\\[0-9]{3}     { stringbuf_add_array(&sb, yytext, yyleng - 4);
-			   stringbuf_add_char(&sb,
-					      strtoul(yytext + yyleng - 3,
-						      NULL, 8)); }
+[^\\\"\n]*\\[0-9]{3}     { stringbuf_add_escape_octal(&sb, yytext, yyleng); }
 [^\\\"\n]*\\0[xX][a-fA-F0-9]{2} {
-			   stringbuf_add_array(&sb, yytext, yyleng - 5);
-			   stringbuf_add_char(&sb,
-					      strtoul(yytext + yyleng - 2,
-						      NULL, 16)); }
-[^\\\"\n]*\\.            { struct cfloc loc;
-	                   loc.beg = loc.end = curloc.end;
-			   loc.beg.column -= 2;
-	                   cferror(&loc,
-				   _("unrecognized escape \\%c"),
-				   yytext + yyleng - 1);
-			   stringbuf_init(&sb);
-			   stringbuf_add_array(&sb, yytext, yyleng); }
+	                   stringbuf_add_escape_hex(&sb, yytext, yyleng); }
+[^\\\"\n]*\\.|[^\\\"\n]*\\\n { stringbuf_add_escape_dfl(&sb, yytext, yyleng); }
 \n   {  advance_line(1);
 	yyerror("unescaped newline in quoted string"); }
 .    {  straychar(yytext[0]); }

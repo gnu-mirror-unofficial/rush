@@ -72,6 +72,7 @@ TESTSUITE_AT = \
   unsetvar.at\
   undef.at\
   regexp.at\
+  qstr.at\
   legacy/argc.at\
   legacy/backref.at\
   legacy/chdir.at\

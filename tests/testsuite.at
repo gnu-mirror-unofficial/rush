@@ -56,6 +56,7 @@ AT_INIT
 AT_TESTED([rush])
 
 m4_include([null.at])
+m4_include([qstr.at])
 m4_include([setvar.at])
 m4_include([unsetvar.at])
 m4_include([undef.at])

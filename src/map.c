@@ -1,4 +1,4 @@
-/* This file is part of GNU Rush.                  
+/* This file is part of GNU Rush.
    Copyright (C) 2008-2019 Sergey Poznyakoff
 
    GNU Rush is free software; you can redistribute it and/or modify
@@ -26,37 +26,60 @@ d2n(int d)
 	return strchr(dig, d) - dig;
 }
 
+static int
+refno(char const *input, int *len)
+{
+	if (c_isdigit(input[1])) {
+		*len = 2;
+		return d2n(input[1]);
+	} else if (input[1] == '{') {
+		char const *p = input + 1;
+		int n = 0;
+		while (*++p && c_isdigit(*p))
+			n = n * 10 + d2n(*p);
+		if (*p == '}' && p > &input[1]) {
+			*len = p - input + 1;
+			return n;
+		}
+	}
+	return -1;
+}
+
 /* Expand references to BACKREF in INPUT. A reference begins with one
    of characters in PFX, followed by the ordinal number of the parenthesized
    subgroup (in decimal, range [0, 9]).
 */
 static char *
-expandref(char *input, struct rush_backref *backref, char *pfx)
+expandref(char const *input, struct rush_backref *backref, char *pfx)
 {
 	char *output;
 	size_t output_len = strlen(input) + 1;
 	size_t istart = 0, ostart = 0;
-	
+
 	output = xmalloc(output_len);
 	while (input[istart]) {
 		size_t len = strcspn(input + istart, pfx);
-		int n;
-		
+		int n, i;
+
 		while (ostart + len >= output_len)
 			output = x2realloc(output, &output_len);
 		memcpy(output + ostart, input + istart, len);
 		ostart += len;
 		istart += len;
-		if (input[istart]
-		    && isdigit(input[istart + 1])
-		    && (n = d2n(input[istart + 1])) < backref->nmatch) {
+		if (!input[istart])
+			break;
+		else if (istart > 1 && input[istart-1] == '\\') {
+			output[ostart-1] = input[istart];
+			istart++;
+		} else if ((n = refno(input + istart, &i)) >= 0
+		    && n < backref->nmatch) {
 			len = backref->match[n].rm_eo - backref->match[n].rm_so;
 			while (ostart + len >= output_len)
 				output = x2realloc(output, &output_len);
 			memcpy(output + ostart,
 			       backref->subject + backref->match[n].rm_so, len);
 			ostart += len;
-			istart += 2;
+			istart += i;
 		} else {
 			if (ostart + 2 >= output_len)
 				output = x2realloc(output, &output_len);
@@ -151,7 +174,7 @@ rush_request_getvar(struct rush_request *req, char const *varname)
 	size_t i;
 	struct vardef *vd;
 	char const *s;
-	
+
 	if (req->var_kv) {
 		for (i = 0; i < req->var_count; i += 2)
 			if (strcmp(req->var_kv[i], varname) == 0)
@@ -165,7 +188,7 @@ rush_request_getvar(struct rush_request *req, char const *varname)
 			break;
 		}
 	}
-	
+
 	while (req->var_count + 3 >= req->var_max)
 		req->var_kv = x2nrealloc(req->var_kv, &req->var_max,
 					 sizeof(req->var_kv[0]));
@@ -174,13 +197,13 @@ rush_request_getvar(struct rush_request *req, char const *varname)
 	req->var_kv[req->var_count] = NULL;
 
 	return &req->var_kv[req->var_count - 1];
-}	
+}
 
 void
 rush_request_delvar(struct rush_request *req, char const *varname)
 {
 	size_t i;
-	
+
 	for (i = 0; i < req->var_count; i += 2) {
 		if (strcmp(req->var_kv[i], varname) == 0) {
 			free(req->var_kv[i]);
@@ -200,7 +223,7 @@ getvar(char **ret, const char *var, size_t len, void *clos)
 	struct rush_request *req = clos;
 	const char *s = NULL;
 	char *p;
-	
+
 	if (*var == '-') {
 		unsigned long n;
 		errno = 0;
@@ -224,7 +247,7 @@ getvar(char **ret, const char *var, size_t len, void *clos)
 				break;
 			}
 		}
-		
+
 		if (!s && req->env_count) {
 			/* Look up in the environment */
 			int i;
@@ -240,7 +263,7 @@ getvar(char **ret, const char *var, size_t len, void *clos)
 		}
 	}
 
-	if (!s) 
+	if (!s)
 		return WRDSE_UNDEF;
 	p = strdup(s);
 	if (!p)
@@ -266,10 +289,13 @@ rush_expand_string(const char *string, struct rush_request *req)
 		ws.ws_env = (const char **)req->var_kv;
 		wsflags |= WRDSF_ENV|WRDSF_ENV_KV;
 	}
-	if (wordsplit(string, &ws, wsflags))
+
+	result = expandref(string, &req->backref[req->backref_cur], "%");
+	if (wordsplit(result, &ws, wsflags))
 		die(system_error, &req->i18n, "%s", wordsplit_strerror(&ws));
-	result = expandref(ws.ws_wordv[0], &req->backref[req->backref_cur],
-			   "%");
+	free(result);
+	result = ws.ws_wordv[0];
+	ws.ws_wordv[0] = NULL;
 	wordsplit_free(&ws);
 	return result;
 }
@@ -291,7 +317,7 @@ map_string(struct rush_map *map, struct rush_request *req)
 		die(system_error, &req->i18n, _("cannot stat file %s: %s"),
 		    file, strerror(errno));
 	}
-	if (check_config_permissions(file, &st)) 
+	if (check_config_permissions(file, &st))
 		die(config_error, &req->i18n, _("%s: file is not safe"),
 		    file);
 
@@ -306,7 +332,7 @@ map_string(struct rush_map *map, struct rush_request *req)
 		struct wordsplit ws;
 
 		line++;
-		
+
 		len = strlen(buf);
 		while (len > 0 && buf[len-1] == '\n')
 			buf[--len] = 0;
@@ -318,14 +344,14 @@ map_string(struct rush_map *map, struct rush_request *req)
 			    _("%s:%lu: failed to parse line: %s"),
 			    file, (unsigned long)line,
 			    wordsplit_strerror(&ws));
-			
+
 		if (map->key_field <= ws.ws_wordc &&
 		    map->val_field <= ws.ws_wordc &&
 		    strcmp(ws.ws_wordv[map->key_field - 1], key) == 0)
 			ret = xstrdup(ws.ws_wordv[map->val_field - 1]);
 
 		wordsplit_free(&ws);
-		
+
 		if (ret)
 			break;
 	}

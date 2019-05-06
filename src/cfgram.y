@@ -118,7 +118,7 @@ static void add_asgn_list(struct asgn *head, enum envar_type type);
 %type <arglist> arglist
 
 %%
-rcfile     : PREFACE EOL content
+rcfile     : PREFACE eol content
 	     {
 		     if (errors)
 			     YYERROR;
@@ -129,6 +129,10 @@ rcfile     : PREFACE EOL content
 			     YYERROR;
 	     }
 	   ;
+
+eol        : EOL
+           | eol EOL
+           ;
 
 content    : /* empty */
 	   | rulelist
@@ -142,14 +146,14 @@ rule       : rulehdr rulebody
 	   | globhdr globbody
 	   ;
 
-globhdr    : GLOBAL EOL
+globhdr    : GLOBAL eol
 	   ;
 
 globbody   : glob_stmt
 	   | globbody glob_stmt
 	   ;
 
-glob_stmt  : GLATTRIB arglist EOL
+glob_stmt  : GLATTRIB arglist eol
 	     {
 		     struct cfloc loc;
 		     loc.beg = @1.beg;
@@ -191,7 +195,7 @@ arg        : literal
 	     }
 	   ;
 
-rulehdr    : RULE ruleid EOL
+rulehdr    : RULE ruleid eol
 	     {
 		     current_rule = new_rush_rule();
 		     current_rule->tag = $2;
@@ -209,16 +213,16 @@ rulebody   : stmt
 	   | rulebody stmt
 	   ;
 
-stmt       : match_stmt EOL
-	   | set_stmt EOL
-	   | map_stmt EOL
-	   | delete_stmt EOL
-	   | limits_stmt EOL
-	   | environ_stmt EOL
-	   | include_stmt EOL
-	   | flowctl_stmt EOL
-	   | attrib_stmt EOL
-	   | error { skiptoeol(); } EOL
+stmt       : match_stmt eol
+	   | set_stmt eol
+	   | map_stmt eol
+	   | delete_stmt eol
+	   | limits_stmt eol
+	   | environ_stmt eol
+	   | include_stmt eol
+	   | flowctl_stmt eol
+	   | attrib_stmt eol
+	   | error { skiptoeol(); } eol
 	     {
 		     restorenormal();
 		     yyerrok;

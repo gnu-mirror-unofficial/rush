@@ -86,15 +86,26 @@ dump_null(char const *id, struct json_dumper *dmp)
 static void
 dump_string_data(char const *string, struct json_dumper *dmp)
 {
+	int c;
+
 	if (!string) {
 		fputs("null", dmp->fp);
 		return;
 	}
 	fputc('\"', dmp->fp);
-	for (;*string; string++) {
-		if (*string == '\\' || *string == '\"')
+	for (; (c = *string) != 0; string++) {
+		int ec;
+		if (c == '\\' || c == '\"') {
 			fputc('\\', dmp->fp);
-		fputc(*string, dmp->fp);
+			fputc(c, dmp->fp);
+		} else if (c_isprint(c))
+			fputc(c, dmp->fp);
+		else if ((ec = wordsplit_c_quote_char(c)) != 0) {
+			fputc('\\', dmp->fp);
+			fputc(ec, dmp->fp);
+		} else {
+			fprintf(dmp->fp, "\\%03o", c);
+		}
 	}
 	fputc('\"', dmp->fp);
 }

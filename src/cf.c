@@ -919,7 +919,7 @@ global_attrib_set(struct global_attrib *glatt,
 				cferror(loc,
 					_("expected boolean value, but found `%s'"),
 					arg->strval);
-				return 1;
+				return;
 			}
 			i++;
 			break;
