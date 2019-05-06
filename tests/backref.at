@@ -1,5 +1,5 @@
 # This file is part of GNU Rush. 
-# Copyright (C) 2016-2019 Sergey Poznyakoff
+# Copyright (C) 2019 Sergey Poznyakoff
 #
 # GNU Rush is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -14,54 +14,30 @@
 # You should have received a copy of the GNU General Public License
 # along with GNU Rush.  If not, see <http://www.gnu.org/licenses/>.
 
-AT_SETUP([fall-through])
-AT_KEYWORDS([fallthrough fall-through])
+AT_SETUP([Back-reference expansion])
+AT_KEYWORDS([backref])
 
 AT_RUSH_TEST([
 rush 2.0
-rule
-    set [0] = newcommand
-    fall-through
-    
-rule
-    set [1] = list
-],
-[cmdline,argv],
-[command],
-[0],
-[{
-    "cmdline":"newcommand list",
-    "argv":[[
-        "newcommand",
-        "list"
-    ]]
-}
-],
-[])
+rule chdir
+  match \$command ~ "^cd \"(.+)\" && (runcom .*)$"
+  chdir %1
+  set command = %2
+  fall-through
 
-AT_RUSH_TEST([
-rush 2.0
-rule
-    chdir "/tmp"
-    fall-through
-    
-rule
-    set [0] = newcommand
-    interactive true
+rule runcom
+  match \$0 == runcom
+  set [0] = "./bin/runcom"
 ],
-[cmdline,interactive,home_dir],
-[interactive],
+[cmdline,home_dir],
+[cd "$PWD" && runcom test],
 [0],
 [{
-    "cmdline":"newcommand",
-    "interactive":1,
-    "home_dir":null    
+    "cmdline":"./bin/runcom test",
+    "home_dir":"$TESTDIR"
 }
 ],
 [])
 
 AT_CLEANUP
-
-
-
 

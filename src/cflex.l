@@ -171,7 +171,7 @@ rush[ \t]+2\.0[ \t]*$ {
   	        return tok(IDENT);
         }
 		}
-.   { straychar(yytext[0]); skiptoeol(); }
+.       return yytext[0];
 }
 
 <ARGS,INMATCH>{
@@ -180,7 +180,7 @@ rush[ \t]+2\.0[ \t]*$ {
 				return tok(NUMBER); }
 [A-Za-z_][A-Za-z0-9_-]*       { yylval.str = xstrdup(yytext);
 				return tok(IDENT); }
-[A-Za-z_+-][A-Za-z0-9_-]*     { yylval.str = xstrdup(yytext);
+[A-Za-z_/+-][A-Za-z0-9_/+-]*  { yylval.str = xstrdup(yytext);
 				return tok(STRING); }
 \$[A-Za-z_][A-Za-z_0-9-]*     { yylval.str = xstrdup(yytext);
 				return tok(STRING);  }
@@ -233,7 +233,17 @@ rush[ \t]+2\.0[ \t]*$ {
 					      strtoul(yytext + yyleng - 2,
 						      NULL, 16));
 			   pushstart(QSTR); }
-"~"|"("|")"|"["|"]"        return tok(yytext[0]);
+\"[^\\\"\n]*\\.          { struct cfloc loc;
+	                   loc.beg = loc.end = curloc.end;
+			   loc.beg.column -= 2;
+	                   cferror(&loc,
+				   _("unrecognized escape \\%c"),
+				   yytext[yyleng - 1]);
+			   stringbuf_init(&sb);
+			   stringbuf_add_array(&sb, yytext + 1, yyleng - 1);
+			   pushstart(QSTR); }
+"=~"                       return tok(XF);
+.                          return yytext[0];
 }
 
 <QSTR>{
@@ -261,8 +271,17 @@ rush[ \t]+2\.0[ \t]*$ {
 			   stringbuf_add_char(&sb,
 					      strtoul(yytext + yyleng - 2,
 						      NULL, 16)); }
+[^\\\"\n]*\\.            { struct cfloc loc;
+	                   loc.beg = loc.end = curloc.end;
+			   loc.beg.column -= 2;
+	                   cferror(&loc,
+				   _("unrecognized escape \\%c"),
+				   yytext + yyleng - 1);
+			   stringbuf_init(&sb);
+			   stringbuf_add_array(&sb, yytext, yyleng); }
 \n   {  advance_line(1);
 	yyerror("unescaped newline in quoted string"); }
+.    {  straychar(yytext[0]); }
 }
 
 <VAR>{
@@ -302,11 +321,10 @@ rush[ \t]+2\.0[ \t]*$ {
 						   strtoul(yytext + yyleng - 2,
 							   NULL, 16));
 				pushstart(QSTR); }
-[^}\"\$%]+                      { stringbuf_add_array(&sb, yytext, yyleng); }
+[^}\"\$%]+                    { stringbuf_add_array(&sb, yytext, yyleng); }
+.                             { straychar(yytext[0]);
+	                        stringbuf_add_char(&sb, yytext[0]); }
 }
-
-<INMATCH,ARGS,VAR,QSTR>.          { straychar(yytext[0]);
-				    return tok(BOGUS); }
 %%
 void
 straychar(int c)

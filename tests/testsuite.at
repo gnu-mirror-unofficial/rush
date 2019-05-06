@@ -56,12 +56,16 @@ AT_INIT
 AT_TESTED([rush])
 
 m4_include([null.at])
+m4_include([setvar.at])
+m4_include([unsetvar.at])
+m4_include([undef.at])
 
 AT_BANNER([Simple Conditions])
 m4_include([argc.at])
 m4_include([command.at])
 m4_include([matcharg.at])
 m4_include([matchprog.at])
+m4_include([regexp.at])
 m4_include([uid.at])
 m4_include([user.at])
 m4_include([in.at])
@@ -85,11 +89,20 @@ m4_include([newgrp.at])
 m4_include([chdir.at])
 m4_include([interactive.at])
 
-AT_BANNER([Flow control])
+AT_BANNER([Environment])
+m4_include([clrenv.at])
+m4_include([unsetenv.at])
+m4_include([keepenv.at])
+m4_include([setenv.at])
 
-AT_BANNER([Legacy configuration])
+AT_BANNER([Features])
+m4_include([backref.at])
+
+AT_BANNER([Flow control])
 m4_include([fallthrough.at])
 m4_include([error.at])
+
+AT_BANNER([Legacy configuration])
 
 dnl AT_BANNER([Conditionals])
 m4_include([legacy/argc.at])

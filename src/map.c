@@ -16,6 +16,9 @@
 
 #include <rush.h>
 
+/* Set to 1 if expansion of undefined variables is allowed */
+int expand_undefined;
+
 static inline int
 d2n(int d)
 {
@@ -252,7 +255,7 @@ rush_expand_string(const char *string, struct rush_request *req)
 	struct wordsplit ws;
 	int wsflags = WRDSF_NOSPLIT
 		      | WRDSF_NOCMD
-		      | WRDSF_UNDEF
+		      | (expand_undefined ? 0: WRDSF_UNDEF)
 		      | WRDSF_GETVAR
 		      | WRDSF_CLOSURE;
 	char *result;

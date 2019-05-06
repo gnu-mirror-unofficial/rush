@@ -152,6 +152,7 @@ void global_attrib_set(struct global_attrib *glatt,
 
 
 extern int re_flags;
+extern int expand_undefined;
 extern struct cfloc curloc;
 
 void trimws(char *s);

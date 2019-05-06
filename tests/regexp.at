@@ -1,5 +1,5 @@
 # This file is part of GNU Rush. 
-# Copyright (C) 2016-2019 Sergey Poznyakoff
+# Copyright (C) 2019 Sergey Poznyakoff
 #
 # GNU Rush is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -14,103 +14,75 @@
 # You should have received a copy of the GNU General Public License
 # along with GNU Rush.  If not, see <http://www.gnu.org/licenses/>.
 
-AT_SETUP([set])
-AT_KEYWORDS([set])
+AT_SETUP([regexp options])
+AT_KEYWORDS([match regexp])
 
 AT_RUSH_TEST([
 rush 2.0
 rule
-  set command = "ls /"
+  match \$command ~ "fo+\$"
 ],
-[cmdline,argv,prog],
-[echo],
+[cmdline,argv],
+[ls foo],
 [0],
 [{
-    "cmdline":"ls /",
+    "cmdline":"ls foo",
     "argv":[[
         "ls",
-        "/"
-    ]],
-    "prog":null
+        "foo"
+    ]]
 }
 ],
 [])
 
 AT_RUSH_TEST([
 rush 2.0
+global
+  regexp basic
 rule
-  set [0] = "/usr/bin/\$0" 
+  match \$command ~ "fo+\$"
 ],
-[cmdline,argv,prog],
-[ls /],
+[cmdline,argv],
+
+[ls foo],
+[1],
+[],
+[rush: Error: no matching rule for "ls foo", user $MY_USER
+],
+
+[ls fo+],
 [0],
 [{
-    "cmdline":"/usr/bin/ls /",
+    "cmdline":"ls fo+",
     "argv":[[
-        "/usr/bin/ls",
-        "/"
-    ]],
-    "prog":null
+        "ls",
+        "fo+"
+    ]]
 }
 ],
 [])
 
 AT_RUSH_TEST([
 rush 2.0
+global
+  regexp basic ignore-case
 rule
-  set [1] = "/chroot\${1}" 
+  match \$command ~ "fo+\$"
 ],
-[cmdline,argv,prog],
-[ls /],
-[0],
-[{
-    "cmdline":"ls /chroot/",
-    "argv":[[
-        "ls",
-        "/chroot/"
-    ]],
-    "prog":null
-}
-],
-[])
+[cmdline,argv],
 
-AT_RUSH_TEST([
-rush 2.0
-rule
-  set program = "/usr/bin/ls"
-],
-[cmdline,argv,prog],
-[ls /],
+[ls Fo+],
 [0],
 [{
-    "cmdline":"ls /",
+    "cmdline":"ls Fo+",
     "argv":[[
         "ls",
-        "/"
-    ]],
-    "prog":"/usr/bin/ls"
-}
-],
-[])
-
-AT_RUSH_TEST([
-rush 2.0
-rule
-  set [-1] = "/tmp"
-],
-[cmdline,argv,prog],
-[ls /],
-[0],
-[{
-    "cmdline":"ls /tmp",
-    "argv":[[
-        "ls",
-        "/tmp"
-    ]],
-    "prog":null
+        "Fo+"
+    ]]
 }
 ],
 [])
 
 
 AT_CLEANUP
+

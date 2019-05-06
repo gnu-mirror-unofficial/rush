@@ -1,4 +1,4 @@
-/* This file is part of GNU Rush.                  
+/* This file is part of GNU Rush.
    Copyright (C) 2008-2019 Sergey Poznyakoff
 
    GNU Rush is free software; you can redistribute it and/or modify
@@ -20,11 +20,12 @@
 static int errors;
 int re_flags = REG_EXTENDED;
 static struct rush_rule *current_rule;
-struct name_entry {
-	struct name_entry *next;
+struct asgn {
+	struct asgn *next;
 	char *name;
+	char *value;
 };
-static void add_name_list(struct name_entry *head, enum envar_type type);
+static void add_asgn_list(struct asgn *head, enum envar_type type);
 %}
 
 %error-verbose
@@ -45,10 +46,11 @@ static void add_name_list(struct name_entry *head, enum envar_type type);
 		int start;
 		int end;
 	} range;
+	struct asgn *asgn;
 	struct {
-		struct name_entry *head;
-		struct name_entry *tail;
-	} name_list;
+		struct asgn *head;
+		struct asgn *tail;
+	} asgn_list;
 	struct limits_rec *lrec;
 	rule_attrib_setter_t attrib;
 	struct global_attrib *global_attrib;
@@ -85,10 +87,23 @@ static void add_name_list(struct name_entry *head, enum envar_type type);
 %token <global_attrib> GLATTRIB "global attribute"
 %token BOGUS "erroneous token"
 
+%token OR "||"
+%token AND "&&"
+%token NOT "!"
+%token EQ "=="
+%token NE "!="
+%token LT "<"
+%token LE "<="
+%token GT ">"
+%token GE ">="
+%token XF "=~"
+%token IN "in"
+%token MEMBER "member"
+
 %left OR
 %left AND
 %left NOT
-%nonassoc EQ NE LT LE GT GE '~' IN MEMBER
+%nonassoc EQ NE LT LE GT GE XF '~' IN MEMBER
 
 %type <intval> fdescr index
 %type <str> literal string value defval ruleid
@@ -96,18 +111,19 @@ static void add_name_list(struct name_entry *head, enum envar_type type);
 %type <node> expr compound_cond simple_cond
 %type <range> range
 %type <lrec> resource_limits
-%type <name_list> name_list
+%type <asgn> asgn
+%type <asgn_list> asgn_list
 %type <strlist> strlist
 %type <arg> arg
 %type <arglist> arglist
 
 %%
 rcfile     : PREFACE EOL content
-             {
+	     {
 		     if (errors)
 			     YYERROR;
 	     }
-           | BOGUS
+	   | BOGUS
 	     {
 		     if (parse_old_rc())
 			     YYERROR;
@@ -115,11 +131,11 @@ rcfile     : PREFACE EOL content
 	   ;
 
 content    : /* empty */
-           | rulelist
-           ;
+	   | rulelist
+	   ;
 
 rulelist   : rule
- 	   | rulelist rule
+	   | rulelist rule
 	   ;
 
 rule       : rulehdr rulebody
@@ -183,10 +199,10 @@ rulehdr    : RULE ruleid EOL
 	   ;
 
 ruleid     : /* empty */
-             {
+	     {
 		     $$ = NULL;
 	     }
-           | string
+	   | string
 	   ;
 
 rulebody   : stmt
@@ -202,8 +218,8 @@ stmt       : match_stmt EOL
 	   | include_stmt EOL
 	   | flowctl_stmt EOL
 	   | attrib_stmt EOL
-           | error { skiptoeol(); } EOL
-             {
+	   | error { skiptoeol(); } EOL
+	     {
 		     restorenormal();
 		     yyerrok;
 		     yyclearin;
@@ -356,17 +372,17 @@ regex      : string
 /* ******************
    Set statement
    ****************** */
-set_stmt   : SET index value
+set_stmt   : SET index '=' value
 	     {
 		     struct transform_node *node;
 
 		     node = new_transform_node(current_rule, transform_set);
 		     node->target.type = target_arg;
 		     node->target.v.arg = $2;
-		     node->v.xf.pattern = $3;
+		     node->v.xf.pattern = $4;
 		     node->v.xf.trans = NULL;
 	     }
-	   | SET index '~' value
+	   | SET index XF value
 	     {
 		     struct transform_node *node;
 
@@ -376,17 +392,17 @@ set_stmt   : SET index value
 		     node->v.xf.pattern = NULL;
 		     node->v.xf.trans = compile_transform_expr($4, re_flags);
 	     }
-	   | SET index string '~' value
+	   | SET index '=' string '~' value
 	     {
 		     struct transform_node *node;
 
 		     node = new_transform_node(current_rule, transform_set);
 		     node->target.type = target_arg;
 		     node->target.v.arg = $2;
-		     node->v.xf.pattern = $3;
-		     node->v.xf.trans = compile_transform_expr($5, re_flags);
+		     node->v.xf.pattern = $4;
+		     node->v.xf.trans = compile_transform_expr($6, re_flags);
 	     }
-	   | SET IDENT value
+	   | SET IDENT '=' value
 	     {
 		     struct transform_node *node;
 
@@ -401,10 +417,10 @@ set_stmt   : SET index value
 			     node->target.type = target_var;
 			     node->target.v.name = $2;
 		     }
-		     node->v.xf.pattern = $3;
+		     node->v.xf.pattern = $4;
 		     node->v.xf.trans = NULL;
 	     }
-	   | SET IDENT '~' value
+	   | SET IDENT XF value
 	     {
 		     struct transform_node *node;
 
@@ -422,7 +438,7 @@ set_stmt   : SET index value
 		     node->v.xf.pattern = NULL;
 		     node->v.xf.trans = compile_transform_expr($4, re_flags);
 	     }
-	   | SET IDENT string '~' value
+	   | SET IDENT '=' string '~' value
 	     {
 		     struct transform_node *node;
 
@@ -437,8 +453,8 @@ set_stmt   : SET index value
 			     node->target.type = target_var;
 			     node->target.v.name = $2;
 		     }
-		     node->v.xf.pattern = $3;
-		     node->v.xf.trans = compile_transform_expr($5, re_flags);
+		     node->v.xf.pattern = $4;
+		     node->v.xf.trans = compile_transform_expr($6, re_flags);
 	     }
 	   | UNSET IDENT
 	     {
@@ -626,37 +642,47 @@ environ_stmt: CLRENV
 	      {
 		     current_rule->clrenv = 1;
 	      }
-	    | SETENV IDENT string
+	    | SETENV IDENT '=' string
 	      {
 		     new_envar(current_rule,
 			       $2, strlen($2),
-			       $3, strlen($3),
+			       $4, strlen($4),
 			       envar_set);
 	      }
-	    | UNSETENV name_list
+	    | UNSETENV asgn_list
 	      {
-		      add_name_list($2.head, envar_unset);
+		      add_asgn_list($2.head, envar_unset);
 	      }
-	    | KEEPENV name_list
+	    | KEEPENV asgn_list
 	      {
-		      add_name_list($2.head, envar_keep);
+		      add_asgn_list($2.head, envar_keep);
 	      }
 	    ;
 
-name_list   : IDENT
+asgn_list   : asgn
 	      {
-		     struct name_entry *np = xmalloc(sizeof(*np));
-		     np->next = NULL;
-		     np->name = $1;
-		     $$.head = $$.tail = np;
+		      $$.head = $$.tail = $1;
 	      }
-	    | name_list IDENT
+	    | asgn_list asgn
 	      {
-		     struct name_entry *np = xmalloc(sizeof(*np));
-		     np->next = NULL;
-		     np->name = $2;
-		     LIST_APPEND(np, $1.head, $1.tail);
-		     $$ = $1;
+		      LIST_APPEND($2, $1.head, $1.tail);
+		      $$ = $1;
+	      }
+	    ;
+
+asgn        : IDENT
+	      {
+		     $$ = xmalloc(sizeof(*$$));
+		     $$->next = NULL;
+		     $$->name = $1;
+		     $$->value = NULL;
+	      }
+	    | IDENT '=' value
+	      {
+		     $$ = xmalloc(sizeof(*$$));
+		     $$->next = NULL;
+		     $$->name = $1;
+		     $$->value = $3;
 	      }
 	    ;
 
@@ -759,12 +785,12 @@ new_envar(struct rush_rule *rule,
 }
 
 static void
-add_name_list(struct name_entry *head, enum envar_type type)
+add_asgn_list(struct asgn *head, enum envar_type type)
 {
 	for (; head; head = head->next) {
 		new_envar(current_rule,
 			  head->name, strlen(head->name),
-			  NULL, 0,
+			  head->value, head->value ? strlen(head->value) : 0,
 			  type);
 		free(head->name);
 	}

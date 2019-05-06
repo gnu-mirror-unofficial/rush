@@ -63,6 +63,15 @@ TESTSUITE_AT = \
   interactive.at\
   fallthrough.at\
   error.at\
+  clrenv.at\
+  unsetenv.at\
+  keepenv.at\
+  setenv.at\
+  backref.at\
+  setvar.at\
+  unsetvar.at\
+  undef.at\
+  regexp.at\
   legacy/argc.at\
   legacy/backref.at\
   legacy/chdir.at\

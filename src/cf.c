@@ -862,6 +862,13 @@ glattrib_acct_umask(int argc, struct argval *arg)
 	return parse_file_mode(arg->strval, &rushdb_umask, &arg->loc);
 }
 
+static int
+glattrib_expand_undef(int argc, struct argval *arg)
+{
+	expand_undefined = arg->intval;
+	return 0;
+}
+
 static struct global_attrib global_attrib[] = {
 	{ "debug",            "n",  glattrib_debug },
 	{ "sleep-time",       "n",  glattrib_sleep_time },
@@ -871,6 +878,7 @@ static struct global_attrib global_attrib[] = {
 	{ "acct-file-mode",   "s",  glattrib_acct_file_mode },
 	{ "acct-dir-mode",    "s",  glattrib_acct_dir_mode },
 	{ "acct-umask",       "s",  glattrib_acct_umask },
+	{ "expand-undefined", "b",  glattrib_expand_undef },
 	{ NULL }
 };
 
@@ -904,6 +912,15 @@ global_attrib_set(struct global_attrib *glatt,
 			i++;
 			break;
 		case 's':
+			i++;
+			break;
+		case 'b':
+			if (get_bool(arg->strval, &arg->intval)) {
+				cferror(loc,
+					_("expected boolean value, but found `%s'"),
+					arg->strval);
+				return 1;
+			}
 			i++;
 			break;
 		case '.':

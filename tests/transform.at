@@ -20,7 +20,7 @@ AT_KEYWORDS([transform])
 AT_RUSH_TEST([
 rush 2.0
 rule
-    set command ~ "s/^[^[:space:]]+/& -t/"
+    set command =~ "s/^[^[:space:]]+/& -t/"
 ],
 [cmdline,argv,prog],
 [svnserve],
@@ -39,7 +39,7 @@ rule
 AT_RUSH_TEST([
 rush 2.0
 rule
-    set command "\${command} end" ~ "s/[[:space:]]+-[^[:space:]]+//g"
+    set command = "\${command} end" ~ "s/[[:space:]]+-[^[:space:]]+//g"
 ],
 [cmdline,argv,prog],
 [echo -c -t foo -n bar],
@@ -60,7 +60,7 @@ rule
 AT_RUSH_TEST([
 rush 2.0
 rule
-    set [0] ~ "s|^[^/]|/usr/bin/&|"
+    set [0] =~ "s|^[^/]|/usr/bin/&|"
 ],
 [cmdline,argv,prog],
 [echo foo],
@@ -92,7 +92,7 @@ rule
 AT_RUSH_TEST([
 rush 2.0
 rule
-    set [0] \$program ~ "s,.*/,-,"
+    set [0] = \$program ~ "s,.*/,-,"
 ],
 [cmdline,argv,prog],
 [/bin/sh],

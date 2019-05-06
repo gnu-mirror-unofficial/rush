@@ -1,5 +1,5 @@
 # This file is part of GNU Rush. 
-# Copyright (C) 2016-2019 Sergey Poznyakoff
+# Copyright (C) 2019 Sergey Poznyakoff
 #
 # GNU Rush is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -14,54 +14,33 @@
 # You should have received a copy of the GNU General Public License
 # along with GNU Rush.  If not, see <http://www.gnu.org/licenses/>.
 
-AT_SETUP([fall-through])
-AT_KEYWORDS([fallthrough fall-through])
-
+AT_SETUP([unsetvar])
+AT_KEYWORDS([unsetvar])
 AT_RUSH_TEST([
 rush 2.0
-rule
-    set [0] = newcommand
-    fall-through
-    
-rule
-    set [1] = list
+rule first
+  set home = "$PWD"
+  set count = 1
+  set FOO = bar
+  fall-through
+
+rule intermediate
+  unset count
+  fall-through
+  
+rule last
+  set command = "\$FOO \${count:-}"
 ],
-[cmdline,argv],
-[command],
+[cmdline,vars],
+[ls],
 [0],
 [{
-    "cmdline":"newcommand list",
-    "argv":[[
-        "newcommand",
-        "list"
-    ]]
+    "cmdline":"bar ",
+    "vars":{
+        "FOO":"bar",
+        "home":"$TESTDIR"
+    }
 }
 ],
 [])
-
-AT_RUSH_TEST([
-rush 2.0
-rule
-    chdir "/tmp"
-    fall-through
-    
-rule
-    set [0] = newcommand
-    interactive true
-],
-[cmdline,interactive,home_dir],
-[interactive],
-[0],
-[{
-    "cmdline":"newcommand",
-    "interactive":1,
-    "home_dir":null    
-}
-],
-[])
-
 AT_CLEANUP
-
-
-
-

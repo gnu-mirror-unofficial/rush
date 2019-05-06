@@ -14,26 +14,22 @@
 # You should have received a copy of the GNU General Public License
 # along with GNU Rush.  If not, see <http://www.gnu.org/licenses/>.
 
-AT_SETUP([fall-through])
-AT_KEYWORDS([fallthrough fall-through])
+AT_SETUP([unsetenv])
+AT_KEYWORDS([unsetenv])
 
+m4_pushdef([RUSH_ENVIRON],[-i HOME=$PWD USER=$MY_USER LOGIN=$MY_USER])
 AT_RUSH_TEST([
 rush 2.0
 rule
-    set [0] = newcommand
-    fall-through
-    
-rule
-    set [1] = list
+    unsetenv LOGIN
 ],
-[cmdline,argv],
+[environ],
 [command],
 [0],
 [{
-    "cmdline":"newcommand list",
-    "argv":[[
-        "newcommand",
-        "list"
+    "environ":[[
+        "HOME=$TESTDIR",
+        "USER=$MY_USER"
     ]]
 }
 ],
@@ -42,26 +38,39 @@ rule
 AT_RUSH_TEST([
 rush 2.0
 rule
-    chdir "/tmp"
-    fall-through
-    
-rule
-    set [0] = newcommand
-    interactive true
+    unsetenv LOGIN=$MY_USER
 ],
-[cmdline,interactive,home_dir],
-[interactive],
+[environ],
+[command],
 [0],
 [{
-    "cmdline":"newcommand",
-    "interactive":1,
-    "home_dir":null    
+    "environ":[[
+        "HOME=$TESTDIR",
+        "USER=$MY_USER"
+    ]]
 }
 ],
 [])
+m4_popdef([RUSH_ENVIRON])
+
+m4_pushdef([RUSH_ENVIRON],[-i HOME=$PWD USER=$MY_USER LOGIN=NO_$MY_USER])
+AT_RUSH_TEST([
+rush 2.0
+rule
+    unsetenv LOGIN=$MY_USER
+],
+[environ],
+[command],
+[0],
+[{
+    "environ":[[
+        "HOME=$TESTDIR",
+        "LOGIN=NO_$MY_USER",
+        "USER=$MY_USER"
+    ]]
+}
+],
+[])
+m4_popdef([RUSH_ENVIRON])
 
 AT_CLEANUP
-
-
-
-
