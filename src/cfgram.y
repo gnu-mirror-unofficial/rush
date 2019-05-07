@@ -554,6 +554,7 @@ flowctl_stmt: FALLTHROUGH
 	   | EXIT fdescr STRING
 	     {
 		     current_rule->error = new_error($2, $3, 0);
+		     free($3);
 	     }
 	   | EXIT fdescr IDENT
 	     {
@@ -562,6 +563,7 @@ flowctl_stmt: FALLTHROUGH
 			     cferror(&@1, _("Unknown message reference"));
 		     else
 			     current_rule->error = new_standard_error($2, n);
+		     free($3);
 	     }
 	   ;
 
@@ -609,6 +611,7 @@ range      : NUMBER
 include_stmt: INCLUDE string
 	      {
 		     cflex_include($2, &@2);
+		     free($2);
 	      }
 	    ;
 
@@ -639,6 +642,7 @@ resource_limits: IDENT
 				     p);
 			     break;
 		     }
+		     free($1);
 	      }
 	    | resource_limits IDENT
 	      {
@@ -657,6 +661,7 @@ resource_limits: IDENT
 				     p);
 			     break;
 		     }
+		     free($2);
 		     $$ = $1;
 	     }
 	    ;
@@ -674,6 +679,8 @@ environ_stmt: CLRENV
 			       $2, strlen($2),
 			       $4, strlen($4),
 			       envar_set);
+		     free($2);
+		     free($4);
 	      }
 	    | UNSETENV asgn_list
 	      {
@@ -718,6 +725,7 @@ asgn        : IDENT
 attrib_stmt : ATTRIB string
 	      {
 		      $1(current_rule, $2, &@2);
+		      free($2);
 	      }
 	    ;
 
@@ -819,5 +827,6 @@ add_asgn_list(struct asgn *head, enum envar_type type)
 			  head->value, head->value ? strlen(head->value) : 0,
 			  type);
 		free(head->name);
+		free(head->value);
 	}
 }
