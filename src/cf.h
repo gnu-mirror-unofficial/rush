@@ -95,6 +95,7 @@ cfstream_getc(CFSTREAM *cf)
 		return 0;
 	return c;
 }
+int cfstream_same_file(CFSTREAM *cf, struct stat const *st);
 
 void cflex_debug(int v);
 void cfgram_debug(int v);

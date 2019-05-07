@@ -1,0 +1,48 @@
+# This file is part of GNU Rush. 
+# Copyright (C) 2016-2019 Sergey Poznyakoff
+#
+# GNU Rush is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3, or (at your option)
+# any later version.
+#
+# GNU Rush is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with GNU Rush.  If not, see <http://www.gnu.org/licenses/>.
+
+AT_SETUP([basic include functionality])
+AT_KEYWORDS([inc00 inc include])
+
+AT_CHECK([
+AT_DATA([test.cf],
+[rush 2.0
+rule
+  match $0 == "ls"
+  include "i1.cf"
+
+rule
+  match $0 == "dir"
+  include "i2.cf"
+])
+AT_DATA([i1.cf],
+[set [[0]] = "/bin/ls"
+])
+AT_DATA([i2.cf],
+[set [[0]] = "/bin/dir"
+])
+rush -C none -D cmdline -t -c "ls" test.cf
+rush -C none -D cmdline -t -c "dir" test.cf
+],
+[0],
+[{
+    "cmdline":"/bin/ls"
+}
+{
+    "cmdline":"/bin/dir"
+}
+])
+AT_CLEANUP

@@ -166,7 +166,64 @@ stringbuf_add_escape_hex(struct stringbuf *sb, char const *text, size_t leng)
 	stringbuf_add_array(sb, text, leng - 5);
 	stringbuf_add_char(sb, strtoul(text + leng - 2, NULL, 16));
 }
+
+/* Input_Stream context stack */
+struct inpctx {
+	struct inpctx   *prev;
+	struct cfloc    loc;   /* Location */
+	CFSTREAM        *input_stream;
+	YY_BUFFER_STATE buf;   /* lex buffer state */
+};
 
+static struct inpctx *inpctx_tos;
+
+static inline int
+in_included_file(void)
+{
+	return inpctx_tos != NULL;
+}
+
+static struct inpctx *
+inpctx_locate(struct stat *st)
+{
+	struct inpctx *ctx;
+
+	for (ctx = inpctx_tos; ctx; ctx = ctx->prev)
+		if (cfstream_same_file(ctx->input_stream, st))
+			break;
+	return ctx;
+}
+
+static void
+inpctx_push(void)
+{
+	struct inpctx *ctx = xmalloc(sizeof(ctx[0]));
+
+	ctx->loc = curloc;
+	ctx->input_stream = input_stream;
+	ctx->buf = YY_CURRENT_BUFFER;
+	ctx->prev = inpctx_tos;
+	inpctx_tos = ctx;
+	yy_switch_to_buffer(yy_create_buffer(yyin, YY_BUF_SIZE));
+}
+
+static int
+inpctx_pop(void)
+{
+	struct inpctx *ctx = inpctx_tos;
+	if (!ctx)
+		return 1;
+	inpctx_tos = ctx->prev;
+
+	curloc = ctx->loc;
+	input_stream = ctx->input_stream;
+	yy_delete_buffer(YY_CURRENT_BUFFER);
+	yy_switch_to_buffer(ctx->buf);
+	free(ctx);
+	return 0;
+}
+
+static int noinc(void);
 %}
 %x NORMAL ARGS INMATCH QSTR VAR
 %option nounput
@@ -208,8 +265,12 @@ stringbuf_add_escape_hex(struct stringbuf *sb, char const *text, size_t leng)
 }
 
 <NORMAL>{
-"rule"      { BEGIN(ARGS); return tok(RULE); }
-"global"    { return tok(GLOBAL); }
+"rule"      { if (!noinc()) {
+	              BEGIN(ARGS);
+		      return tok(RULE);
+              }
+            }
+"global"    { if (!noinc()) return tok(GLOBAL); }
 "set"       { BEGIN(ARGS); return tok(SET); }
 "unset"     { BEGIN(ARGS); return tok(UNSET); }
 "match"     { BEGIN(INMATCH); return tok(MATCH); }
@@ -342,7 +403,21 @@ stringbuf_add_escape_hex(struct stringbuf *sb, char const *text, size_t leng)
 	                        stringbuf_add_char(&sb, yytext[0]); }
 }
 %%
-void
+static int
+noinc(void)
+{
+	if (in_included_file()) {
+		yyerror(_("the %s statement is not allowed in included file"),
+		        yytext);
+		cferror(&curloc, _("skipping to the end of file"));
+		while (input() != EOF)
+			      ;
+		return 1;
+	}
+	return 0;
+}             
+
+static void
 straychar(int c)
 {
 	static char *start_name[] = {
@@ -379,72 +454,6 @@ restorenormal(void)
 	BEGIN(NORMAL);
 }
 
-/* Input_Stream context stack */
-struct inpctx {
-	struct inpctx   *prev;
-	struct cfloc    loc;   /* Location */
-	dev_t           dev;
-	ino_t           ino;
-	int             is_file;
-	CFSTREAM        *input_stream;
-	YY_BUFFER_STATE buf;   /* lex buffer state */
-};
-
-static struct inpctx *inpctx_tos;
-static dev_t input_stream_dev;
-static ino_t input_stream_ino;
-
-static struct inpctx *
-inpctx_locate(struct stat *st)
-{
-	struct inpctx *ctx;
-
-	for (ctx = inpctx_tos; ctx; ctx = ctx->prev)
-		if (ctx->dev == st->st_dev && ctx->ino == st->st_ino)
-			break;
-	return ctx;
-}
-
-static void
-inpctx_push(void)
-{
-	struct inpctx *ctx = xmalloc(sizeof(ctx[0]));
-
-	ctx->loc = curloc;
-	ctx->dev = input_stream_dev;
-	ctx->ino = input_stream_ino;
-	ctx->input_stream = input_stream;
-	ctx->buf = YY_CURRENT_BUFFER;
-	ctx->prev = inpctx_tos;
-	inpctx_tos = ctx;
-}
-
-static void
-inpctx_unpush(void)
-{
-	struct inpctx *ctx = inpctx_tos;
-	inpctx_tos = ctx->prev;
-	free(ctx);
-}
-
-static int
-inpctx_pop(void)
-{
-	struct inpctx *ctx = inpctx_tos;
-	if (!ctx)
-		return 1;
-	inpctx_tos = ctx->prev;
-
-	curloc = ctx->loc;
-	input_stream_dev = ctx->dev;
-	input_stream_ino = ctx->ino;
-	input_stream = ctx->input_stream;
-	yy_delete_buffer(YY_CURRENT_BUFFER);
-	yy_switch_to_buffer(ctx->buf);
-	free(ctx);
-	return 0;
-}
-
 static void
 curloc_init(char const *filename, int line)
 {
@@ -525,13 +534,17 @@ cflex_include(char const *filename, struct cfloc const *loc)
 
 	inpctx_push();
 	if ((ctx = inpctx_locate(&st))) {
-		cferror(loc, "%s already included", name);
-		cferror(&ctx->loc, "%s already included here", name);
-		inpctx_unpush();
+		ctx = ctx->prev;
+		if (ctx) {
+			cferror(loc, "%s already included", name);
+			cferror(&ctx->loc, "%s already included here", name);
+		} else
+			cferror(loc, "%s: main configuration file cannot be included", name);
+		inpctx_pop();
 		free(name);
 		return -1;
 	}
-	
+
 	cflex_setup(cfstream_open_file(name), name, 1);
 	free(name);
 

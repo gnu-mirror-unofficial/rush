@@ -549,6 +549,12 @@ env_setup(struct rush_rule *rule, struct rush_request *req)
 			req->env[n] = xmalloc(len);
 			strcat(strcat(strcpy(req->env[n], ev->name), "="), val);
 			free(val);
+			break;
+
+		default:
+			die(system_error, NULL,
+			    _("INTERNAL ERROR at %s:%d: invalid envar type %d"),
+			    __FILE__, __LINE__, ev->type);
 		}
 	}
         if (__debug_p(2)) {

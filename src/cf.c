@@ -287,6 +287,19 @@ cfstream_read(CFSTREAM *cf, char *bufptr, size_t bufsize)
 	return nrd;
 }
 
+int
+cfstream_same_file(CFSTREAM *cf, struct stat const *st)
+{
+	struct stat fst;
+	if (cf->fd < 0)
+		return 0;
+	if (fstat(cf->fd, &fst)) {
+		logmsg(LOG_ERR, "fstat: %s", strerror(errno));
+		return 0;
+	}
+	return fst.st_dev == st->st_dev && fst.st_ino == st->st_ino;
+}
+
 
 const char default_entry[] = ""
 #ifdef RUSH_DEFAULT_CONFIG

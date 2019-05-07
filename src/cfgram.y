@@ -77,7 +77,7 @@ static void add_asgn_list(struct asgn *head, enum envar_type type);
 %token UNSET "unset"
 %token MATCH "match"
 %token FALLTHROUGH "fallthrough"
-%token INCLUDE "input"
+%token INCLUDE "include"
 %token LIMITS "limits"
 %token CLRENV "clrenv"
 %token SETENV "setenv"
@@ -240,15 +240,16 @@ stmt       : match_stmt eol
 	   | delete_stmt eol
 	   | limits_stmt eol
 	   | environ_stmt eol
-	   | include_stmt eol
 	   | flowctl_stmt eol
 	   | attrib_stmt eol
+	   | include_stmt skipeol
 	   | error
 	     {
 		     skiptoeol();
 		     restorenormal();
 		     yyerrok;
 		     yyclearin;
+		     errors = 1;
 	     }
 	   ;
 
@@ -559,9 +560,10 @@ flowctl_stmt: FALLTHROUGH
 	   | EXIT fdescr IDENT
 	     {
 		     int n = string_to_error_index($3);
-		     if (n == -1)
+		     if (n == -1) {
 			     cferror(&@1, _("Unknown message reference"));
-		     else
+			     YYERROR;
+		     } else
 			     current_rule->error = new_standard_error($2, n);
 		     free($3);
 	     }
@@ -607,10 +609,14 @@ range      : NUMBER
 
 /* ******************
    Include statement
+
+   In contrast to the rest of statements, the EOL must be a part of this
+   one, in order to avoid spurious look-aheads.
    ****************** */
-include_stmt: INCLUDE string
+include_stmt: INCLUDE string EOL
 	      {
-		     cflex_include($2, &@2);
+		     if (cflex_include($2, &@2))
+			     YYERROR;
 		     free($2);
 	      }
 	    ;
@@ -802,6 +808,7 @@ new_envar(struct rush_rule *rule,
 	struct envar *p = xmalloc(sizeof(*p)
 				  + nlen + 1
 				  + (value ? vlen + 1 : 0));
+	p->next = NULL;
 	p->name = (char*)(p + 1);
 	memcpy(p->name, name, nlen);
 	p->name[nlen] = 0;

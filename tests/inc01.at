@@ -1,0 +1,66 @@
+# This file is part of GNU Rush. 
+# Copyright (C) 2016-2019 Sergey Poznyakoff
+#
+# GNU Rush is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3, or (at your option)
+# any later version.
+#
+# GNU Rush is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with GNU Rush.  If not, see <http://www.gnu.org/licenses/>.
+
+AT_SETUP([rule and global statements])
+AT_KEYWORDS([inc01 inc include])
+
+AT_CHECK([
+AT_DATA([test.cf],
+[rush 2.0
+rule
+  match $0 == "ls"
+  include "i1.cf"
+])
+AT_DATA([i1.cf],
+[setenv INC="i1"
+
+rule new
+  set command = "dir"
+])
+rush -C none -D cmdline -t -c "ls" test.cf
+],
+[1],
+[],
+[rush: Error: i1.cf:3.1-5: the rule statement is not allowed in included file
+rush: Error: i1.cf:3.1-5: skipping to the end of file
+rush: Error: errors in configuration file
+])
+
+AT_CHECK([
+AT_DATA([test.cf],
+[rush 2.0
+rule
+  match $0 == "ls"
+  include "i1.cf"
+])
+AT_DATA([i1.cf],
+[setenv INC="i1"
+
+global
+  debug 2
+])
+rush -C none -D cmdline -t -c "ls" test.cf
+],
+[1],
+[],
+[rush: Error: i1.cf:3.1-7: the global statement is not allowed in included file
+rush: Error: i1.cf:3.1-7: skipping to the end of file
+rush: Error: errors in configuration file
+])
+
+AT_CLEANUP
+
+

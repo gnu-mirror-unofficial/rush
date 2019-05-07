@@ -103,6 +103,10 @@ AT_BANNER([Flow control])
 m4_include([fallthrough.at])
 m4_include([error.at])
 
+AT_BANNER([Includes])
+m4_include([inc00.at])
+m4_include([inc01.at])
+
 AT_BANNER([Legacy configuration])
 
 dnl AT_BANNER([Conditionals])
