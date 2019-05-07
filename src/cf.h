@@ -75,11 +75,12 @@ void yyerror(char const *msg,...);
 
 
 typedef struct cfstream {
-	int fd;
-	char *buffer;
-	size_t size;
-	size_t level;
-	size_t pos;
+	int fd;        /* File descriptor (-1 for built-in config) */
+	char *buffer;  /* Read buffer */
+	size_t size;   /* Size of buffer */
+	size_t level;  /* Number of data bytes available in the buffer */
+	size_t pos;    /* Current read position */
+	int eol;       /* 1 if the last character read was \n, 0 otherwise */
 } CFSTREAM;
 
 CFSTREAM *cfstream_open_file(char const *filename);

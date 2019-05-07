@@ -219,6 +219,8 @@ arg        : literal
 rulehdr    : RULE ruleid eol
 	     {
 		     current_rule = new_rush_rule();
+		     current_rule->file = @1.beg.filename;
+		     current_rule->line = @1.beg.line;
 		     current_rule->tag = $2;
 	     }
 	   ;

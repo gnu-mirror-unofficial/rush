@@ -178,6 +178,7 @@ cfstream_open_file(char const *filename)
 	cf->size = CFSTREAM_BUFSIZE;
 	cf->level = 0;
 	cf->pos = 0;
+	cf->eol = 0;
 
 	return cf;
 }
@@ -194,6 +195,7 @@ cfstream_open_mem(char const *buffer, size_t len)
 	cf->size = len;
 	cf->level = len;
 	cf->pos = 0;
+	cf->eol = 0;
 
 	return cf;
 }
@@ -219,6 +221,7 @@ cfstream_rewind(CFSTREAM *cf)
 	} else
 		cf->level = cf->size;
 	cf->pos = 0;
+	cf->eol = 0;
 }
 
 static inline size_t
@@ -275,15 +278,22 @@ cfstream_read(CFSTREAM *cf, char *bufptr, size_t bufsize)
 	while (nrd < bufsize) {
 		size_t n = bufsize - nrd;
 		size_t avail = cfstream_avail(cf);
-		if (avail == 0)
+		if (avail == 0) {
+			if (!cf->eol) {
+				/* Force final newline */
+				bufptr[nrd++] = '\n';
+				cf->eol = 1;
+			}
 			break;
+		}
 		if (n > avail)
 			n = avail;
 		memcpy(bufptr + nrd, cfstream_buf_ptr(cf), n);
 		cfstream_buf_advance(cf, n);
 		nrd += n;
+		cf->eol = bufptr[nrd-1] == '\n';
 	}
-
+	
 	return nrd;
 }
 
