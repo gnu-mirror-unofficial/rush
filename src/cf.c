@@ -293,7 +293,7 @@ cfstream_read(CFSTREAM *cf, char *bufptr, size_t bufsize)
 		nrd += n;
 		cf->eol = bufptr[nrd-1] == '\n';
 	}
-	
+
 	return nrd;
 }
 

@@ -14,10 +14,11 @@
    You should have received a copy of the GNU General Public License
    along with GNU Rush.  If not, see <http://www.gnu.org/licenses/>. */
 
+/* String buffer */
 struct stringbuf {
-	char *buffer;
-	size_t size;
-	size_t pos;
+	char *buffer;  /* The buffer itself */
+	size_t size;   /* Size of the buffer */
+	size_t pos;    /* Actual number of characters in the buffer */
 };
 
 void stringbuf_init(struct stringbuf *sb);
@@ -28,13 +29,13 @@ void stringbuf_add_array(struct stringbuf *sb, char const *str, size_t len);
 void stringbuf_add_num(struct stringbuf *sb, unsigned n);
 void stringbuf_finish(struct stringbuf *sb);
 
-struct cfpoint {
+struct cfpoint {               /* A point in the configuration file */
 	char const *filename;
 	int line;
 	int column;
 };
 
-struct cfloc {
+struct cfloc {                 /* Location in the configuration file */
 	struct cfpoint beg;
 	struct cfpoint end;
 };
@@ -63,9 +64,9 @@ void cfpoint_format(struct cfpoint const *cfp, struct stringbuf *sb);
 void cfloc_format(struct cfloc const *cfl, struct stringbuf *sb);
 void cfloc_print(struct cfloc const *cfl, FILE *fp);
 
-struct cfnumber {
-	int intval;
-	char *strval;
+struct cfnumber {        /* Representation of a "number-like" string */
+	int intval;      /* Numeric value */
+	char *strval;    /* String value */
 };
 
 void cferror(struct cfloc const *loc, char const *fmt, ...);
@@ -158,6 +159,8 @@ extern int re_flags;
 extern int expand_undefined;
 extern struct cfloc curloc;
 
+/* The following are shared between the two configuration parsers. Once
+   the legacy parses is phased out, they will become static to cf.c */
 void trimws(char *s);
 size_t trimslash(char *s);
 int attrib_umask(struct rush_rule *rule, char const *arg, struct cfloc const *loc);

@@ -19,11 +19,15 @@
 #include <sys/stat.h>
 #include <cf.h>
 #include <cfgram.h>
-#include <assert.h>
 
+/* Current input stream (yyin is not used) */
 static CFSTREAM *input_stream;
+/* Buffer for composing string values */
 static struct stringbuf sb;
 
+/* Names of the source files form a singly-linked list. They remain in
+   the memory until the end of run because various objects refer to them
+   (most notably, rush_rule). */
 struct source_file {
 	struct source_file *prev;
 	char filename[1];
@@ -48,10 +52,12 @@ new_source_file_name(char const *f)
 	return file->filename;
 }
 
+/* Current input location */
 struct cfloc curloc;
-
+/* User action is set uo to update end column. */
 #define YY_USER_ACTION	(curloc.end.column += yyleng);
 
+/* Advance the end point of the current location N lines. */
 static inline void
 advance_line(size_t n)
 {
@@ -59,12 +65,15 @@ advance_line(size_t n)
 	curloc.end.column = 1;
 }
 
+/* Reset the start point of the current location to its end point. This
+   starts the next token. */
 static inline void
 reset_loc(void)
 {
 	curloc.beg = curloc.end;
 }
 
+/* This is used in the scanner actions below to return token types. */
 static inline int
 tok(int c)
 {
@@ -74,6 +83,8 @@ tok(int c)
 	return c;
 }
 
+/* The scanner implements several exclusive conditions, some of which
+   are preserved on stack. */
 struct start_cond {
 	struct start_cond *next;
 	int start;
@@ -94,17 +105,30 @@ static inline void
 popstart(void)
 {
 	struct start_cond *tos = start_tos;
-	assert(tos != NULL);
+	if (!tos)
+		die(system_error, NULL,
+		    _("INTERNAL ERROR at %s:%d: state stack is empty"),
+		    __FILE__, __LINE__);
 	start_tos = tos->next;
 	BEGIN(tos->start);
 	free(tos);
 }
-static void straychar(int);
 
+/* Read next chunk of the input. */
 #undef YY_INPUT
 #define YY_INPUT(buf,result,max_size)		\
 	(result) = cfstream_read(input_stream, buf, max_size)
+
+/* Additional stringbuf function for use when processing escape sequences.
+   SB is the string buffer, TEXT is the input text ending with '\' + something,
+   LENG is number of bytes in it.
+ */
 
+/* Default function: TEXT ends with a C-style escape sequence (e.g. \v) or
+   rush-specific \% escape.
+   Unrecognized escape sequence is reported and transferred varbatim
+   to the output.
+*/
 static void
 stringbuf_add_escape_dfl(struct stringbuf *sb, char const *text, size_t leng)
 {
@@ -153,6 +177,7 @@ stringbuf_add_escape_dfl(struct stringbuf *sb, char const *text, size_t leng)
 	}
 }
 
+/* TEXT ends with a '\' followed by a 3-byte octal number. */
 static void
 stringbuf_add_escape_octal(struct stringbuf *sb, char const *text, size_t leng)
 {
@@ -160,10 +185,11 @@ stringbuf_add_escape_octal(struct stringbuf *sb, char const *text, size_t leng)
 	stringbuf_add_char(sb, strtoul(text + leng - 3, NULL, 8));
 }
 
+/* TEXT ends with a '\x' followed by a 2-byte hex number. */
 static void
 stringbuf_add_escape_hex(struct stringbuf *sb, char const *text, size_t leng)
 {
-	stringbuf_add_array(sb, text, leng - 5);
+	stringbuf_add_array(sb, text, leng - 4);
 	stringbuf_add_char(sb, strtoul(text + leng - 2, NULL, 16));
 }
 
@@ -177,12 +203,15 @@ struct inpctx {
 
 static struct inpctx *inpctx_tos;
 
+/* Returns 1 if an included file is being processed. */
 static inline int
 in_included_file(void)
 {
 	return inpctx_tos != NULL;
 }
 
+/* Look up in the stack for the input context matching the device and
+   inode numbers from ST. */
 static struct inpctx *
 inpctx_locate(struct stat *st)
 {
@@ -194,6 +223,7 @@ inpctx_locate(struct stat *st)
 	return ctx;
 }
 
+/* Push current input context on stack. */
 static void
 inpctx_push(void)
 {
@@ -207,6 +237,7 @@ inpctx_push(void)
 	yy_switch_to_buffer(yy_create_buffer(yyin, YY_BUF_SIZE));
 }
 
+/* Pop the top of stack into the current input context. */
 static int
 inpctx_pop(void)
 {
@@ -223,17 +254,25 @@ inpctx_pop(void)
 	return 0;
 }
 
+/* Forward declarations */
+static void straychar(int);
 static int noinc(void);
 %}
 %x NORMAL ARGS INMATCH QSTR VAR
 %option nounput
 %%
+ /* INITIAL: The scanner is processing the initial portion of the input file,
+    until the version clause ("rush X.Y\n"), upon which the NORMAL state is
+    activated, or any other token, upon which the control is transferred to
+    the legacy parser (see config.c).
+  */
 <INITIAL>{
 "rush"     return RUSH;
 [0-9]+\.[0-9]+  { char *p;
 	          yylval.version.major = strtoul(yytext, &p, 10);
 		  yylval.version.minor = strtoul(p + 1, NULL, 10);
 		  return tok(T_VERSION); }
+\\\n        { advance_line(1); }
 #.*\n      { advance_line(1); return EOL; }
 \n+        { advance_line(yyleng); return EOL; }
 [ \t]+     reset_loc();
@@ -241,15 +280,19 @@ static int noinc(void);
 }
 
 <NORMAL,INMATCH,ARGS>{
+\\\n        { advance_line(1); }
 #.*\n       { advance_line(1);
 	      BEGIN(NORMAL);
-	      return tok(EOL); }
+	      return tok(EOL); }	 
 \n+         { advance_line(yyleng);
 	      BEGIN(NORMAL);
 	      return tok(EOL); }
 [ \t]+      reset_loc();
 }
 
+ /* The INMATCH state is activated when scanning the arguments to the "match"
+    command. This is the only state where comparison and logical operators
+    are allowed. */
 <INMATCH>{
 "&&"        return tok(AND);
 "||"        return tok(OR);
@@ -264,6 +307,8 @@ static int noinc(void);
 "member"    return tok(MEMBER);
 }
 
+ /* NORMAL: The input point is before the next keyword.
+  */
 <NORMAL>{
 "rule"      { if (!noinc()) {
 	              BEGIN(ARGS);
@@ -299,6 +344,8 @@ static int noinc(void);
 .       return yytext[0];
 }
 
+ /* ARGS: Processing arguments to a configuration statement.
+  */
 <ARGS,INMATCH>{
 [+-]?[0-9]+                   { yylval.num.strval = xstrdup(yytext);
 				yylval.num.intval = atoi(yytext);
@@ -332,7 +379,7 @@ static int noinc(void);
 			   stringbuf_add_escape_octal(&sb,
 						      yytext + 1, yyleng - 1);
 			   pushstart(QSTR); }
-\"[^\\\"\n]*\\0[xX][a-fA-F0-9]{2} {
+\"[^\\\"\n]*\\[xX][a-fA-F0-9]{2} {
 			   stringbuf_init(&sb);
 			   stringbuf_add_escape_hex(&sb,
 						    yytext + 1, yyleng - 1);
@@ -346,6 +393,8 @@ static int noinc(void);
 .                          return yytext[0];
 }
 
+ /* QSTR: Composing a quoted string.
+  */
 <QSTR>{
 [^\\\"\n]*\"             { stringbuf_add_array(&sb, yytext, yyleng - 1);
 	                   stringbuf_finish(&sb);
@@ -353,7 +402,7 @@ static int noinc(void);
 			   popstart();
 			   return tok(STRING); }
 [^\\\"\n]*\\[0-9]{3}     { stringbuf_add_escape_octal(&sb, yytext, yyleng); }
-[^\\\"\n]*\\0[xX][a-fA-F0-9]{2} {
+[^\\\"\n]*\\[xX][a-fA-F0-9]{2} {
 	                   stringbuf_add_escape_hex(&sb, yytext, yyleng); }
 [^\\\"\n]*\\.|[^\\\"\n]*\\\n { stringbuf_add_escape_dfl(&sb, yytext, yyleng); }
 \n   {  advance_line(1);
@@ -361,6 +410,9 @@ static int noinc(void);
 .    {  straychar(yytext[0]); }
 }
 
+ /* VAR: The scanner is processing an unquoted variable reference with
+    a default value (e.g. ${X:-0}).
+  */
 <VAR>{
 \}                            { popstart();
 				if (YY_START != VAR) {
@@ -403,6 +455,8 @@ static int noinc(void);
 	                        stringbuf_add_char(&sb, yytext[0]); }
 }
 %%
+/* If processing the included file, report an error, drain the input, and
+   return 1. Otherwise, return 0. */
 static int
 noinc(void)
 {
@@ -417,26 +471,28 @@ noinc(void)
 	return 0;
 }             
 
+/* Report a stray character C */
 static void
 straychar(int c)
 {
 	static char *start_name[] = {
-		[INITIAL] = "looking for rush version clause",
-		[NORMAL] = "looking for rule",
-		[INMATCH] = "scanning match arguments",
-		[ARGS] = "scanning arguments",
-		[QSTR] = "scanning quoted string",
-		[VAR] = "scanning variable reference"
+		[INITIAL] = N_("looking for rush version clause"),
+		[NORMAL] =  N_("looking for rule"),
+		[INMATCH] = N_("scanning match expression"),
+		[ARGS] = N_("scanning arguments"),
+		[QSTR] = N_("scanning quoted string"),
+		[VAR] = N_("scanning variable reference")
 	};
 	if (isprint(c)) {
-		yyerror("stray character %c while %s", c,
-			start_name[YY_START]);
+		yyerror(_("stray character %c while %s"), c,
+			gettext(start_name[YY_START]));
 	} else {
-		yyerror("stray character %03o while %s", c,
-			start_name[YY_START]);
+		yyerror(_("stray character %03o while %s"), c,
+			gettext(start_name[YY_START]));
 	}
 }
 
+/* Skip the input up to the next '\n' character. */
 void
 skiptoeol(void)
 {
@@ -446,6 +502,7 @@ skiptoeol(void)
 		;
 }
 
+/* Clear the start state stack and switch scanner to the NORMAL state. */
 void
 restorenormal(void)
 {
@@ -454,6 +511,7 @@ restorenormal(void)
 	BEGIN(NORMAL);
 }
 
+/* Initialize current location to point to this filename and line number. */
 static void
 curloc_init(char const *filename, int line)
 {
@@ -463,6 +521,7 @@ curloc_init(char const *filename, int line)
 	curloc.end = curloc.beg;
 }
 
+/* Switch to input from CF. FILENAME and LINE give the initial location. */
 void
 cflex_setup(CFSTREAM *cf, char const *filename, int line)
 {
@@ -471,6 +530,7 @@ cflex_setup(CFSTREAM *cf, char const *filename, int line)
 	YY_FLUSH_BUFFER;
 }
 
+/* Set scanner debug level to V. */
 void
 cflex_debug(int v)
 {
@@ -479,12 +539,14 @@ cflex_debug(int v)
 #endif
 }
 
+/* Switch to the NORMAL condition. */
 void
 cflex_normal(void)
 {
 	BEGIN(NORMAL);
 }
 
+/* Include FILENAME. Return 0 on success, -1 on error. */
 int
 cflex_include(char const *filename, struct cfloc const *loc)
 {
@@ -557,18 +619,21 @@ yywrap(void)
 	return inpctx_pop();
 }
 
+/* Preserve the current start state on stack and switch to ARGS. */ 
 void
 cflex_pushargs(void)
 {
 	pushstart(ARGS);
 }
 
+/* Extern interface to popstart */
 void
 cflex_popargs(void)
 {
 	popstart();
 }
 
+/* Remove trailing whitespace from S. */
 void
 trimws(char *s)
 {
@@ -577,6 +642,8 @@ trimws(char *s)
 		s[--len] = 0;
 }
 
+/* Remove trailing slashes from S. Return the length of the resulting
+   string. */
 size_t
 trimslash(char *s)
 {
@@ -586,6 +653,8 @@ trimslash(char *s)
 	return len;
 }
 
+/* Rewind the input stream to the beginning and parse it as a legacy
+   configuration. */
 int
 parse_old_rc(void)
 {

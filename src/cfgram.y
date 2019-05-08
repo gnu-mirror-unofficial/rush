@@ -122,7 +122,6 @@ static void add_asgn_list(struct asgn *head, enum envar_type type);
 %%
 rcfile     : skipeol select
            ;
- 
 
 select     : preface content
 	     {
