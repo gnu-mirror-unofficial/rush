@@ -303,6 +303,7 @@ static int noinc(void);
 "<="        return tok(LE);
 ">"         return tok(GT);
 ">="        return tok(GE);
+"!~"        return tok(NM);
 "in"        return tok(IN);
 "member"    return tok(MEMBER);
 }

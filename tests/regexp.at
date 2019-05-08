@@ -37,6 +37,31 @@ rule
 
 AT_RUSH_TEST([
 rush 2.0
+rule
+  match \$command !~ "fo+\$"
+],
+[cmdline,argv],
+
+[ls foo],
+[1],
+[],
+[rush: Error: no matching rule for "ls foo", user gray
+],
+
+[ls bar],
+[0],
+[{
+    "cmdline":"ls bar",
+    "argv":[[
+        "ls",
+        "bar"
+    ]]
+}
+],
+[])
+
+AT_RUSH_TEST([
+rush 2.0
 global
   regexp basic
 rule

@@ -99,13 +99,14 @@ static void add_asgn_list(struct asgn *head, enum envar_type type);
 %token GT ">"
 %token GE ">="
 %token XF "=~"
+%token NM "!~"
 %token IN "in"
 %token MEMBER "member"
 
 %left OR
 %left AND
 %left NOT
-%nonassoc EQ NE LT LE GT GE XF '~' IN MEMBER
+%nonassoc EQ NE LT LE GT GE NM XF '~' IN MEMBER
 
 %type <intval> fdescr index
 %type <str> literal string value defval ruleid
@@ -302,6 +303,16 @@ expr       : string '~' regex
 		     $$->v.cmp.op = cmp_match;
 		     $$->v.cmp.larg = $1;
 		     $$->v.cmp.rarg.rx = $3;
+	     }
+           | string NM regex
+	     {
+		     struct test_node *np = new_test_node(test_cmps);
+		     np->v.cmp.op = cmp_match;
+		     np->v.cmp.larg = $1;
+		     np->v.cmp.rarg.rx = $3;
+
+		     $$ = new_test_node(test_not);
+		     $$->v.arg[0] = np;
 	     }
 	   | string EQ literal
 	     {
