@@ -258,7 +258,7 @@ inpctx_pop(void)
 static void straychar(int);
 static int noinc(void);
 %}
-%x NORMAL ARGS INMATCH QSTR VAR
+%x NORMAL ARGS QSTR VAR
 %option nounput
 %%
  /* INITIAL: The scanner is processing the initial portion of the input file,
@@ -279,7 +279,7 @@ static int noinc(void);
 .          return tok(BOGUS);
 }
 
-<NORMAL,INMATCH,ARGS>{
+<NORMAL,ARGS>{
 \\\n        { advance_line(1); }
 #.*\n       { advance_line(1);
 	      BEGIN(NORMAL);
@@ -288,24 +288,6 @@ static int noinc(void);
 	      BEGIN(NORMAL);
 	      return tok(EOL); }
 [ \t]+      reset_loc();
-}
-
- /* The INMATCH state is activated when scanning the arguments to the "match"
-    command. This is the only state where comparison and logical operators
-    are allowed. */
-<INMATCH>{
-"&&"        return tok(AND);
-"||"        return tok(OR);
-"!"         return tok(NOT);
-"=="        return tok(EQ);
-"!="        return tok(NE);
-"<"         return tok(LT);
-"<="        return tok(LE);
-">"         return tok(GT);
-">="        return tok(GE);
-"!~"        return tok(NM);
-"in"        return tok(IN);
-"member"    return tok(MEMBER);
 }
 
  /* NORMAL: The input point is before the next keyword.
@@ -319,7 +301,7 @@ static int noinc(void);
 "global"    { if (!noinc()) return tok(GLOBAL); }
 "set"       { BEGIN(ARGS); return tok(SET); }
 "unset"     { BEGIN(ARGS); return tok(UNSET); }
-"match"     { BEGIN(INMATCH); return tok(MATCH); }
+"match"     { BEGIN(ARGS); return tok(MATCH); }
 "fallthrough"|"fall-through" { BEGIN(ARGS); return tok(FALLTHROUGH); }
 "include"   { BEGIN(ARGS); return tok(INCLUDE); }
 "limits"    { BEGIN(ARGS); return tok(LIMITS); }
@@ -347,14 +329,26 @@ static int noinc(void);
 
  /* ARGS: Processing arguments to a configuration statement.
   */
-<ARGS,INMATCH>{
+<ARGS>{
+"&&"                          return tok(AND);
+"||"                          return tok(OR);
+"!"                           return tok(NOT);
+"=="                          return tok(EQ);
+"!="                          return tok(NE);
+"<"                           return tok(LT);
+"<="                          return tok(LE);
+">"                           return tok(GT);
+">="                          return tok(GE);
+"!~"                          return tok(NM);
+"in"                          return tok(IN);
+"member"                      return tok(MEMBER);
 [+-]?[0-9]+                   { yylval.num.strval = xstrdup(yytext);
 				yylval.num.intval = atoi(yytext);
 				return tok(NUMBER); }
 [A-Za-z_][A-Za-z0-9_-]*       { yylval.str = xstrdup(yytext);
 				return tok(IDENT); }
-[A-Za-z_/+-][A-Za-z0-9_/+-]*  { yylval.str = xstrdup(yytext);
-				return tok(STRING); }
+[^ \t\n\\\"!=<>(){}\[\]\$%&|~#]+ { yylval.str = xstrdup(yytext);
+			  	   return tok(STRING); }
 \$[A-Za-z_][A-Za-z_0-9-]*     { yylval.str = xstrdup(yytext);
 				return tok(STRING);  }
 \$\{[A-Za-z_][A-Za-z_0-9-]*\} { yylval.str = xstrdup(yytext);
@@ -440,17 +434,13 @@ static int noinc(void);
 \"[^\\\"\n]*\\\n              { stringbuf_add_array(&sb, yytext + 1, yyleng - 3);
 				advance_line(1);
 				pushstart(QSTR); }
-\"[^\\\"\n]*\\[0-9]{3}        { stringbuf_add_array(&sb, yytext + 1, yyleng - 5);
-				stringbuf_add_char(&sb,
-						   strtoul(yytext + yyleng - 3,
-							   NULL, 8));
+\"[^\\\"\n]*\\[0-9]{3}        { stringbuf_add_escape_octal(&sb,
+							   yytext + 1,
+							   yyleng - 1);
 				pushstart(QSTR); }
-\"[^\\\"\n]*\\0[xX][a-fA-F0-9]{2} {
-				stringbuf_add_array(&sb, yytext + 1, yyleng - 6);
-				stringbuf_add_char(&sb,
-						   strtoul(yytext + yyleng - 2,
-							   NULL, 16));
-				pushstart(QSTR); }
+\"[^\\\"\n]*\\[xX][a-fA-F0-9]{2} { stringbuf_add_escape_hex(&sb,
+							    yytext + 1,
+							    yyleng - 1);				           pushstart(QSTR); }
 [^}\"\$%]+                    { stringbuf_add_array(&sb, yytext, yyleng); }
 .                             { straychar(yytext[0]);
 	                        stringbuf_add_char(&sb, yytext[0]); }
@@ -479,7 +469,6 @@ straychar(int c)
 	static char *start_name[] = {
 		[INITIAL] = N_("looking for rush version clause"),
 		[NORMAL] =  N_("looking for rule"),
-		[INMATCH] = N_("scanning match expression"),
 		[ARGS] = N_("scanning arguments"),
 		[QSTR] = N_("scanning quoted string"),
 		[VAR] = N_("scanning variable reference")
