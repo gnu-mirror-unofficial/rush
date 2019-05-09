@@ -72,6 +72,7 @@ sub scan {
     my $line = 0;
     my $start_line;
     my $cont_lines = 0;
+    my $version;
     while (<$fd>) {
 	chomp;
 
@@ -88,23 +89,48 @@ sub scan {
 
 	s/\s+$//;
 	s/^\s+//;
+	if (/^$/) {
+	    next;
+	} elsif (!defined($version)) {
+	    if (/^rush\s+(\d+\.\d+)$/) {
+		$version = $1;
+		die "unsupported version: $version" unless $version eq '2.0';
+		$version = 2;
+		next;
+	    } else {
+		$version = 1;
+	    }
+	}
 
 	if (/^include\s+(.+)$/) {
+	    my $s = $1;
+	    if ($version == 2) {
+		$s = dequote($s);
+	    }
 	    scan($1);
 	    next;
 	}
 
 	if (s/^exit\s+\d+\s+//) {
-	    if (s/^\@\@/\@/) {
-		# ok
-	    } elsif (/^@/) {
+	    if ($version == 1) {
+		if (s/^\@\@/\@/) {
+		    # ok
+		} elsif (/^@/) {
+		    next
+	        }
+	    } elsif (!/^\".*\"$/) {
 		next
 	    }
 	} elsif (!s/^(usage|nologin|config)-error\s+//) {
 	    next;
 	}
 
-	s{"}{\\"}g;
+	if ($version == 1) {
+	    s{([\\"])}{\\$1}g
+	} else {
+	    s/^\"(.*)\"$/$1/
+	}
+
 	printf("#: %s:%d\n", $filename, $start_line);
 	printf("msgid \"%s\"\n", $_);
 	printf("msgstr \"\"\n\n");
