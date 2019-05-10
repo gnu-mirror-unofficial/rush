@@ -153,12 +153,25 @@ struct cfstream_file {
 
 #define CFSTREAM_BUFSIZE 1024
 
+static CFSTREAM *
+cfstream_create(int fd, size_t bs)
+{
+	CFSTREAM *cf = xmalloc(sizeof(*cf));
+	cf->fd = fd;
+	cf->buffer = xmalloc(bs);
+	cf->size = bs;
+	cf->level = 0;
+	cf->pos = 0;
+	cf->eol = 0;
+	cf->eof = 0;
+	return cf;
+}
+
 CFSTREAM *
 cfstream_open_file(char const *filename)
 {
 	int fd;
 	struct stat st;
-	CFSTREAM *cf;
 
 	if (stat(filename, &st)) {
 		die(system_error, NULL, _("cannot stat file %s: %s"),
@@ -172,31 +185,22 @@ cfstream_open_file(char const *filename)
 		die(system_error, NULL, _("cannot open file %s: %s"),
 		    filename, strerror(errno));
 
-	cf = xmalloc(sizeof(*cf));
-	cf->fd = fd;
-	cf->buffer = xmalloc(CFSTREAM_BUFSIZE);
-	cf->size = CFSTREAM_BUFSIZE;
-	cf->level = 0;
-	cf->pos = 0;
-	cf->eol = 0;
+	return cfstream_create(fd, CFSTREAM_BUFSIZE);
+}
 
-	return cf;
+CFSTREAM *
+cfstream_open_stdin(void)
+{
+	return cfstream_create(0, CFSTREAM_BUFSIZE);
 }
 
 CFSTREAM *
 cfstream_open_mem(char const *buffer, size_t len)
 {
-	CFSTREAM *cf;
-
-	cf = xmalloc(sizeof(*cf));
-	cf->fd = -1;
-	cf->buffer = xmalloc(len);
+	CFSTREAM *cf = cfstream_create(-1, len);
 	memcpy(cf->buffer, buffer, len);
 	cf->size = len;
 	cf->level = len;
-	cf->pos = 0;
-	cf->eol = 0;
-
 	return cf;
 }
 
@@ -222,6 +226,7 @@ cfstream_rewind(CFSTREAM *cf)
 		cf->level = cf->size;
 	cf->pos = 0;
 	cf->eol = 0;
+	cf->eof = 0;
 }
 
 static inline size_t
@@ -235,7 +240,7 @@ cfstream_avail(CFSTREAM *cf)
 {
 	size_t avail = cfstream_buf_avail(cf);
 	if (avail == 0) {
-		if (cf->fd == -1)
+		if (cf->eof || cf->fd == -1)
 			return 0;
 		else {
 			ssize_t rc;
@@ -247,8 +252,10 @@ cfstream_avail(CFSTREAM *cf)
 				    strerror(errno));
 			cf->level = rc;
 			cf->pos = 0;
-			if (rc == 0)
+			if (rc == 0) {
+				cf->eof = 1;
 				return 0;
+			}
 			avail = cfstream_buf_avail(cf);
 		}
 	}

@@ -55,6 +55,9 @@ AT_INIT
 
 AT_TESTED([rush])
 
+m4_include([lex.at])
+
+AT_BANNER([Base])
 m4_include([null.at])
 m4_include([qstr.at])
 m4_include([setvar.at])

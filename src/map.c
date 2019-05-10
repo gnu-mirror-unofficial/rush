@@ -280,11 +280,13 @@ rush_expand_string(const char *string, struct rush_request *req)
 		      | WRDSF_NOCMD
 		      | (expand_undefined ? 0: WRDSF_UNDEF)
 		      | WRDSF_GETVAR
-		      | WRDSF_CLOSURE;
+		      | WRDSF_CLOSURE
+		      | WRDSF_OPTIONS;
 	char *result;
 
 	ws.ws_getvar = getvar;
 	ws.ws_closure = req;
+	ws.ws_options = WRDSO_BSKEEP_QUOTE;
 	if (req->var_kv) {
 		ws.ws_env = (const char **)req->var_kv;
 		wsflags |= WRDSF_ENV|WRDSF_ENV_KV;

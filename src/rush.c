@@ -21,6 +21,7 @@ extern char **environ;
 
 char *rush_config_file = CONFIG_FILE;
 int lint_option = 0;
+int scanner_test = 0;
 unsigned sleep_time = 5;
 unsigned debug_level;
 int debug_option;
@@ -1042,6 +1043,16 @@ main(int argc, char **argv)
 	get_options(argc, argv);
 	cfgram_debug(parser_traces > 0);
 	cflex_debug(parser_traces > 1);
+
+	if (scanner_test) {
+		cfck_keyword("none");
+		if (argc > optind + 1) {
+			logmsg(LOG_ERR, "%s", _("too many arguments"));
+			exit(1);
+		}
+		cflex_test(argv[optind]);
+		exit(0);
+	}
 
 	if (argc == optind + 1) {
 		if (lint_option)

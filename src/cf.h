@@ -81,10 +81,12 @@ typedef struct cfstream {
 	size_t size;   /* Size of buffer */
 	size_t level;  /* Number of data bytes available in the buffer */
 	size_t pos;    /* Current read position */
-	int eol;       /* 1 if the last character read was \n, 0 otherwise */
+	unsigned eol:1;/* 1 if the last character read was \n, 0 otherwise */
+	unsigned eof:1;/* 1 if end of file has been reached */
 } CFSTREAM;
 
 CFSTREAM *cfstream_open_file(char const *filename);
+CFSTREAM *cfstream_open_stdin(void);
 CFSTREAM *cfstream_open_mem(char const *buffer, size_t len);
 ssize_t cfstream_read(CFSTREAM *, char *, size_t);
 void cfstream_close(CFSTREAM *);
@@ -101,6 +103,8 @@ int cfstream_same_file(CFSTREAM *cf, struct stat const *st);
 
 void cflex_debug(int v);
 void cfgram_debug(int v);
+void cflex_test(char const *file);
+void dumpstr(char const *string, FILE *fp);
 
 void cflex_setup(CFSTREAM *cf, char const *filename, int line);
 int cflex_include(char const *filename, struct cfloc const *loc);

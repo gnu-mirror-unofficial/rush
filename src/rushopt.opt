@@ -34,6 +34,12 @@ BEGIN
 	lint_option = 1;
 END
 
+OPTION(,T,,
+       [<Scanner test.>])
+BEGIN
+       scanner_test = 1;
+END
+
 OPTION(trace,x,,
        [<Print grammar and lexical analyzer traces>])
 BEGIN

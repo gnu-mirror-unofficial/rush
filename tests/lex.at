@@ -1,0 +1,126 @@
+# This file is part of GNU Rush. 
+# Copyright (C) 2019 Sergey Poznyakoff
+#
+# GNU Rush is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3, or (at your option)
+# any later version.
+#
+# GNU Rush is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with GNU Rush.  If not, see <http://www.gnu.org/licenses/>.
+
+AT_BANNER([Lexical structure])
+
+m4_pushdef([LEXTEST],
+[AT_SETUP([$1])
+AT_KEYWORDS([lex])
+AT_CHECK(
+[rush -T <<'EOT'
+$2[]dnl
+EOT
+],
+[0],
+[$3])
+AT_CLEANUP
+])
+
+LEXTEST([identifier],
+[rule test
+],
+[state 2, stdin:1.1-4: 'rule'
+state 2, stdin:1.6-9: IDENT test
+state 1, stdin:1.10-2: EOL
+])
+
+LEXTEST([unquoted string],
+[rule /un.quoted,string&()
+],
+[state 2, stdin:1.1-4: 'rule'
+state 2, stdin:1.6-22: STRING "/un.quoted,string"
+state 2, stdin:1.23: '&'
+state 2, stdin:1.24: '('
+state 2, stdin:1.25: ')'
+state 1, stdin:1.26-2: EOL
+])
+
+LEXTEST([number],
+[rule 10
+rule +10
+rule -10
+],
+[state 2, stdin:1.1-4: 'rule'
+state 2, stdin:1.6-7: NUMBER 10
+state 1, stdin:1.8-2: EOL
+state 2, stdin:2.1-4: 'rule'
+state 2, stdin:2.6-8: NUMBER +10
+state 1, stdin:2.9-3: EOL
+state 2, stdin:3.1-4: 'rule'
+state 2, stdin:3.6-8: NUMBER -10
+state 1, stdin:3.9-4: EOL
+])
+
+LEXTEST([quoted string],
+[rule "input string"
+],
+[state 2, stdin:1.1-4: 'rule'
+state 2, stdin:1.6-19: STRING "input string"
+state 1, stdin:1.20-2: EOL
+])
+
+LEXTEST([escapes in quoted string],
+[rule "simple\btext\040with e\163capes \%3"
+],
+[state 2, stdin:1.1-4: 'rule'
+state 2, stdin:1.6-42: STRING "simple\btext with escapes \\%3"
+state 1, stdin:1.43-2: EOL
+])
+
+LEXTEST([multiline string],
+[rule "multiline\
+ text\
+"
+],
+[state 2, stdin:1.1-4: 'rule'
+state 2, stdin:1.6-3.1: STRING "multiline text"
+state 1, stdin:3.2-4: EOL
+])
+
+LEXTEST([complex multiline string],
+[rule "a \"com\x70lex\r\n\
+multiline\"\r\n\
+text"
+],
+[state 2, stdin:1.1-4: 'rule'
+state 2, stdin:1.6-3.5: STRING "a \"complex\r\nmultiline\"\r\ntext"
+state 1, stdin:3.6-4: EOL
+])
+
+LEXTEST([invalid escape sequence],
+[rule "bad \&escape"
+],
+[state 2, stdin:1.1-4: 'rule'
+state 2, stdin:1.6-19: STRING "bad \\&escape"
+state 1, stdin:1.20-2: EOL
+])
+
+LEXTEST([unquoted variable],
+[rule $VAR
+],
+[state 2, stdin:1.1-4: 'rule'
+state 2, stdin:1.6-9: STRING "$VAR"
+state 1, stdin:1.10-2: EOL
+])
+
+LEXTEST([unquoted variable with defaults],
+[rule ${VAR:-"string\
+\145\x6et ${SUBVAR=:} \"test\""}
+],
+[state 2, stdin:1.1-4: 'rule'
+state 2, stdin:1.6-2.32: STRING "${VAR:-\"string\\145\\x6et ${SUBVAR=:} \\\"test\\\"\"}"
+state 1, stdin:2.33-3: EOL
+])

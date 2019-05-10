@@ -114,6 +114,8 @@ popstart(void)
 	free(tos);
 }
 
+static int in_var(void);
+
 /* Read next chunk of the input. */
 #undef YY_INPUT
 #define YY_INPUT(buf,result,max_size)		\
@@ -128,11 +130,20 @@ popstart(void)
    rush-specific \% escape.
    Unrecognized escape sequence is reported and transferred varbatim
    to the output.
+   Within a ${V:-""} construct, only "\\n" and "\%" are processed, the rest
+   is retained. It will be expanded by wordsplit.
 */
 static void
 stringbuf_add_escape_dfl(struct stringbuf *sb, char const *text, size_t leng)
 {
 	int c = text[leng - 1];
+
+	if (in_var()) {
+		if (c != '\n' && c != '%') {
+			stringbuf_add_array(sb, text, leng);
+			return;
+		}
+	}
 
 	stringbuf_add_array(sb, text, leng - 2);
 	switch (c) {
@@ -177,20 +188,32 @@ stringbuf_add_escape_dfl(struct stringbuf *sb, char const *text, size_t leng)
 	}
 }
 
-/* TEXT ends with a '\' followed by a 3-byte octal number. */
+/* TEXT ends with a '\' followed by a 3-byte octal number.
+   No expansion occurs within a ${V:-""} construct.
+*/
 static void
 stringbuf_add_escape_octal(struct stringbuf *sb, char const *text, size_t leng)
 {
-	stringbuf_add_array(sb, text, leng - 4);
-	stringbuf_add_char(sb, strtoul(text + leng - 3, NULL, 8));
+	if (in_var()) {
+		stringbuf_add_array(sb, text, leng);
+	} else {
+		stringbuf_add_array(sb, text, leng - 4);
+		stringbuf_add_char(sb, strtoul(text + leng - 3, NULL, 8));
+	}
 }
 
-/* TEXT ends with a '\x' followed by a 2-byte hex number. */
+/* TEXT ends with a '\x' followed by a 2-byte hex number.
+   No expansion occurs within a ${V:-""} construct.
+*/
 static void
 stringbuf_add_escape_hex(struct stringbuf *sb, char const *text, size_t leng)
 {
-	stringbuf_add_array(sb, text, leng - 4);
-	stringbuf_add_char(sb, strtoul(text + leng - 2, NULL, 16));
+	if (in_var()) {
+		stringbuf_add_array(sb, text, leng);
+	} else {
+		stringbuf_add_array(sb, text, leng - 4);
+		stringbuf_add_char(sb, strtoul(text + leng - 2, NULL, 16));
+	}
 }
 
 /* Input_Stream context stack */
@@ -324,7 +347,7 @@ static int noinc(void);
   	        return tok(IDENT);
         }
 		}
-.       return yytext[0];
+.       return tok(yytext[0]);
 }
 
  /* ARGS: Processing arguments to a configuration statement.
@@ -385,17 +408,21 @@ static int noinc(void);
 						    yytext + 1, yyleng - 1);
 			   pushstart(QSTR); }
 "=~"                       return tok(XF);
-.                          return yytext[0];
+.                          return tok(yytext[0]);
 }
 
  /* QSTR: Composing a quoted string.
   */
 <QSTR>{
 [^\\\"\n]*\"             { stringbuf_add_array(&sb, yytext, yyleng - 1);
-	                   stringbuf_finish(&sb);
-			   yylval.str = sb.buffer;
 			   popstart();
-			   return tok(STRING); }
+	                   if (YY_START == ARGS) {
+	                           stringbuf_finish(&sb);
+			           yylval.str = sb.buffer;
+			           return tok(STRING);
+			   } else
+				   stringbuf_add_char(&sb, yytext[yyleng-1]);
+                         }
 [^\\\"\n]*\\[0-9]{3}     { stringbuf_add_escape_octal(&sb, yytext, yyleng); }
 [^\\\"\n]*\\[xX][a-fA-F0-9]{2} {
 	                   stringbuf_add_escape_hex(&sb, yytext, yyleng); }
@@ -409,8 +436,11 @@ static int noinc(void);
     a default value (e.g. ${X:-0}).
   */
 <VAR>{
-\}                            { popstart();
+\}                            { stringbuf_add_char(&sb, yytext[0]);
+	                        popstart();
 				if (YY_START != VAR) {
+					stringbuf_finish(&sb);
+					yylval.str = sb.buffer;
 					return tok(STRING);
 				}
 			      }
@@ -420,27 +450,12 @@ static int noinc(void);
 				stringbuf_add_array(&sb, yytext, yyleng);
 				pushstart(VAR); }
 %[0-9]                        { stringbuf_add_array(&sb, yytext, yyleng); }
-\"[^\\\"\n]*\"                { stringbuf_add_array(&sb, yytext + 1, yyleng - 2); }
-\"[^\\\"\n]*\\[abfnrtv]       { stringbuf_add_array(&sb, yytext + 1, yyleng - 3);
-				stringbuf_add_char(&sb,
-						   wordsplit_c_unquote_char(yytext[yyleng-1]));
+\"[^\\\"\n]*\"                { stringbuf_add_array(&sb, yytext, yyleng); }
+\"[^\\\"\n]*\\.|\"[^\\\"\n]*\\\n { stringbuf_add_escape_dfl(&sb, yytext, yyleng);
+                                   pushstart(QSTR); }
+\"[^\\\"\n]*\\[0-9]{3}        { stringbuf_add_escape_octal(&sb, yytext, yyleng);
 				pushstart(QSTR); }
-\"[^\\\"\n]*\\\"              { stringbuf_add_array(&sb, yytext + 1, yyleng - 3);
-				stringbuf_add_char(&sb, '"');
-				pushstart(QSTR); }
-\"[^\\\"\n]*\\\\              { stringbuf_add_array(&sb, yytext + 1, yyleng - 3);
-				stringbuf_add_char(&sb, '\\');
-				pushstart(QSTR); }
-\"[^\\\"\n]*\\\n              { stringbuf_add_array(&sb, yytext + 1, yyleng - 3);
-				advance_line(1);
-				pushstart(QSTR); }
-\"[^\\\"\n]*\\[0-9]{3}        { stringbuf_add_escape_octal(&sb,
-							   yytext + 1,
-							   yyleng - 1);
-				pushstart(QSTR); }
-\"[^\\\"\n]*\\[xX][a-fA-F0-9]{2} { stringbuf_add_escape_hex(&sb,
-							    yytext + 1,
-							    yyleng - 1);				           pushstart(QSTR); }
+\"[^\\\"\n]*\\[xX][a-fA-F0-9]{2} { stringbuf_add_escape_hex(&sb, yytext, yyleng);				   pushstart(QSTR); }
 [^}\"\$%]+                    { stringbuf_add_array(&sb, yytext, yyleng); }
 .                             { straychar(yytext[0]);
 	                        stringbuf_add_char(&sb, yytext[0]); }
@@ -461,6 +476,14 @@ noinc(void)
 	}
 	return 0;
 }             
+
+/* Return true if the quoted string being expanded occurs within a
+   variable construct -- ${V:-"string"} */
+static int
+in_var(void)
+{
+	return (start_tos && start_tos->start == VAR);
+}
 
 /* Report a stray character C */
 static void
@@ -658,3 +681,48 @@ parse_old_rc(void)
 	return cfparse_old(cf, filename, 1);
 }
 
+void
+cflex_test(char const *filename)
+{
+	int c;
+	CFSTREAM *cf;
+
+	if (filename) {
+		cf = cfstream_open_file(filename);
+	} else {
+		cf = cfstream_open_stdin();
+		filename = "stdin";
+	}
+	cflex_setup(cf, filename, 1);
+	BEGIN(NORMAL);
+	while ((c = yylex()) != 0) {
+		printf("state %d, ",YY_START);
+		YY_LOCATION_PRINT(stdout, yylloc);
+		printf(": ");
+		switch (c) {
+		case STRING:
+			printf("STRING ");
+			dumpstr(yylval.str, stdout);
+			break;
+		case IDENT:
+			printf("IDENT %s", yylval.str);
+			break;
+		case NUMBER:
+			printf("NUMBER %s", yylval.num.strval);
+			break;
+		case ATTRIB:
+			printf("ATTRIB %s", yytext);
+			break;
+		case GLATTRIB:
+			printf("GLATTRIB %s", yylval.global_attrib->name);
+			break;
+		case EOL:
+			printf("EOL");
+			break;
+		default:
+			printf("'%s'", yytext);
+		}
+		putchar('\n');
+	}
+	exit(0);
+}

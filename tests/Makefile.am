@@ -75,6 +75,7 @@ TESTSUITE_AT = \
   qstr.at\
   inc00.at\
   inc01.at\
+  lex.at\
   legacy/argc.at\
   legacy/backref.at\
   legacy/chdir.at\

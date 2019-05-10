@@ -83,31 +83,37 @@ dump_null(char const *id, struct json_dumper *dmp)
 	fputs("null", dmp->fp);
 }
 
-static void
-dump_string_data(char const *string, struct json_dumper *dmp)
+void
+dumpstr(char const *string, FILE *fp)
 {
 	int c;
 
+	fputc('\"', fp);
+	for (; (c = *string) != 0; string++) {
+		int ec;
+		if (c == '\\' || c == '\"') {
+			fputc('\\', fp);
+			fputc(c, fp);
+		} else if (c_isprint(c))
+			fputc(c, fp);
+		else if ((ec = wordsplit_c_quote_char(c)) != 0) {
+			fputc('\\', fp);
+			fputc(ec, fp);
+		} else {
+			fprintf(fp, "\\%03o", c);
+		}
+	}
+	fputc('\"', fp);
+}
+
+static void
+dump_string_data(char const *string, struct json_dumper *dmp)
+{
 	if (!string) {
 		fputs("null", dmp->fp);
 		return;
 	}
-	fputc('\"', dmp->fp);
-	for (; (c = *string) != 0; string++) {
-		int ec;
-		if (c == '\\' || c == '\"') {
-			fputc('\\', dmp->fp);
-			fputc(c, dmp->fp);
-		} else if (c_isprint(c))
-			fputc(c, dmp->fp);
-		else if ((ec = wordsplit_c_quote_char(c)) != 0) {
-			fputc('\\', dmp->fp);
-			fputc(ec, dmp->fp);
-		} else {
-			fprintf(dmp->fp, "\\%03o", c);
-		}
-	}
-	fputc('\"', dmp->fp);
+	dumpstr(string, dmp->fp);
 }
 
 static void
