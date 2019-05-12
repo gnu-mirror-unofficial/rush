@@ -377,6 +377,13 @@ expr       : string '~' regex
 		     $$->v.cmp.larg = $1;
 		     $$->v.cmp.rarg.strv = $3.argv;
 	     }
+           | MEMBER string
+	     {
+		     $$ = new_test_node(test_member);
+		     $$->v.groups = xcalloc(2, sizeof($$->v.groups[0]));
+		     $$->v.groups[0] = $2;
+		     $$->v.groups[1] = NULL;
+	     }
 	   | MEMBER strlist
 	     {
 		     $$ = new_test_node(test_member);
