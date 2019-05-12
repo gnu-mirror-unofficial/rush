@@ -36,7 +36,7 @@
 @copying
 Published by the Free Software Foundation,
 51 Franklin Street, Fifth Floor,
-Boston, MA 02110-1301 USA 
+Boston, MA 02110-1301 USA
 
 Copyright @copyright{} 2008-2019 Sergey Poznyakoff
 
@@ -45,9 +45,9 @@ under the terms of the GNU Free Documentation License, Version 1.3 or
 any later version published by the Free Software Foundation; with no
 Invariant Sections, no Front-Cover Texts, and no Back-Cover Texts.
 A copy of the license is included in the section entitled ``GNU Free
-Documentation License''. 
+Documentation License''.
 @end copying
-                                   
+
 @titlepage
 @title GNU Rush -- a restricted user shell
 @subtitle version @value{VERSION}, @value{UPDATED}
@@ -99,37 +99,54 @@ Appendices
 
 Configuration File
 
-* Syntax::                      
-* Rule::                        
-* Include::                     
-* Debugging::                   
-* Regex::                       
-* Sleep Time::                  
+* Lexical Structure::
+* Syntax::
+* Global::
+* Rule::
+* Include::
+
+The @code{global} statement
+
+* Expansion control::
+* Debugging::
+* sleep-time::
 * Error Messages::
-
-Syntax
-
-* Quoted Strings::
+* regexp::
+* include-security::
+* Accounting control::
 
 Rule
 
-* Conditions::                  
-* Transformations::             
-* System Actions::              
-* Environment::                 
-* Fall-through::                
-* Accounting and Forked Mode::  
-* Notification::                
+* Request::
+* Matching Conditions::
+* Modifying variables::
+* Transformations::
+* System Actions::
+* Environment::
+* Fall-through::
+* Accounting and Forked Mode::
+* Notification::
 * Exit::
 * Interactive::
 * Localization::
 
-Transformations
+The Request
 
-* set::
-* delete::
-* transform::
-* map::
+* Positional variables::
+* Request variables::
+* Variable expansion::
+
+Matching Conditions
+
+* Comparisons::
+* Membership operators::
+* Boolean expressions::
+
+Modifying variables
+
+* set::             Set variable
+* unset::           Unset variable
+* map::             Use file lookup to modify variable
 
 Localization
 
@@ -145,6 +162,10 @@ Usage Tips
 * svn::
 * git::
 * notification example::
+
+Test Mode
+
+* dump mode::
 
 The @code{rushwho} utility.
 
@@ -166,10 +187,10 @@ Accounting Database
 @node Intro
 @chapter Introduction
   GNU Rush is a Restricted User Shell, designed for sites that provide
-limited remote access to their resources, such as svn or git  
+limited remote access to their resources, such as svn or git
 repositories, scp, or the like.  Using a sophisticated configuration
 file, GNU Rush gives you complete control over the command lines that
-users execute, as well as over the usage of system resources, such as 
+users execute, as well as over the usage of system resources, such as
 virtual memory, CPU time, etc.
 
 @node Operation
@@ -193,7 +214,7 @@ for the user who executes @command{rush} are said to form a
 @cindex conditions
 @cindex actions
   After startup, @command{rush} reads a set of @dfn{rules} from its
-configuration file.  Each rule consists of conditions
+configuration file.  Each rule consists of matching conditions
 and actions.  @dfn{Conditions} decide whether the request matches
 the rule.  They can include regular expression matching against entire
 command line or particular words thereof, comparisons of user name or
@@ -231,14 +252,13 @@ following configuration file rule:
 @smallexample
 @group
 rule sftp
-  # Conditions:
-  command ^.*/sftp-server
-  uid >= 100
+  # Matching condition
+  match $uid >= 100 && $command ~ "^.*/sftp-server"
   # Actions:
-  transform[0] s,.*,bin/sftp-server,
+  set [0] = "bin/sftp-server"
   umask 002
-  chroot ~
-  chdir /
+  chroot "~"
+  chdir "/"
 @end group
 @end smallexample
 
@@ -247,34 +267,19 @@ serves as a rule tag, used for diagnostic messages and for accounting.
 
   Lines beginning with @samp{#} are comments, they are intended for a
 human reader and are ignored by @code{rush}.
- 
-  The two statements that follow the comment, @code{command} and
-@code{uid}, define conditions that must be met for this rule to become
-active.  The @code{command} statement introduces a regular expression
-to match with the command line.  In this example, the command line must
-begin with @samp{/sftp-server}, optionally preceded by arbitrary
-directory components. 
 
-  The @code{uid} statement tells that this rule applies only to users
-whose @acronym{UID}s are greater than or equal to 100. 
+  The @code{match} statement, defines condition that must be met for
+this rule to become active.  In this example it requests that the
+UID of the requesting user be greater than or equal to 100, and the
+command line begin with @samp{/sftp-server}, optionally preceded by
+arbitrary directory components.
 
   Subsequent clauses define actions associated with this rule.
 
-  The @code{transform[0]} clause contains instructions on how to
-modify the first argument of the command line (i.e. the command
-name).  These instructions are in the form of @code{sed} replace
-expression (@pxref{Transformations, transformation expression}).  The
-expression in our example instructs GNU Rush to replace the command name with
-@samp{bin/sftp-server}@footnote{In this particular case, the
-@code{set} statement, introduced in GNU Rush version 1.6, is probably more
-appropriate:
-
-@smallexample
-  set[0] bin/sftp-server
-@end smallexample
-
-@xref{set}, for details.
-}.
+  The @code{set} clause contains instructions on how to
+modify the first argument of the command line.  Argument indices start
+at 0, so @samp{[0]} refers to the command name.  The expression in our example
+instructs GNU Rush to replace it with @samp{bin/sftp-server}.
 
   The @code{umask} clause sets the file creation mask.
 
@@ -287,7 +292,7 @@ after installing the chroot.
 @node Configuration File
 @chapter Configuration File
 @flindex rush.rc
-  The configuration file is called @file{rush.rc} and is located in
+  The configuration file @file{rush.rc} is located in
 @file{/usr/local/etc} by default.@footnote{The exact location of the
 configuration file is defined when configuring the package.  See the
 file @file{INSTALL} in the GNU Rush source directory for more information}.
@@ -321,54 +326,74 @@ execution.
 Any of these tests can be disabled using the
 @command{--security-check} option (@pxref{--security-check}).
 
+  As of version @value{VERSION}, @command{rush} supports two distinct
+configuration file formats.
+
+@cindex legacy syntax
+@cindex syntax, legacy
+  The @dfn{legacy} configuration format is the one used in rush
+versions up to 1.9.  It is still supported to facilitate transition of
+existing installations to the new syntax.  Its support will be removed
+in future versions.  The legacy syntax is described in detail in
+@uref{http://www.gnu.org.ua/software/rush/manual/1.x}.
+
+  This manual describes new configuration file format.
+
 @menu
-* Syntax::                      
-* Rule::                        
-* Include::                     
-* Debugging::                   
-* Regex::                       
-* Sleep Time::                  
-* Error Messages::
+* Lexical Structure::
+* Syntax::
+* Global::
+* Rule::
+* Include::
 @end menu
 
-@node Syntax
-@section Syntax
-@cindex syntax, configuration files
-@cindex configuration file syntax
-  Configuration file consists of statements and comments.  
+@node Lexical Structure
+@section Lexical Structure of the Configuration File
+  Configuration file consist of tokens separated by arbitrary amount
+of whitespace characters: horizontal spaces and tabs.  Except when
+enclosed in double quotes, the @samp{#} character introduces an inline
+comment: the character itself and any material following it up to the
+end of the physical line is ignored.  Comments are treated as newlines.
 
-  A @dfn{comment} is any line whose first non-whitespace character is
-@samp{#}.  Empty lines and comments are ignored.
+@anchor{word}
+@anchor{token}
+The following classes of tokens are recogized.
 
-  A @dfn{statement} consists of a keyword and optional argument,
-separated by any amount of whitespace.  Depending on the keyword, the
-statement may treat its argument as a single value or as multiple values.
-For example, the @code{command} instruction takes a single 
-value as its argument, so parsing the statement
+@table @dfn
+@item Newlines
+A newline character (ASCII 10) terminates a statement.  If immediately
+preceded by a backslash, both backslash and newline are removed and
+the following line is treated as continuation of the current line.
+This allows for splitting exceedingly long statements over several
+physical lines.
 
-@smallexample
-command ^scp -t /incoming/
-@end smallexample
+@cindex identifiers, configuration
+@item Identifiers
+Identifiers begin with a letter and consist of letters, digits,
+underscores and dashes.  They serve as keywords and variable names.
 
-@noindent
-results in keyword @samp{command} and value @samp{^scp -t /incoming/}.
+@item Decimal numbers
+A sequence of decimal digits, optionally preceded by a minus or plus
+sign.
 
-If the keyword requires multiple values, its argument is split into
-words using the following algorithm:
+@cindex unquoted strings
+@item Unquoted strings
+An unquoted string is any contiguous sequence of any characters,
+except newlines, whitespace and the following special characters:
+@samp{\}, @samp{"}, @samp{!}, @samp{=}, @samp{<}, @samp{>}, @samp{(},
+@samp{)}, @samp{@{}, @samp{@}}, @samp{[}, @samp{]}, @samp{$},
+@samp{%}, @samp{&}, @samp{|}, @samp{~}, @samp{#}.
 
-@enumerate 1
-@item Any sequence of one or more non-whitespace characters is a word.
-@item Any sequence of characters enclosed in single (@samp{'}) or
-double-quotes (@samp{"}) is a word.
-@item Words are separated by any amount of white space.
-@item If the keyword expects s-expressions (@pxref{s-expression}),
-these are treated as words, even if they contain white space.
-@end enumerate
+@cindex quoted strings
+@item Quoted strings
+A quoted string is a sequence of characters enclosed in
+double-quotes.  Quoted strings are subject to backslash
+interpretation, backreference interpretation and variable
+expansion.
 
-Arguments, obtained as a result of rules (1) and (2) are subject to
-@dfn{backslash interpretation}, during which the following @dfn{escape
-sequences} are replaced with single characters, as described in the
-table below:  
+@cindex backslash interpretation
+During the @dfn{backslash interpretation}, the @dfn{escape sequences}
+are recognized and replaced as per table below:
 
 @float Table, backslash-interpretation
 @caption{Backslash escapes}
@@ -381,99 +406,411 @@ table below:
 @item \r @tab Carriage return character (@acronym{ASCII} 13)
 @item \t @tab Horizontal tabulation character (@acronym{ASCII} 9)
 @item \v @tab Vertical tabulation character (@acronym{ASCII} 11)
+@item \\ @tab Single backslash character
+@item \" @tab Double-quote
+@item \% @tab Percent character
 @end multitable
 @end float
 
-  Any escape sequence not listed in this table is replaced with its
-second character.
+The backslash immediately followed by newline character is removed.
+When followed by any other character except as listed above, both the
+backslash and the character are retained verbatim.
 
-  Statements are delimited by newline characters.  Length of a
-statement line is not limited.  To improve readability, long
-statements may be split over several lines by using backslash
-(@samp{\}) as a last character on line.  Thus, the following statement:
+@cindex backreference interpretation
+@anchor{backreference}
+During @dfn{backreference interpretation}, references to parenthesized
+groups in regular expression are replaced with the actual content of
+the corresponding group in the most recently matched string. A
+reference is @samp{%@{@var{n}@}} where @var{n} is a decimal number. If
+@var{n} is one digit, curly braces can be omitted: @samp{%@var{n}}.
+If the @samp{%} character results from previous backslash
+interpretation, no backreference interpretation occurs.
 
-@smallexample
-usage-error Contact your\
- system administrator
-@end smallexample
+Strings used in the left-hand side of a comparison expression are
+subject to variable expansion.  This is discussed in detail in
+@ref{Variable expansion}.
 
-@noindent
-is equivalent to:
+@item Variable references
+Variable references consist of a @samp{$} sign, followed by the
+positional argument number or variable name, optionally enclosed in
+curly braces.  Positional arguments greater than 9 must be enclosed in
+curly braces. The variable name must follow the rules for valid
+identifiers: it must begin with a letter and consist of letters,
+digits and underscores.  Variable name in curly braces can be followed
+by @samp{-}, @samp{=}, @samp{?}, or @samp{+}, optionally preceded by
+@samp{:} as summarized in the table below:
 
-@smallexample
-usage-error Contact your system administrator
-@end smallexample
+@float Table, variable references
+@caption{Variable reference}
+@multitable @columnfractions 0.30 .5
+@item Reference @tab Meaning
+@item $@{@var{var}:-@var{word}@} @tab  Use Default Values
+@item $@{@var{var}:=@var{word}@} @tab  Assign Default Values
+@item $@{@var{var}:?@var{word}@} @tab  Display Error if Null or Unset
+@item $@{@var{var}:+@var{word}@} @tab  Use Alternate Value
+@end multitable
+@end float
+
+Where @var{word} stands for any valid token as described in this
+section.  @xref{Variable expansion}, for a detailed discussion of
+these forms and their meaning.
+
+@anchor{operator}
+@item Comparison and boolean operators
+These are:
+
+@float Table, Operators
+@caption{Operators}
+@multitable @columnfractions 0.30 .5
+@item @samp{&&}      @tab Boolean @dfn{and}
+@item @samp{||}      @tab Boolean @dfn{or}
+@item @samp{!}       @tab Boolean negation
+@item @samp{==}      @tab Equality (string or numeric)
+@item @samp{!=}      @tab Inequality (string or numeric)
+@item @samp{<}       @tab Less than
+@item @samp{<=}      @tab Less than or equal to
+@item @samp{>}       @tab Greater than
+@item @samp{>=}      @tab Greater than or equal to
+@item @samp{~}       @tab Regexp matching
+@item @samp{!~}      @tab Negated regexp matching
+@item @samp{in}      @tab Membership in set of strings
+@item @samp{member}  @tab Membership in UNIX group
+@item @samp{=}       @tab Assignment
+@item @samp{=~}      @tab Regular expression substitution
+@end multitable
+@end float
+
+@xref{Matching Conditions}, for a detailed discussion.
+@end table
+
+@node Syntax
+@section Syntax
+@cindex syntax, configuration files
+@cindex configuration file syntax
+  The @samp{rush} configuration consists of @dfn{statements}.
+
+  A @dfn{statement} consists of a keyword and optional arguments,
+separated by any amount of whitespace.  Each statement occupies one
+line in the configuration file and is terminated by newline character.
+Extremely long statements may be split across several physical lines
+by ending each line except the last with a backslash followed by a
+newline.
+
+  Statements may be separated by any amount of empty lines or comments.
+
+@cindex syntax version statement
+@cindex @code{rush}, statement
+  The first statement in a configuration file indicates the syntax
+version.  It has the following form:
+
+@example
+rush 2.0
+@end example
+
+  This statement is mandatory.  In its absence, the file will be
+treated as legacy configuration file.
+
+  Statements that follow form logical groups.  Each group begins
+with a @code{rule} or @code{global} statement.
+
+The @code{global} statement introduces global settings.  It affects
+all statements that follow it.
+
+The @code{rule} statement introduces a single @command{rush} rule,
+that defines how to process a particular command.
+
+These statements are described in the sections that follow.
+
+@node Global
+@section The @code{global} statement
+@cindex @code{global}
+  The @code{global} statement defines global settings.  The syntax is:
+
+@example
+  global
+    @var{stmt1}
+    @var{stmt2}
+    ...
+@end example
+
+where dots represent any number of statements.  The following
+subsections discuss the statements that can be used within a
+@code{global} block.
 
 @menu
-* Quoted Strings::
+* Expansion control::
+* Debugging::
+* sleep-time::
+* Error Messages::
+* regexp::
+* include-security::
+* Accounting control::
 @end menu
 
-@node Quoted Strings
-@subsection Notes on Quoted Strings
-@cindex quoted strings
+@node Expansion control
+@subsection Expansion control
 
-  The syntax of GNU Rush configuration file was designed so as to
-implement minimum amount of syntactic mark up.  Most statements
-treat their argument as a single value, even if it contains embedded
-white space.  However, leading and trailing whitespace is always
-removed.  Consider, for example, the following
-statement@footnote{@xref{match}, for information about
-@code{match} statement.}:
+The following statement controls the behavior of @command{rush} when
+an undefined variable is expanded (@pxref{Variable expansion}).
+
+@deffn {global} expand-undefined @var{bool}
+If @var{bool} is @samp{true}, expand undefined variables to empty
+value. If it is @samp{false} (the default), issue an error and abort.
+
+The following values can be used as a synonim for @samp{true}:
+@samp{yes}, @samp{on}, @samp{t}, @samp{1}.
+
+The following values can be used as a synonim for @samp{false}:
+@samp{no}, @samp{off}, @samp{nil}, @samp{0}.
+@end deffn
+
+@FIXME{Describe the recommended use of $@{VAR:-""@} to prevent errors
+during expansion}.
+
+@node Debugging
+@subsection Debugging
+@cindex debugging
+  The @code{debug} global statement sets the @dfn{debugging level} -- an
+integer value that controls the verbosity of @command{rush}:
+
+@deffn {global} debug @var{num}
+Set debugging level to @var{num}.
+@end deffn
+
+  The greater @var{num} is, the more verbose is the logging.  The
+debugging information is reported via @code{syslog} at facility
+@samp{authpriv}, priority @samp{debug}.  As of version @value{VERSION},
+the following debugging levels are supported:
+
+@cindex debugging levels
+@table @asis
+@item 1
+A minimum debugging level, and the only one whose messages are logged
+using the priority @samp{notice}.  At this level, @command{rush} only
+logs requests and rules selected to handle them.  For example:
 
 @smallexample
-  match[1] ^/sources/[^ ]+\.git$
+rush[16821]: Serving request "/usr/libexec/sftp-server"
+for sergiusz by rule sftp-savane
 @end smallexample
 
-@noindent
-Here, the argument is @samp{^/sources/[^ ]+\.git$}.  Note, that you
-must not quote it, because quotation marks would be considered part of
-the argument.
+@item 2
+List all actions executed when serving requests.
 
-There are, however, statements that take several arguments.  In these
-statements, arguments that contain embedded white space must be
-quoted.  For example, in the statement below@footnote{@xref{map}, for
-a description of @command{map} statement.} the second argument is a
-single space character.  It is quoted to prevent it from being treated
-as a delimiter:
+@item 3
+Verbosely describe parsing of the configuration file.
+@end table
 
-@smallexample
-  map[0] /etc/passwd.rush " " $@{user@} 1 7
-@end smallexample
+  More debugging levels may be implemented in future.
 
-Notice also, that arguments to these statements are subject to
-backslash interpretation (@pxref{backslash-interpretation}).
+@node sleep-time
+@subsection The @code{sleep-time} statement
 
-The table below lists all statements that take multiple arguments,
-with cross references to more in-depth explanations in the body of the
-manual.
+@deffn {global} sleep-time @var{num}
+Set the time in seconds to sleep before exiting on error.
+This statement is intended as a measure against brute-force attacks.
+Default sleep time is 5 seconds.
+@end deffn
+
+@node Error Messages
+@subsection Error Messages
+@cindex error messages
+
+@deffn {global} message @var{class} @var{text}
+Define a textual message which is returned to the remote party if an
+error of the given @var{class} occurs.
+@end deffn
+
+Valid values for @var{class} are:
 
 @table @asis
-@item user
-@xref{Conditions, user}.
-@item group
-@xref{Conditions, group}.
-@item transform @var{pattern} @var{expr}
-@itemx transform[@var{n}] @var{pattern} @var{expr}
-@xref{transform}.  
-@item map
-@xref{map}.
-@item env
-@xref{Environment}.
-@item regexp
-@xref{Regex}.
-@item include-security
-@xref{include-security}.
+@cindex @code{usage-error}
+@item usage-error
+This error is reported when @command{rush} has been invoked
+improperly.  The default text is:
+
+@smallexample
+You are not permitted to execute this command.
+@end smallexample
+
+@cindex nologin-error
+@item nologin-error
+Define a textual message which is returned to the remote user if
+there is no such user name in the password database.
+
+Default is:
+
+@smallexample
+You do not have interactive login access to this machine.
+@end smallexample
+
+@cindex @code{config-error}
+@item config-error
+Define a textual message which is returned to the remote party if the
+@command{rush} configuration file contains errors.
+
+Default is:
+
+@smallexample
+Local configuration error occurred.
+@end smallexample
+
+@cindex @code{system-error}
+@item system-error
+Define a textual message which is returned to the remote party if
+a system error occurs.
+
+Default message is:
+
+@smallexample
+A system error occurred while attempting to execute command.
+@end smallexample
 @end table
+
+@node regexp
+@subsection The @code{regexp} statement
+@cindex regular expressions
+@cindex extended regular expressions
+@cindex basic regular expressions
+@FIXME{Remove the Regex anchor when all references have been cleaned up}
+@anchor{Regex}
+The @code{regexp} statement configures the flavor of regular
+expressions for use by subsequent @code{match} and
+@code{set} statements.
+
+@deffn {global} regexp @var{flags} ...
+Configure the type of regular expressions.
+@end deffn
+
+Each @var{flag} is word specifying some regular expression
+feature.  It can be preceded by @samp{+} to enable this feature (this
+is the default), or by @samp{-} to disable it.  Valid flags are:
+
+@table @samp
+@item extended
+Use @acronym{POSIX} Extended Regular Expression syntax when
+interpreting regex.  This is the default.
+
+@item basic
+Use basic regular expressions.  Equivalent to @samp{-extended}.
+
+@item icase
+@itemx ignore-case
+Do not differentiate case.  Subsequent regex matches will be case
+insensitive.
+@end table
+
+For example, the following statement enables @acronym{POSIX} extended,
+case insensitive matching:
+
+@smallexample
+global
+  regex +extended +icase
+@end smallexample
+
+@node include-security
+@subsection The @code{include-security} statement
+
+Additional configuration can be included to the main configuration
+file using the @code{include} statement (@pxref{Include}).  Before
+inclusion, a number of checks is performed on the file to ensure it
+is safe to rely on it.  These checks are configured using the
+following statement:
+
+@deffn {global} include-security @var{list}
+Configure the security checks for include files.  This statement takes
+a list of arguments, separated by white space.  The following
+arguments are recognized:
+
+@table @asis
+@cindex @code{all}, include security flag
+@item all
+Enable all checks.
+
+@cindex @code{owner}, include security flag
+@item owner
+The file is not owned by root.
+
+@cindex @code{iwgrp}, include security flag
+@cindex @code{groupwritablefile}, include security flag
+@item iwgrp
+@itemx groupwritablefile
+The file is group writable.
+
+@cindex @code{iwoth}, include security flag
+@cindex @code{worlwritablefile}, include security flag
+@item iwoth
+@itemx worldwritablefile
+The file is world writable.
+
+@cindex @code{dir_iwgrp}, include security flag
+@cindex @code{groupwritabledir}, include security flag
+@item dir_iwgrp
+@itemx groupwritabledir
+The file resides in a group writable directory.
+
+@cindex @code{dir_iwoth}, include security flag
+@cindex @code{worldwritabledir}, include security flag
+@item dir_iwoth
+@itemx worldwritabledir
+The file resides in a world writable directory.
+
+@cindex @code{link}, include security flag
+@item link
+The file is a symbolic link to a file residing in a group or world
+writable directory.
+@end table
+@end deffn
+
+Each of the above keywords may be prefixed by @samp{no}, which
+reverses its meaning.  The special keyword @samp{none} disables all
+checks.  Each keyword adds or removes a particular test to the
+existing check list, which is initialized as described in
+@ref{security checks}.  Thus, the followning statement results in all
+checks, except for the file ownership:
+
+@smallexample
+global
+  include-security noowner
+@end smallexample
+
+In the example below, the check list is first cleared by using the
+@code{none} statement, and then a set of checks is added to it:
+
+@smallexample
+global
+  include-security none owner iwoth iwgrp
+@end smallexample
+
+@node Accounting control
+@subsection Accounting control statements
+
+The following global statements control file mode and permissions of
+the @dfn{accounting database files}.  For a detailed description of
+this feature, @xref{Accounting Database}.
+
+@deffn {global} acct-umask @var{mask}
+Set umask used when accessing accounting database files.  Default
+value is @samp{022}.
+@end deffn
+
+@deffn {global} acct-dir-mode @var{mode}
+Set mode bits for the accounting directory.  The @var{mode} argument
+is the mode in octal.
+@end deffn
+
+@deffn {global} acct-file-mode @var{mode}
+Set mode bits for @file{wtmp} and @file{utmp} files.
+@end deffn
 
 @node Rule
 @section Rule
-@cindex @code{rule} statement
-  The @code{rule} statement configures a GNU Rush rule.  This is a
-@dfn{block} statement, which means that all statements located between
-it and the next @code{rule} statement (or end of file, whichever
-occurs first) modify the definition of the rule.
+@cindex @code{rule}
+  The @code{rule} statement configures a GNU @command{rush} rule.
+This is a @dfn{block} statement, which means that all statements
+located between it and the next @code{rule} statement (or end of file,
+whichever occurs first) modify the definition of that rule.
 
-@kwindex rule
   The syntax of the @code{rule} statement is:
 
 @deffn {Configuration} rule @var{tag}
@@ -489,247 +826,100 @@ default tag, which is constructed by concatenating @samp{#} character
 and the ordinal number of rule in the configuration file, in decimal
 notation.  Rule numbering starts from @samp{1}.
 
-The following sub-sections describe statements that can be used
-within a @code{rule}.
+Each rule group can contain a number of statements that control what
+kind of requests match that rule and what actions are taken when the
+rule is matched.  Arguments to this statements can refer to command
+line arguments and other parts of the request.
 
 @menu
-* Conditions::                  
-* Transformations::             
-* System Actions::              
-* Environment::                 
-* Fall-through::                
-* Accounting and Forked Mode::  
-* Notification::                
+* Request::
+* Matching Conditions::
+* Modifying variables::
+* Transformations::
+* System Actions::
+* Environment::
+* Fall-through::
+* Accounting and Forked Mode::
+* Notification::
 * Exit::
 * Interactive::
 * Localization::
 @end menu
 
-@node Conditions
-@subsection Conditions
-@cindex conditions
-  These statements define conditions that are evaluated when matching
-the rule against the request.  A rule may contain any number of
-conditions.  All conditions are tested in order of their appearance in
-the rule and are tied together using boolean shortcut @samp{and}
-evaluation: if any of them yields false, the rest is not evaluated and
-control is transferred to the subsequent rule. 
+@node Request
+@subsection The Request
+@cindex request
+@UNREVISED
 
-@deffn {Rule Config} command @var{regex}
-True, if the current command line matches regular expression
-@var{regex}.  
+@menu
+* Positional variables::
+* Request variables::
+* Variable expansion::
+@end menu
 
-For example:
-
-@smallexample
-command ^scp (-v )?-t /incoming/(alpha|ftp)
-@end smallexample
-
-By default, @acronym{POSIX} extended regular expressions are used.
-This, however can be changed using @code{regex} statement (@pxref{Regex}).
-@end deffn
-
-@anchor{match}
-@deffn {Rule Config} match[@var{n}] @var{regexp}
-True, if @var{n}th @dfn{word} from the command line matches
-regular expression @var{regexp}.  Notice, that square brackets form
-part of the statement syntax.  The index @var{n} is normally a decimal
-number indicating position of the word in the command line (first word
-being at index 0).  It can be negative, which means that the position
-is counted from the last word.  Several special notations are also
-allowed, e.g. @samp{$} denotes the last word.  For a detailed discussion of
-word-splitting alorithm and allowed notations of @var{n}, @ref{indexing}.  
-
-Second argument @var{regexp} is a regular expression to match the word
-against.  Unless changed by previous @code{regex} statement
-(@pxref{Regex}), @acronym{POSIX} extended regular expression is assumed.
-
-For example, the condition below yields true if the last argument is
-an absolute path name:
-
-@smallexample
-match[$] ^/.*
-@end smallexample
-@end deffn
-
-@deffn {Rule Config} argc @var{op} @var{num}
-Compare the number of command line arguments to @var{num}.
-The comparison operator is given by @var{op}, which can be one 
-of the following: @samp{=} (or @samp{==}), @samp{!=}, @samp{<},
-@samp{<=}, @samp{>}, @samp{>=}.
-
-For example, the following condition matches if the number of
-arguments is less than 3:
-
-@smallexample
-argc < 3
-@end smallexample
-@end deffn
-
-@deffn {Rule Config} uid [@var{op}] @var{user-id}
-Compare current @acronym{UID} to @var{user-id}.  The latter may be
-either a numeric UID or a name of an existing user.
-
-The comparison operator is given by optional @var{op}, which can be one 
-of the following: @samp{=} (@samp{==}), @samp{!=}, @samp{<},
-@samp{<=}, @samp{>}, @samp{>=}.  If @var{op} is not given, equality
-(@samp{==}) is assumed.
-
-Examples:
-
-@smallexample
-uid smith
-@end smallexample
-
-@end deffn
-
-@deffn {Rule Config} gid @var{op} @var{group-id}
-Compare current @acronym{GID} to @var{group-id}, which is either a
-numeric value or a name of an existing group.
-
-The comparison operator is given by @var{op}, which can be one
-of the following: @samp{=} (@samp{==}), @samp{!=}, @samp{<},
-@samp{<=}, @samp{>}, @samp{>=}.  If @var{op} is not given, equality
-(@samp{==}) is assumed.
-@end deffn
-
-@deffn {Rule Config} user @var{names}
-Argument is a whitespace-separated list of user names.  This condition
-yields true, if the user name is listed in @var{names}.
-String comparisons are case-sensitive.
-@end deffn
-
-@deffn {Rule Config} group @var{names}
-Argument is a whitespace-separated list of group names.  This condition
-yields true, if the the name of any group the user is a member of
-is listed in @var{names}.  String comparisons are case-sensitive.
-
-For example, to match users from groups @samp{admin} and @samp{root}:
-
-@smallexample
-group admin root
-@end smallexample
-@end deffn
-
-  Each condition can be negated by placing exclamation sign between
-the condition keyword and expression.  For example: 
-
-@table @code
-@item command ^scp
-True, if the command line begins with @samp{scp}.
-
-@item command ! ^scp
-True if the command line does not begin with @samp{scp}.
-@end table
-
-@node Transformations
-@subsection Transformations
-@cindex transformations
-  Special actions that modify the original command line are called
-@dfn{transformations}.  GNU Rush supports several kinds of
-transformations: @samp{set}, @samp{transform}, @samp{delete}, 
-@samp{map}.  All of them operate on command line split into
-@dfn{words}.  Additionally, @samp{set} and @samp{transform} can
-operate on the entire command line.
+@node Positional variables
+@subsubsection Positional variables
 
 @anchor{indexing}
 @cindex word splitting
 @cindex indexing, words in command line
   Rush performs word splitting using the same rules as @command{sh}.
-Transformation actions refer to words by their @dfn{index}.  Three
-kinds of indexes are supported.  First of all, a word may be referred
-to by its ordinal number in the command line.  The command name itself
-has index @samp{0}.  For example, given the command line:
+Configuration statement refer to command line arguments (words) by
+their @dfn{index}, using @dfn{positional variables}.  A positional
+variable can have the following forms:
+
+@example
+ $@var{n}
+ $@{@var{n}@}
+@end example
+
+@noindent
+where @var{n} is the variable index.  The form with curly braces must
+be used if @var{n} is negative (see below) or greater than 9.
+
+Positional indexes start at @samp{0}.  Thus, the variable @samp{$0}
+refers to the command name.  Consider, for example, the following
+command line:
 
 @smallexample
 /bin/scp -t /upload
 @end smallexample
 
-one gets:
+Word splitting phase results in three positional variables being defined:
 
 @multitable @columnfractions 0.3 0.7
-@headitem Index @tab Value
-@item 0 @tab /bin/scp
-@item 1 @tab -t
-@item 2 @tab /upload
+@headitem Variable @tab Value
+@item $0 @tab /bin/scp
+@item $1 @tab -t
+@item $2 @tab /upload
 @end multitable
 
-  Negative indexes can also be used.  They refer to words in the
-reverse order, as illustrated in the following table:
+  These values can also be referred to using negative indexes.  They
+refer to words in the reverse order, as illustrated in the following
+table (notice the use of curly braces):
 
 @multitable @columnfractions 0.3 0.7
-@headitem Index @tab Value
-@item -3 @tab /bin/scp
-@item -2 @tab -t
-@item -1 @tab /upload
+@headitem Variable @tab Value
+@item $@{-3@} @tab /bin/scp
+@item $@{-2@} @tab -t
+@item $@{-1@} @tab /upload
 @end multitable
 
-  Notice that negative indexes are 1-based.
+  Notice also, that negative indexes are 1-based.
 
-  Finally, two special notations are available.  The last word may be
-referred to as @samp{$}, and the command name itself as @samp{^}.
-There is a subtle difference between @samp{0} and @samp{^}.  The
-notation @samp{^} refers to the name of the program that
-@command{rush} will execute at the end of the matching rule, whereas
-the notation @samp{0} refers to the 0th argument that will be passed
-to that program (@samp{argv[0]}).  Most of the time the two values
-coincide.  Unless the rule modifies @samp{^}, @samp{0}th word will be
-used as the program name.  There exist some cases when you need to
-explicitly set @samp{^}.  @xref{Interactive}, for a possible use of
-this feature.
+One final note about the @samp{$0} variable.  Immediately after word
+splitting it refers to both the executable program name and the 0th
+argument that will be passed to that program (@code{argv[0]}).  Most
+of the time the two values coincide.  However, the rule can modify
+either value, so that they become different.  Whether modified or not,
+the actual name of the program to be run is kept in the request
+variable @samp{$program} (see the following section).
 
-@anchor{patterns}
-@cindex patterns
-  In the detailed discussion below, arguments to some transformations
-are referred to as @dfn{patterns}.  A pattern is a string which, prior
-to its actual use, is subject to @dfn{variable} and @dfn{backreference}
-expansions.
+@node Request variables
+@subsubsection Request variables
 
-@cindex variable expansion
-@anchor{variable expansion}
-  During @dfn{variable expansion} all references to variables in the
-string are replaced with the actual values of the corresponding variables.  
-Variables are referred to using the following syntax: @samp{$@var{x}}
-or @samp{$@{@var{x}@}}, where @var{x} is the variable name. The latter
-notation serves two purposes. First, it should be used if the variable
-reference is immediately followed by an alphanumeric symbol, which
-will otherwise be considered part of it. Consider, for example the
-string @samp{$@{home@}dir}. Here, the curly braces separate the name
-of the variable @samp{home} from the string that follows it. Secondly,
-this form allows for specifying the action to take if the variable is
-undefined or expands to an empty value. The following constructs test
-for a variable that is unset or null. Omitting the colon results in a
-test only for a variable that is unset.
-
-@table @asis
-@item $@{@var{variable}:-@var{word}@}
-@dfn{Use Default Values}. If @var{variable} is unset or null, the expansion
-of @var{word} is  substituted. Otherwise, the value of @var{variable} is
-substituted.
-
-@item $@{@var{variable}:=@var{word}@}
-@dfn{Assign Default Values}. If @var{variable} is unset or null, the
-expansion  of @var{word} is assigned to variable. The value of 
-@var{variable} is then substituted.
-                            
-@item $@{@var{variable}:?@var{word}@}
-@dfn{Display Error if Null or Unset}. If @var{variable} is null or unset,
-the expansion of @var{word} (or a message to that effect if @var{word} is
-not present) is output to the current logging channel. Otherwise, the
-value of @var{variable} is substituted.
-
-@item $@{@var{variable}:+@var{word}@}
-@dfn{Use Alternate Value}. If @var{variable} is null or unset, nothing is
-substituted, otherwise the expansion of @var{word} is substituted.
-@end table
-
-All variables fall into two categories: @dfn{built-in} and
-@dfn{user-defined}. Built-in variables are always
-defined. User-defined variables are created using the @samp{setvar}
-statement and can be undefined using the @samp{unsetvar} statement
-(see below).
-
-The built-in variables are summarized in the table below:
+The following variables can be used to refer to various parts of the
+user request:
 
 @multitable @columnfractions 0.3 0.7
 @headitem Variable   @tab Expansion
@@ -746,158 +936,264 @@ The built-in variables are summarized in the table below:
 @vindex gecos
 @item $gecos         @tab User's @acronym{GECOS} field
 @vindex program
-@item $program       @tab Program name (@samp{^})
+@item $program       @tab Executable program name
 @vindex command
-@item $command       @tab Full command line
-@vindex $@var{n}
-@item $0 to $9           @tab Corresponding word from the command line
-@vindex $@{@var{n}@}
-@item $@{@var{N}@}       @tab @var{N}th word (see above for the
-allowed values of @var{N})
+@item $command       @tab Entire command line
+@vindex $argc
+@item $argc          @tab Number of arguments in @samp{$command}
 @end multitable
 
-@cindex backreferences
-@anchor{backreference expansion}
-During the @dfn{backreference expansion}, references to parenthesized
-subgroups from the last regexp match are replaced by the text that
-matched each subgroup. Syntactically a backreference consists of a
-percent sign followed by a decimal number of the subgroup in range
-between 0 and 9, inclusively. Consider the following rule:
+@FIXME{Mention the user-defined and environment variables.}
+
+@node Variable expansion
+@subsubsection Variable Expansion
+
+Some words in the configuration file undergo variable expansion prior
+to their use.  During variable expansion, any references to variables
+in the string are replaced with their actual values.  A variable
+reference has two basic forms:
+
+@example
+  $@var{v}
+  $@{@var{v}@}
+@end example
+
+@noindent
+where @var{v} is either the name of the variable (request or
+user-defined), or the index of the positional variable.  The notation
+in curly braces serves several purposes.  First, it is obligatory if
+@var{v} is an index of the positional variable that is negative or
+greater than 9.  Secondly, it should be used if the variable
+reference is immediately followed by an alphanumeric symbol, which
+will otherwise be considered part of it (as in @samp{$@{home@}dir}).
+Finally, this form allows for specifying the action to take if the
+variable is undefined or expands to an empty value:
+
+@table @asis
+@item $@{@var{variable}:-@var{word}@}
+@dfn{Use Default Values}. If @var{variable} is unset or null, the expansion
+of @var{word} is  substituted. Otherwise, the value of @var{variable} is
+substituted.
+
+@item $@{@var{variable}:=@var{word}@}
+@dfn{Assign Default Values}. If @var{variable} is unset or null, the
+expansion  of @var{word} is assigned to variable. The value of
+@var{variable} is then substituted.
+
+@item $@{@var{variable}:?@var{word}@}
+@dfn{Display Error if Null or Unset}. If @var{variable} is null or unset,
+the expansion of @var{word} (or a message to that effect if @var{word} is
+not present) is output to the current logging channel. Otherwise, the
+value of @var{variable} is substituted.
+
+@item $@{@var{variable}:+@var{word}@}
+@dfn{Use Alternate Value}. If @var{variable} is null or unset, nothing is
+substituted, otherwise the expansion of @var{word} is substituted.
+@end table
+
+These constructs test for a variable that is unset or null. Omitting
+the colon results in a test only for a variable that is unset.
+
+@FIXME{Describe expansion of undefined variables}.
+
+@node Matching Conditions
+@subsection Matching Conditions
+@cindex matching conditions
+@cindex conditions
+
+@deffn {rule} match @var{expr}
+  The @code{match} statement defines conditions that decide whether
+the rule matches the particular request.  Its argument is a simple
+expression or a boolean expression involving several simple
+expressions.
+@end deffn
+
+@menu
+* Comparisons::
+* Membership operators::
+* Boolean expressions::
+@end menu
+
+@node Comparisons
+@subsubsection Comparisons
+@cindex comparison
+A @dfn{simple comparison} is:
+
+@example
+@var{lhs} @var{op} @var{rhs}
+@end example
+
+@noindent
+here, @var{lhs} (@dfn{left-hand side}) is a string (quoted or
+unquoted), or variable reference (@pxref{Lexical Structure}),
+@var{rhs} (@dfn{right-hand side}) is a string, and @var{op} is one of
+the following binary operators:
+
+@float Table, Comparison Operators
+@caption{Comparison Operators}
+@multitable @columnfractions 0.30 .5
+@item @samp{==}      @tab Equality (string or numeric)
+@item @samp{!=}      @tab Inequality (string or numeric)
+@item @samp{<}       @tab Less than
+@item @samp{<=}      @tab Less than or equal to
+@item @samp{>}       @tab Greater than
+@item @samp{>=}      @tab Greater than or equal to
+@item @samp{~}       @tab Regexp matching
+@item @samp{!~}      @tab Negated regexp matching
+@end multitable
+@end float
+
+Prior to evaluating a simple expression, its left-hand side
+undergoes variable expansion.  In contrast, the right-hand side is
+always treated verbatim.
+
+For example the following rule will match any request with 2 or more
+arguments (recall, that the command name itself is counted as one of
+the arguments):
+
+@example
+rule
+  match $argc >= 2
+@end example
+
+The @samp{==} and @samp{!=} can operate both on strings and on
+numbers.  When applied to strings the @samp{==} means byte-to-byte
+equality, e.g.
+
+@example
+  match $0 == "/bin/ls"
+@end example
+
+@noindent
+will match requests with @samp{/bin/ls} as the command name.
+
+The @samp{~} and @samp{!~} operators implement @dfn{regular expression
+matching}.  E.g.
+
+@example
+  match $command ~ "^scp (-v )?-t /incoming/(alpha|ftp)"
+@end example
+
+The @samp{!~} evaluates to @samp{true} if @var{lhs} does not match the
+regular expression in the @var{rhs}.
+
+If the regular expression contains parenthesized groups, the
+subsequent commands can refer to the strings that matched the groups
+using the @dfn{backreference notation} @samp{%@var{n}}, where @var{n}
+is 1-based index ordinal number of the group in the regular expression
+(@pxref{backreference}).  For example:
 
 @example
 rule chdir
-  command ^cd (.+) && (.+)
+  match $command "^cd (.+) && (.+)"
   chdir %1
-  set %2
+  set command = %2
   fall-through
 @end example
 
 It splits the compound command into the working directory and the
-command itself. Then it remembers the name of the working directory
-(first parenthesized group -- @samp{%1}) for changing to it later and
-resets the command line to the part of the string that follows the @samp{&&}
-token. Finally, it passes control to another rules (@samp{fall-through}).
+command itself.  Then it remembers the name of the working directory
+(first parenthesized group -- @samp{%1}) for changing to it later
+(@pxref{chdir}) and resets the command line to the part of the
+string that follows the @samp{&&} token.  Finally, it passes control
+to another rules (@pxref{Fall-through}).
+
+@node Membership operators
+@subsubsection Membership operators
+Membership operators check if their argument is a member of some
+set of values.  There are two such operators.
+
+@kwindex @samp{in}, operator
+@example
+@var{lhs} in ( @var{args} )
+@end example
+
+  The @code{in} operator evaluates to @samp{true} if @var{lhs} is
+listed in @var{args}, which is a whitespace-separated list of strings.
+For example:
+
+@example
+  match $0 in ("scp" "rsync")
+@end example
+
+@kwindex @samp{member}
+@example
+member @var{string}
+member ( @var{args} )
+@end example
+
+ The @code{member} operator evaluates to @samp{true} if the requesting
+user is a member of at least one group listed in its right-hand side.
+
+@node Boolean expressions
+@subsubsection Boolean expressions
+  Simple expressions can be combined into complex conditions using
+boolean operators:
+
+@float Table, Boolean Operators
+@caption{Boolean Operators}
+@multitable @columnfractions 0.30 .5
+@item @samp{||}      @tab Disjunction (@dfn{or})
+@item @samp{&&}      @tab Conjunction (@dfn{and})
+@item @samp{!}       @tab Negation
+@end multitable
+@end float
+
+Arguments to these operators can be either simple expressions or
+another boolean expressions.  The operators in the table above are
+ordered by their precedence.  As in most programming languages,
+parentheses can be used to enforce the desired order of evaluation.
+
+Both binary operators implement shortcut evaluation.
+
+@FIXME{Examples}.
+
+@node Modifying variables
+@subsection Modifying variables
+@UNREVISED
+
+@FIXME{Introductory paragraph}
 
 @menu
-* set::             Overriding the command line or parts of it.
-* delete::          Delete words from the command line.
-* transform::       Modify command line or its parts using regular expressions.
-* map::             Use file lookup to modify the command line
-* setvar and unsetvar::  Set and unset variables 
+* set::             Set variable
+* unset::           Unset variable
+* map::             Use file lookup to modify variable
 @end menu
 
 @node set
-@subsubsection Set
-@kwindex set
-  The @samp{set} transformation replaces the entire command line,
-or any of its arguments, with the given value.
+@subsubsection The @code{set} statement
 
-@deffn {Rule Config} set @var{pattern}
-Command line is replaced with the expansion of @var{pattern}
-(@pxref{patterns}).  E.g.:
+The @code{set} statement modifies the value of a positional, request,
+or user-defined variable.
 
-@smallexample
-set /bin/echo "Command forbidden: $@{command@}"
-@end smallexample
+@deffn {rule} set @var{name} = @var{value}
+@deffnx {rule} set [@var{n}] = @var{value}
+@FIXME{Describe set @var{name} = @var{value} ~ @var{s-expr}}
+Sets the variable @var{name} to @var{value}.  Prior to use,
+@var{value} undergoes backreference interpretation
+(@pxref{backreference}) and variable expansion (@pxref{Variable
+expansion}).
 
-@anchor{set-command}
-  As another example, the following rule uses @code{set} to
-ensure that @file{/usr/bin/cvs} binary is used:
-
-@smallexample
-@group
-rule cvs
-  command ^cvs server
-  set[0] /usr/bin/cvs
-@end group
-@end smallexample
+The second form assigns to the positional variable @samp{$@var{n}}.
+It is defined in more detail in @ref{Transformations}.
 @end deffn
 
-@deffn {Rule Config} set[@var{n}] @var{pattern}
-Replace @var{n}th argument with the expansion of @var{pattern}.
-Notice, that square brackets are part of the statement syntax.
+@deffn {rule} set @var{name} =~ @var{s-expr}
+@deffnx {rule} set [@var{n}] =~ @var{s-expr}
+Applies the @command{sed}-like search-and-replace expression
+@var{s-expr} to the current value of the variable @var{name} and
+stores the resulting string as its new value.  Prior to use,
+@var{s-expr} undergoes backreference interpretation
+(@pxref{backreference}) and variable expansion (@pxref{Variable
+expansion}).
 
-@xref{indexing}, for a description of @var{n}.  @xref{patterns}, for
-a description of @var{pattern}.  E.g.:
-
-@smallexample
-set[0] /bin/echo
-@end smallexample
-@end deffn
-
-@node delete
-@subsubsection Delete
-@kwindex delete
-  The @samp{delete} action deletes the given word, or range of words,
-from the command line.  It has two forms.
-  
-@deffn {Rule Config} delete[@var{n}]
-Delete @var{n}th word.  @xref{indexing}, for a detailed description of
-@var{n} and its syntax.  However, see the note below.
-@end deffn
-
-@deffn {Rule Config} delete @var{n} @var{m}
-Delete words from @var{n} to @var{m}, inclusive.  For example, the
-following action removes all arguments, except the command name:
-
-@smallexample
-delete 1 $
-@end smallexample
-@end deffn
-
-Neither form can be used to delete the command name, i.e.  @samp{[0]}
-or @samp{[^]}. 
-
-@node transform
-@subsubsection Transform
-@kwindex transform
-
-  The @code{transform} action modifies the value of the command line,
-or any particular word of it, according to a sed-like @dfn{s-expression}.
-S-expressions are described in more detail below (@pxref{s-expression}).
-This action has several forms.
-
-@deffn {Rule Config} transform @var{expr}
-Apply expression @var{expr} to entire command line.  For example, the
-action below adds a @option{-t} option after the command name:
-
-@smallexample
-transform s,^[^ ]+,& -t,
-@end smallexample
-@end deffn
-
-@deffn {Rule Config} transform @var{pattern} @var{expr}
-Expand @var{pattern} as described in @ref{patterns}, apply @var{expr}
-to the expansion, and replace the command line with the result.
-@end deffn
-
-@deffn {Rule Config} transform[@var{n}] @var{expr}
-Apply expression @var{expr} to @var{n}th @dfn{word} from the
-command line.  Notice, that square brackets are part of the statement
-syntax.  @xref{indexing}, for a detailed description of @var{n} and
-its syntax.
-@end deffn
-
-@deffn {Rule Config} transform[@var{n}] @var{pattern} @var{expr}
-Apply expression @var{expr} to the expanded @var{pattern} and assign
-the result to @var{n}th word.  @xref{patterns}, for a description of
-patterns and their expansion.  @xref{indexing}, for a detailed
-description of @var{n} and its syntax.
-
-The example below replaces the 0th argument with the base name of the
-command, prefixed by a dash:
-
-@smallexample
-transform[0] $@{^@} s,.*/,-,
-@end smallexample
-
-For instance, if the command name is @samp{/bin/bash}, @samp{argv[0]} will
-become @samp{-bash}.
+The second form modifies the value of the positional variable
+@samp{$@var{n}}.  @xref{Transformations}, for more detail on this form.
 @end deffn
 
 @cindex s-expression
 @anchor{s-expression}
-The transformation expression, @var{expr}, is a @command{sed}-like
+The transformation expression, @var{s-expr}, is @command{sed}-like
 replace expression of the form:
 
 @smallexample
@@ -911,7 +1207,7 @@ replacement for each part of the input that matches @var{regexp}.  Both
 @ref{The "s" Command, The "s" Command, The `s' Command, sed, GNU sed}.
 
 As in @command{sed}, you can give several replace expressions,
-separated by a semicolon.
+separated by semicolons.
 
 Supported @var{flags} are:
 
@@ -942,66 +1238,35 @@ the interaction is defined to be: ignore matches before the
 @var{number}th on.
 @end table
 
-Any delimiter can be used in lieu of @samp{/}, the only requirement being
-that it be used consistently throughout the expression.  For example,
-the following two expressions are equivalent:
+Notice, that normally the @var{s-expr} is quoted, which means that
+it is subject to backslash interpretation. Consequently, pay attention
+to properly escaping the backslash characters in @var{s-expr}, in
+particular when using back-references to parenthesized groups in its
+@var{regexp} part.
 
-@smallexample
-@group
-transform s/one/two/
-transform s,one,two,
-@end group
-@end smallexample
+@FIXME{Example!}
 
-  Changing delimiters is often useful when the @var{regex} contains
-slashes.  For instance, it is more convenient to write @code{s,/,-,} than
-@code{s/\//-/}.
+@node unset
+@subsubsection The @code{unset} statement
 
-  For example, the following rule uses @code{transform} to ensure that
-@file{/usr/bin/cvs} binary is used:
-
-@smallexample
-@group
-rule cvs
-  command ^cvs server
-  transform[0] s|.*|/usr/bin/cvs|
-@end group
-@end smallexample
-
- The same effect can be achieved with a @code{set} statement, as shown in
-@ref{set-command}. 
-
- As a more complex example, consider the following rule:
-
-@smallexample
-@group
-rule svn
-  command ^svnserve -t
-  transform s|-r *[^ ]*||;s|^svnserve |/usr/bin/svnserve -r /svnroot |
-@end group
-@end smallexample
-
-  This transform expression first removes all occurrences of
-@option{-r} option and its arguments from the command line, and then
-adds its own @option{-r} option and replaces @samp{svnserve} with the
-full program file name.
+@deffn {rule} unset @var{name}
+Unsets the variable @var{name}.
+@end deffn
 
 @node map
-@subsubsection Map
-@kwindex map
-  The @samp{map} statement uses file lookup to find a new value for
-the command line word.
+@subsubsection The @code{map} statement
 
-@deffn {Rule Config} map[@var{n}] @var{file} @var{delim} @var{pattern} @
+@deffn {rule} map @var{name} @var{file} @var{delim} @var{key} @
         @var{kn} @var{vn}
-@deffnx {Rule Config} map[@var{n}] @var{file} @var{delim} @var{pattern} @
+@deffnx {rule} map [@var{n}] @var{file} @var{delim} @var{key} @
          @var{kn} @var{vn} @var{default}
+  The @samp{map} statement uses file lookup to find a new value for
+the variable @var{name} (or, in its second form, for the positional
+variable @samp{$@var{n}}).
+
 Arguments are:
 
 @table @var
-@item n
-Argument index, as in @ref{indexing}.
-
 @item file
 Name of the @dfn{map file}.  It must begin with @samp{/} or
 @samp{~/}.  Before using, the file permissions and ownership are
@@ -1010,9 +1275,9 @@ checked using the procedure described in @ref{security checks}.
 @item delim
 A string containing allowed field delimiters.
 
-@item pattern
-The value of the lookup key.  Before using, it is expanded as
-described in @ref{patterns}.
+@item key
+The value of the lookup key.  Before using, it undergoes backslash
+interpretation and variable expansion.
 
 @item kn
 Number of the key field in @var{file}.  Fields are numbered starting
@@ -1040,8 +1305,8 @@ tabulations).  Otherwise, exactly one delimiter delimits fields.
 
 @enumerate 1
 @item
-The @var{pattern} argument is expanded as described in @ref{patterns}
-and the resulting value is used as lookup key.
+Variable expansion is performed over the @var{file} argument
+(@pxref{Variable expansion}) and the resulting value is used as lookup key.
 
 @item
 The @var{file} is scanned for a record whose @var{kn}th field
@@ -1067,60 +1332,90 @@ will replace @samp{argv[0]} with the value of @samp{shell} field,
 using the current user name as a key:
 
 @smallexample
-map[0] /etc/passwd.rush : $@{user@} 1 7
+map [0] /etc/passwd.rush : $@{user@} 1 7
 @end smallexample
 
 See also @ref{Interactive}, for another example of using this
 statement.
 
-@node setvar and unsetvar
-@subsubsection Set and unset variables
+@node Transformations
+@subsection Transformations
+  Transformations are special commands that modify entire command line
+or particular arguments from it (positional variables).
 
-@cindex setvar
-The @samp{setvar} statement allows you to define or redefine
-variables. The syntax is:
+  Statements that modify entire command line have been described in
+the previous section: these are @code{set} and @code{map} commands
+with @samp{command} given as first argument.
 
-@deffn {Rule Config} setvar[@var{name}] @var{pattern}
-When executing this statement, the @var{pattern} is first expanded
-using variable and backreference expansions (@pxref{patterns}), then
-the resulting value is assigned to the variable @var{name}.
-@end deffn
+@FIXME{Move the [n] forms here. Mention re-splitting the command line
+after modification and rebuilding it after changes to any of the arguments}.
 
-You can set both user-defined and built-in variables. The common use
-for the @samp{setvar} statement is to save the result of pattern
-matching for use in further rules, e.g.:
+  Let's consider several examples.
+
+@enumerate 1
+@item Echo the command line
+@example
+rule
+  set command = "/bin/echo $command"
+@end example
+
+@item This rule first removes all occurrences of @option{-r}
+option and its arguments from the command line, and then adds its own
+@option{-r} option and replaces @samp{svnserve} with the full program
+file name.
+
+@example
+rule svn
+  match $command ~ "^svnserve -t"
+  set command =~ "s/-r *[^ ]*//"
+  set command =~ "s|^svnserve |/usr/bin/svnserve -r /svnroot |"
+@end example
+
+  Notice the use of @samp{|} as a delimiter in s-command, in order to
+avoid escaping each @samp{/} in the pathname.  Without it, the second
+@code{set} command will be
+
+@example
+  set command =~ "s/^svnserve /\\/usr\\/bin\\/svnserve -r \\/svnroot /"
+@end example
+
+@item The same rule, rewritten using the single @command{set} statement:
+
+@example
+rule svn
+  match $command ~ "^svnserve -t"
+  set command =~ "s|-r *[^ ]*||;s|^svnserve |/usr/bin/svnserve -r /svnroot |"
+@end example
+
+@item Override the executable program name.
 
 @example
 @group
-rule chdir
-  command ^cd "(.+)" && (.*)$
-  setvar[workdir] %1
-  set %2
-  fall-through
-
-...
-
-rule runcom
-  command ^runcom
-  chdir $workdir
-  ...
-@end group  
+rule cvs
+  match $command ~ "^cvs server"
+  set [0] = /usr/bin/cvs
+@end group
 @end example
+@end enumerate
 
-Here, the rule @samp{chdir} saves the argument to the @command{cd}
-command in the variable @samp{workdir}, which will eventually be used
-in the rule @samp{runcom} to actually change to that directory.
+Another statement modifying the command line is @code{delete}:
 
-User-defined variables can also be unset:
-
-@deffn {Rule Config} unsetvar[@var{name}]
-Undefines the variable @var{name}. If the variable is not defined, the
-statement is silently ignored. If @var{name} is a name of a buil-in
-variable previously overwritten using the @samp{setvar} statement, the
-user-supplied definition is removed and the built-in value is
-restored. Otherwise, if @var{name} refers to a built-in variable which
-was not overridden, this statement does nothing.
+@deffn {rule} delete @var{n}
+Delete @var{n}th argument.
 @end deffn
+
+@deffn {rule} delete @var{i} @var{j}
+Delete all positional arguments between @var{i} and @var{j}.
+@end deffn
+
+Neither form can be used to delete the program name (@samp{$0}).
+
+For example, the following statement deletes all arguments from
+the command line, except for the program name:
+
+@example
+delete 1 -1
+@end example
 
 @node System Actions
 @subsection System Actions
@@ -1129,29 +1424,29 @@ was not overridden, this statement does nothing.
 
 System actions provide an interface to the operating system.
 
-@deffn {Rule Config} umask @var{mask}
+@deffn {rule} umask @var{mask}
 Set the umask.  The @var{mask} must be an octal value not greater than
 @samp{0777}.  The default umask is @samp{022}.
 @end deffn
 
-@deffn {Rule Config} newgrp @var{group-id}
-@deffnx {Rule Config} newgroup @var{group-id}
+@deffn {rule} newgrp @var{group-id}
+@deffnx {rule} newgroup @var{group-id}
 Changes the current group ID to @var{group-id}, which is either a
 numeric value or a name of an existing group.
 @end deffn
 
-@deffn {Rule Config} chroot @var{dir}
+@deffn {rule} chroot @var{dir}
 @cindex tilde expansion
 Change the root directory to that specified in @var{dir}.  This
 directory will be used for file names beginning with @samp{/}.
 The argument is subject to tilde, variable, and backreference
 expansions. During tilde expansion, a tilde (@samp{~}) at the start of
 string is replaced with the absolute pathname of the user's home
-directory. The two other expansions are described in @ref{variable
-expansion}, and @ref{backreference expansion}.
+directory. The two other expansions are described in @ref{Variable
+expansion}, and @ref{backreference}.
 @end deffn
 
-The directory @var{dir} must be properly set up to execute the 
+The directory @var{dir} must be properly set up to execute the
 commands.  For example, the following rule defines execution of
 @command{sftp-server} in an environment, chrooted to the user's home
 directory:
@@ -1159,26 +1454,26 @@ directory:
 @smallexample
 @group
 rule sftp
-  command ^.*/sftp-server
-  set[0] bin/sftp-server
-  chroot ~
+  match $command ~ "^.*/sftp-server"
+  set [0] = "bin/sftp-server"
+  chroot "~"
 @end group
 @end smallexample
 
 For this to work, each user's home must contain the directory
-@file{bin} with a copy of @file{sftp-server} in it, as well as all 
+@file{bin} with a copy of @file{sftp-server} in it, as well as all
 directories and files that are needed for executing it, in particular
 @file{lib}.
 
-@deffn {Rule Config} chdir @var{dir}
+@anchor{chdir}
+@deffn {rule} chdir @var{dir}
 Change to the directory @var{dir}.  The argument is subject to
-tilde, variable (@pxref{variable expansion}), and backreference
-expansions (@pxref{backreference expansion}).  If both
-@code{chdir} and @code{chroot} are specified, then @code{chroot} is
-executed first.
+tilde, variable (@pxref{Variable expansion}), and backreference
+expansions (@pxref{backreference}).  If both @code{chdir} and
+@code{chroot} are specified, then @code{chroot} is applied first.
 @end deffn
 
-@deffn {Rule Config} limits @var{res}
+@deffn {rule} limits @var{res}
 Impose limits on system resources, as defined by @var{res}.  The
 argument consists of @dfn{commands}, optionally separated by any
 amount of whitespace.  A command is a single command letter followed
@@ -1186,7 +1481,7 @@ by a number, that specifies the limit.  The command letters are
 case-insensitive and coincide with those used by the shell @code{ulimit}
 utility:
 
-@multitable @columnfractions 0.3 0.6 
+@multitable @columnfractions 0.3 0.6
 @headitem Command @tab  The limit it sets
 @item     A       @tab  max address space (KB)
 @item     C       @tab  max core file size (KB)
@@ -1212,11 +1507,11 @@ limits T10 R20 U16 P20
 @cindex limiting number of simultaneous sessions
 @anchor{L limit}
 If some limit cannot be set, execution of the rule aborts.  In
-particular, @samp{L} limit can be regarded as a condition, rather than
-action.  The setting @code{limit L@var{n}} succeeds only if no
+particular, the @samp{L} limit can be regarded as a condition, rather than
+an action.  Setting @code{limit L@var{n}} succeeds only if no
 more than @var{n} @code{rush} instances are simultaneously running for
 the same user.  This can be used to limit the number of simultaneously
-open sessions. 
+open sessions.
 
 The use of @samp{L} resource automatically enables @dfn{forked mode}.
 @xref{Accounting and Forked Mode}, for more information about it.
@@ -1224,83 +1519,63 @@ The use of @samp{L} resource automatically enables @dfn{forked mode}.
 
 @node Environment
 @subsection Environment
+@UNREVISED
 @cindex Environment
 
-The @code{env} action modifies the environment in which the
+The following actions modify the environment in which the
 program will be executed.
 
-@deffn {Rule Config} env @var{args}
-Modify the environment.
+@deffn {rule} clrenv
+Clear the environment.
 @end deffn
 
-Its arguments are a whitespace-delimited list of specifiers.  Each
-specifier can contain references to variables from the inherited
-environment.  The reference syntax is the same as in Bourne shell.
+@deffn {rule} keepenv @var{list}
+Retain the names in @var{list} in the environment.  This statement
+should be used in conjunction with @code{clrenv}.
 
-The following specifiers are understood: 
+Argument is a whitespace delimited list of variable names to retain.
+A variable name can be followed by an equals sign and a value, in
+which case it will be retained only if its actual value equals the
+supplied one.
+@end deffn
 
-@table @asis
-@item - (a dash)
-Clear the environment.  This is understood only when used as a first
-word in @var{args}.
+@deffn {rule} setenv @var{name} = @var{value}
+Set value to the environment variable @var{name}.  The @var{value}
+argument is subject to variable expansion (@pxref{Variable
+expansion}).
 
-@item -@var{name}
-Unset the environment variable @var{name}.
+For example, to modify the @env{PATH} value:
 
-@item -@var{name}=@var{val}
-Unset the environment variable @var{name} only if its value is @var{val}.
+@example
+setenv PATH = "$PATH:/opt/bin"
+@end example
+@end deffn
 
-@item @var{name}
-Retain the environment variable @var{name}.
+@deffn {rule} unsetenv @var{list}
+Unset environment variables from the @var{list}.
 
-@item @var{name}=@var{value}
-Define environment variable @var{name} to have given @var{value}.
-
-@item @var{name}+=@var{value}
-Retain variable @var{name} and append @var{value} to its value.  If no
-such variable is present in the environment, it is created and
-@var{value} is assigned to it.  However, if @var{value} starts with a
-punctuation character, this character is removed from it before the
-assignment.  This is convenient for using this construct with 
-environment variables like @env{PATH}, e.g.:
-
-@smallexample
-PATH+=:/sbin
-@end smallexample
-
-In this example, if @env{PATH} exists, @samp{:/sbin} will be appended
-to it.  Otherwise, it will be created and @samp{/sbin} will be
-assigned to it.
-
-This is roughly equivalent to
-
-@smallexample
-PATH=$PATH:/sbin
-@end smallexample
-
-@item @var{name}=+@var{value}
-Retain variable @var{name} and prepend @var{value} to its value.  If
-no such variable is present in the environment, it is created and
-@var{value} is assigned to it.  However, if @var{value} ends with a
-punctuation character, this character is removed from it before
-assignment.
-@end table
+A variable name can be followed by an equals sign and a value, in
+which case it will be unset only if its actual value equals the
+supplied one.
+@end deffn
 
 @node Fall-through
 @subsection Fall-through
-@cindex fall-through rule
+@cindex fall-through statement
+@cindex fallthrough
 The @dfn{fall-through} statement is a special action that does not
 execute the requested command.  When a matching fall-through rule is
 encountered, @command{rush} evaluates it and continues scanning its
-configuration for the next matching rule.  Any transformation and
-@code{env} actions found in the fall-through rule take effect
-immediately, which means that subsequent rules will see modified
-command line and environment.  Execution of any other actions found in
-the fall-through rule is delayed until a usual rule is found.
+configuration for the next matching rule.  Any modifications to the
+request found in the fall-through rule take effect immediately, which
+means that subsequent rules will see modified command line and
+environment.  Execution of any other actions found in the fall-through
+rule is delayed until a usual rule is found. 
 
 A fall-through rule is declared using the following statement:
 
-@deffn {Rule Config} fall-through
+@deffn {rule} fall-through
+@deffnx {rule} fallthrough
 Declare a fall-through rule.
 @end deffn
 
@@ -1310,7 +1585,8 @@ Usually this statement is placed as the last statement in a rule, e.g.:
 @group
 rule default
   umask 002
-  env - HOME USERNAME PATH
+  clrenv
+  keepenv HOME USERNAME PATH
   fall-through
 @end group
 @end smallexample
@@ -1325,7 +1601,7 @@ For example, consider this rule:
 @smallexample
 @group
 rule default
-  transform[0] s|.*/||;
+  set command =~ "s|.*/||"
   fall-through
 @end group
 @end smallexample
@@ -1371,9 +1647,9 @@ statement (@pxref{L limit}).
 contain either @samp{L} command in the @code{limit} statement, or
 @samp{acct on} command:
 
-@deffn {Rule Config} acct @var{bool}
+@deffn {rule} acct @var{bool}
 Turn accounting mode on or off, depending on @var{bool}.  The argument
-can be one of the following: @samp{yes}, @samp{on}, @samp{t}, 
+can be one of the following: @samp{yes}, @samp{on}, @samp{t},
 @samp{true}, or @samp{1}, to enable accounting, and @samp{no},
 @samp{off}, @samp{nil}, @samp{false}, @samp{0}, to disable it.
 
@@ -1391,7 +1667,7 @@ beginning of the configuration file, e.g.:
 @smallexample
 rule default
   acct on
-  fall-through 
+  fall-through
 @end smallexample
 
 If the need be, you can disable it for some of the subsequent rules by
@@ -1400,7 +1676,7 @@ accounting only, the forked mode will remain in action.  To disable it
 as well and enforce default mode for a given rule, use @code{fork off}
 statement:
 
-@deffn {Rule Config} fork @var{bool}
+@deffn {rule} fork @var{bool}
 Enable or disable forked mode.  This statement is mainly designed as a
 way of disabling the forked mode for a given rule.
 @end deffn
@@ -1417,9 +1693,9 @@ view the history of last logins using @code{rushlast} command
 @acronym{INET} or @acronym{UNIX} sockets, after completing user
 request.  It is done using the @code{post-socket} statement:
 
-@deffn {Rule Config} post-socket @var{url}
+@deffn {rule} post-socket @var{url}
 Notify @acronym{URL} about completing the user request.  This statement
-implies forked mode (@pxref{Accounting and Forked Mode}). 
+implies forked mode (@pxref{Accounting and Forked Mode}).
 
 Allowed formats for @var{url} are:
 
@@ -1444,7 +1720,7 @@ For example:
 @smallexample
 @group
 rule default
-  post-socket inet://localhost
+  post-socket "inet://localhost"
 @end group
 @end smallexample
 @end deffn
@@ -1456,7 +1732,7 @@ rule default
 followed by a CRLF pair.  The rule tag acts as a service name.  The
 remote party replies with a single character indicating positive
 (@samp{+}) or negative (@samp{-}) acknowledgment, immediately followed
-by an optional message of explanation, terminated with a CRLF. 
+by an optional message of explanation, terminated with a CRLF.
 
   If positive acknowledgment is received, @command{rush} sends a
 single line, consisting of the user name and the executed command
@@ -1466,58 +1742,51 @@ with a CRLF.
   After sending this line, @command{rush} closes the connection.
 
   The post-process notification feature can be used to schedule
-execution of some actions after certain rules.  
+execution of some actions after certain rules.
 
   @xref{notification example}, for an example of how to use this
-feature.  
+feature.
 
 @node Exit
 @subsection Exit rule
 @cindex exit rule
   An @dfn{exit} rule does not execute any commands.  Instead, it writes
 the supplied error message to the specified file descriptor and exits
-immediately.  An exit rule is defined using the following statement:
+immediately.  The exit rule is defined using the following statement:
 
-@deffn {Rule Config} exit @var{fd} @var{message}
-@deffnx {Rule Config} exit @var{message}
+@deffn {rule} exit @var{fd} @var{message}
+@deffnx {rule} exit @var{message}
 Write textual message @var{message} to a file descriptor, given by the
 optional argument @var{fd}.  If @var{fd} is absent, @samp{2} (standard
 error) is used.
 @end deffn
 
-The @var{message} argument is subject to backslash interpretation
-(@pxref{backslash-interpretation}).
+The @var{message} argument can be either a quoted string, or an
+identifier.
+
+If it is a quoted string, it is subject to backreference
+interpretation and variable expansion prior to being used.
 
 For example (note the use of line continuation character):
 
 @smallexample
-exit \
+exit "\
     \r\nYou are not allowed to execute that command.\r\n\
-    \r\nIf you think this is wrong, ask <foo@@bar.com> for assistance.\r\n
+    \r\nIf you think this is wrong, ask <foo@@bar.com> for assistance.\r\n"
 @end smallexample
 
-  If @var{message} begins with a @samp{@@} sign, the remaining
-characters are treated as the name of a predefined error message
-(@pxref{Error Messages}).  The corresponding message text is retrieved
-and used instead of @var{message}.  For example:
+  If @var{message} is an identifier, it must be the name of a
+predefined error message (@pxref{Error Messages}).  The corresponding
+message text will be printed.  For example:
 
 @smallexample
-  exit @@nologin-message
+  exit nologin-message
 @end smallexample
 
-  If the characters after @samp{@@} do not correspond to any
-predefined error message name, an error of type @samp{config-error}
-is signaled and @command{rush} exits.
+  If the identifier does not match any predefined error message name,
+an error of type @samp{config-error} is signaled and @command{rush}
+exits.
 
-  If you need to begin your exit message with a @samp{@@} sign,
-duplicate it, as in this example:
-
-@smallexample
-  exit @@@@Special error message
-@end smallexample
-
-  This example will produce @samp{@@Special error message}.
-  
 @cindex trap rule
 Exit actions are useful for writing @dfn{trap rules}, i.e. the rules that
 are intended to trap incorrect or prohibited command lines and to return
@@ -1527,9 +1796,8 @@ rule:
 @smallexample
 @group
 rule git
-  command ^git-.+
-  match[1] ^/sources/[^ ]+\.git$
-  transform s|.*|/usr/bin/git-shell -c "&"|
+  match $command ~ "^git-.+" && $1 ~ "^/sources/[^ ]+\.git$"
+  set command =~ "s|.*|/usr/bin/git-shell -c \"&\"|"
 @end group
 @end smallexample
 
@@ -1545,8 +1813,8 @@ after the @samp{git} rule:
 @smallexample
 @group
 rule git-trap
-  command ^git-.+
-  exit fatal: Use of this repository is prohibited.
+  match $command ~ "^git-.+"
+  exit "fatal: Use of this repository is prohibited."
 @end group
 @end smallexample
 
@@ -1562,10 +1830,10 @@ usage.  When @command{rush} is invoked without @option{-c} it assumes
 interactive usage.  In this case only rules explicitly marked as
 interactive are considered, the rest of rules is ignored.
 
-@deffn {Rule Config} interactive
-This statement marks the rule it appears in as interactive.  This rule
-will match only if @command{rush} is invoked without command line
-arguments.
+@deffn {rule} interactive @var{bool}
+If @var{bool} is @samp{true}, this statement marks the rule it appears
+in as interactive.  This rule will match only if @command{rush} is
+invoked without command line arguments.
 @end deffn
 
 Unless command line transformations are applied, interactive rule
@@ -1577,13 +1845,13 @@ Consider the following example:
 
 @smallexample
 rule login
-  interactive
+  interactive true
   group rshell
-  map[^] /etc/rush.shell : $@{user@} 1 2
-  transform[0] $@{program@} s,^,-r,
+  map program /etc/rush.shell : $@{user@} 1 2
+  set [0] = $@{program@} ~ "s,^,-r,"
 
 rule nologin
-  interactive
+  interactive true
   exit You don't have interactive access to this machine.
 @end smallexample
 
@@ -1594,12 +1862,12 @@ is a member of the group @samp{rshell}.  It uses
 colon.  If the shell is found, its base name, prefixed with @samp{-r},
 will be used as @samp{argv[0]} (this indicates a restricted login shell).
 Otherwise, the trap rule @samp{nologin} will be matched, which will
-output the given diagnostics message and terminate @command{rush}. 
+output the given diagnostics message and terminate @command{rush}.
 
 To test interactive access, use the @option{-i} option:
 
 @smallexample
-rush --test -i 
+rush --test -i
 @end smallexample
 
 @node Localization
@@ -1661,7 +1929,7 @@ execute the request (@pxref{Error Messages}).
 
 @item exit messages
 These are messages sent to the remote party by @code{exit} rules
-(@pxref{Exit}). 
+(@pxref{Exit}).
 @end table
 
 These messages use different domain names (and may use different
@@ -1695,17 +1963,17 @@ the system administrator to provide and install such files.
 The following configuration directives control localization.  They
 are available for use in @code{rule} statements:
 
-@deffn {Configuration} locale @var{name}
+@deffn {rule} locale @var{name}
 Sets the locale name.  To specify empty locale, use @samp{""} as
 @var{name} (recall that empty locale name means to use the value of the
 environment variable @env{LC_ALL} as locale name).
 @end deffn
 
-@deffn {Configuration} locale-dir @var{name}
+@deffn {rule} locale-dir @var{name}
 Sets the name of the locale directory.
 @end deffn
 
-@deffn {Configuration} text-domain @var{name}
+@deffn {rule} text-domain @var{name}
 Sets the textual domain name.
 @end deffn
 
@@ -1714,8 +1982,8 @@ The following configuration fragment illustrates their use:
 @smallexample
 @group
 rule l10n
-  locale pl_PL
-  text-domain rush-config
+  locale "pl_PL"
+  text-domain "rush-config"
   fall-through
 @end group
 @end smallexample
@@ -1723,7 +1991,7 @@ rule l10n
 Different users may have different localization
 preferences.  @xref{per-user l10n}, for a description of how to
 implement this.
-  
+
 @node Writing Your Localization
 @subsubsection Writing Your Localization
   You need to write a localization file for your configuration script
@@ -1750,7 +2018,7 @@ the name of the rush configuration file as its argument and produces
 the PO file on the standard output, or in the file given with the
 @option{-o} (@option{--output}) option. E.g., to create a PO file
 from your configuration file, run:
-  
+
 @smallexample
 rush-po -o myconf.po /usr/local/etc/rush.rc
 @end smallexample
@@ -1759,7 +2027,7 @@ rush-po -o myconf.po /usr/local/etc/rush.rc
 
 Open the created @acronym{PO} file with your favorite editor and supply
 message translations after @code{msgstr} keywords.  Although you can
-use any editor, capable of handling plain text files, we recommend to
+use any editor capable of handling plain text files, we recommend to
 use GNU Emacs, which provides a special @dfn{po-mode}.  @xref{Basics,
 PO Files and PO Mode Basics,,gettext, GNU gettext utilities}, for guidelines
 on editing @acronym{PO} files and using the po-mode.
@@ -1784,21 +2052,24 @@ directory.  It is important that the installed @acronym{MO} file uses
 the naming scheme described in @ref{mo-name, localization file
 naming}.
 @end enumerate
-  
+
 @node Include
 @section Include
+@UNREVISED
 @cindex include
   The @code{include} statement forces inclusion of the named file in
 that file location:
 
-@deffn {Configuration} include @var{file}
+@deffn {rule} include @var{file}
   Include file @var{file}
 @end deffn
 
 @cindex tilde expansion
-If @var{file} starts with a tilde character, followed by
+The statement is evaluated when parsing the configuration file,
+consequently the @var{file} undergoes only @dfn{tilde expansion}:
+if it starts with a tilde character, followed by
 a slash (@samp{~/}), these two characters are replaced with the
-full path name of current user's home directory.
+full path name of the current user's home directory.
 
 If @var{file} is a directory, that directory is searched for a file
 whose name coincides with the current user name.  If such a file is
@@ -1808,68 +2079,13 @@ In any case, if the file named by @var{file} (after tilde expansion)
 does not exist, no error is reported, and parsing of the configuration
 file continues.
 
-Before including the file, @command{rush} checks if it is secure, using
+The @code{rule} and @code{global} statements cannot be used in
+included files.
+
+Before including the file @command{rush} checks if it is secure, using
 the same rules as for the main configuration file (@pxref{security
 checks}).  The exact list of checks can be tuned using the
-@code{include-security} statement:
-
-@anchor{include-security}
-@deffn {Configuration} include-security @var{list}
-Configure the security checks for include files.  This statement takes
-a list of arguments, separated by white space.  The following
-arguments are recognized:
-
-@table @code
-@item all
-Enable all checks.
-
-@item owner
-The file is not owned by root.
-
-@item iwgrp
-@itemx groupwritablefile
-The file is group writable.
-
-@item iwoth
-@itemx worldwritablefile
-The file is world writable.
-
-@item dir_iwgrp
-@itemx groupwritabledir
-The file resides in a group writable directory.
-
-@item dir_iwoth
-@itemx worldwritabledir
-The file resides in a world writable directory.
-
-@item link
-The file is a symbolic link to a file residing in a group or world
-writable directory.
-@end table
-
-Each of the above keywords may be prefixed by @samp{no}, which
-reverses its meaning.  The special keyword @samp{none} is synonymous
-to @samp{noall}, i.e. it disables all checks.  Each keyword adds or
-removes a particular test to the existing check list, which is
-initialized as described in @ref{security checks}.  Thus, the foll
-owning statement results in all checks, except for the file ownership:
-
-@smallexample
-include-security noowner
-@end smallexample
-
-In the example below, the check list is first cleared by using the
-@code{noall} statement, and then a set of checks is added to it:
-
-@smallexample
-include-security noall owner iwoth iwgrp
-@end smallexample
-
-The @code{include-security} statement is global, i.e. it affects all
-@code{include} statements appearing below it, up to the next
-@code{include-security} statement, or end of configuration file,
-whichever occurs first.
-@end deffn
+@code{include-security} statement (@pxref{include-security}).
 
 The @code{include} statement can appear in any place of the
 configuration file, both within or outside of a rule.
@@ -1883,14 +2099,13 @@ user's home directory:
 @smallexample
 @group
 rule user
-  include ~/.rush
+  include "~/.rush"
   fall-through
 @end group
 @end smallexample
 
 Of course, it is supposed that such a per-user file, if it exists, is
-writable only for super-user and does not contain any @code{rule}
-statements.
+writable only for super-user.
 
 @anchor{per-user l10n}
 The use of include files may be especially useful for per-user
@@ -1899,151 +2114,9 @@ fall-through rule, similar to the one above, and to place a
 @code{locale} directive in @file{~/.rush} files, according to the
 users' preferences.
 
-@node Debugging
-@section Debugging
-@cindex debugging
-  The @code{debug} statement sets the @dfn{debugging level} -- an
-integer value that controls the verbosity of @command{rush}:
-
-@deffn {Configuration} debug @var{num}
-Set the debugging level to @var{num}.
-@end deffn
-
-  The greater @var{num} is, the more verbose is the logging.  The
-debugging information is reported via @code{syslog} at facility
-@samp{authpriv}, priority @samp{debug}.  As of version @value{VERSION},
-the following debugging levels are supported: 
-
-@cindex debugging levels
-@table @asis
-@item 1
-A minimum debugging level, and the only one whose messages are logged
-using the priority @samp{notice}.  At this level, @command{rush} only
-logs requests and rules selected to handle them.  For example:
-
-@smallexample
-rush[16821]: Serving request "/usr/libexec/sftp-server"
-for sergiusz by rule sftp-savane
-@end smallexample
-
-@item 2
-List all actions executed when serving requests.
-
-@item 3
-Verbosely describe parsing of the configuration file.
-@end table
-
-  More debugging levels may be implemented in future.  
-
-@node Regex
-@section Regex
-@cindex regular expressions
-@cindex extended regular expressions
-@cindex basic regular expressions
-
-The @code{regex} statement configures the flavor of regular
-expressions for use by subsequent @code{command}, @code{match} and
-@code{transform} statements.
-
-@deffn {Configuration} regex @var{regex-flags}
-Configure the type of regular expressions.
-@end deffn
-
-@var{Regex-flags} is a whitespace-separated list of flags.
-Each flag is a word specifying some regular expression 
-feature.  It can be preceded by @samp{+} to enable this feature (this
-is the default), or by @samp{-} to disable it.  Valid flags are:
-
-@table @samp
-@item extended
-Use @acronym{POSIX} Extended Regular Expression syntax when
-interpreting regex.  This is the default.
-
-@item basic
-Use basic regular expressions.  Equivalent to @samp{-extended}.
-
-@item icase
-Do not differentiate case.  Subsequent regex matches will be case
-insensitive. 
-@end table
-
-For example, the following statement enables @acronym{POSIX} extended,
-case insensitive matching:
-
-@smallexample
-regex +extended +icase
-@end smallexample
-
-The @code{regex} settings affect subsequent @code{command} and
-@code{match} statements (@pxref{Conditions}), and remain in effect
-until next @code{regex} statement or the end of configuration file,
-whichever occurs first.
-
-@node Sleep Time
-@section Sleep Time
-
-@deffn {Configuration} sleep-time @var{number}
-Set the time in seconds to sleep before exiting on error.  
-@end deffn
-
-This statement is intended as a measure against brute-force attacks.
-Default sleep time is 5 seconds.
-
-@node Error Messages
-@section Error Messages
-@cindex error messages
-
-A set of statements configures textual messages which GNU Rush
-returns to the user if an error of some class occurs.  All of them
-take a single argument which is subject to backslash interpretation,
-as described in @ref{Exit, backslash interpretation}. 
-
-@deffn {Configuration} usage-error @var{text}
-Define a textual message which is returned to the remote party if a
-usage error occurs.  
-
-Default is:
-
-@smallexample
-You are not permitted to execute this command.
-@end smallexample
-@end deffn
-
-@deffn {Configuration} nologin-error @var{text}
-Define a textual message which is returned to the remote user if
-there is no such user name in the password database.  
-
-Default is:
-
-@smallexample
-You do not have interactive login access to this machine.
-@end smallexample
-@end deffn
-
-@deffn {Configuration} config-error @var{text}
-Define a textual message which is returned to the remote party on
-Rush configuration errors.  
-
-Default is:
-
-@smallexample
-Local configuration error occurred.
-@end smallexample
-@end deffn
-
-@deffn {Configuration} system-error @var{text}
-Define a textual message which is returned to the remote party if
-a system error occurs. 
-
-Default message is:
-
-@smallexample
-A system error occurred while attempting to execute command.
-@end smallexample
-@end deffn
-
 @node Default Configuration
 @chapter Default Configuration
+@UNREVISED
 
 You can compile @command{rush} with the default configuration built in
 the binary.  Such a binary can then be run without configuration file.
@@ -2081,7 +2154,7 @@ utilities.  For this purpose, we assume the following setup:
 @itemize @bullet
 @item Users are allowed to use @code{scp} and @code{rsync} to upload
 files to the @file{/incoming} directory and to copy files to and from
-their @file{~/public_html} directory.  
+their @file{~/public_html} directory.
 The @file{/incoming} directory is located on server in @file{/home/ftp}
 directory, but that is transparent to users, i.e. they use
 @code{scp @var{file} @var{host}:/incoming} (not
@@ -2090,7 +2163,7 @@ directory, but that is transparent to users, i.e. they use
 @item Additionally, users may use @command{sftp} to manage their
 @file{~/public_html} directory.  In this case, to prevent users from
 accessing other directories, @command{sftp-server} is executed in a
-chrooted environment. 
+chrooted environment.
 
 @item The server runs three version control system repositories, whose
 corresponding repositories are located in the following directories:
@@ -2124,12 +2197,12 @@ with option @option{-t}, when copying files to server, and with
 @smallexample
 # Copying to server:
 rule scp-to
-  command ^scp -t
+  match $command ~ "^scp -t"
   ...
 
-# Copying from server:  
+# Copying from server:
 rule scp-from
-  command ^scp -f
+  match $command ~ "^scp -f"
   ...
 @end smallexample
 
@@ -2138,26 +2211,25 @@ line option.  In this case, the @samp{scp-to} rule will become:
 
 @smallexample
 rule scp-to
-  command ^scp (-v )?-t
+  match $command ~ "^scp (-v )?-t"
   ...
 @end smallexample
 
 First, we want users to be able to upload files to
 @file{/home/ftp/incoming} directory.  Moreover, the @file{/home/ftp}
-directory prefix must be invisible to them.  We must also make sure
+directory prefix must be invisible to them.  We should also make sure
 that the user cannot get outside the @file{incoming} directory by using
 @file{../} components in his upload path.  So, our first rule for
 @code{scp} uploads will be:
 
 @smallexample
 rule scp-to-incoming
-  command ^scp (-v )?-t /incoming/
-  match[$] ! \.\./
-  set[0] /bin/scp
-  transform[$] s|^|/home/ftp/|
+  match $command ~ "^scp (-v )?-t /incoming/" && $@{-1@} !~ "\\.\\./"
+  set command "/bin/scp"
+  set [-1] =~ "s|^|/home/ftp/|"
 @end smallexample
 
-The @code{match[$]} statement ensures that no relative components are
+The @code{match} statement ensures that no relative components are
 used.  Two transform rules ensure that the right @command{scp} binary
 is used and that @file{/home/ftp} prefix is prepended to the upload
 path.
@@ -2177,22 +2249,21 @@ the server.  The corresponding rule is:
 
 @smallexample
 rule scp-home
-  command ^scp (-v )?-[tf] [^/].*
-  match[$] ! \.\./
-  set[0] /bin/scp
-  transform[$] s|^|public_html/|
-  chdir ~
+  match $command ~ "^scp (-v )?-[tf] [^/].*" && $@{-1@} !~ "\\.\\./"
+  set [0] = "/bin/scp"
+  set [-1] =~ "s|^|public_html/|"
+  chdir "~"
 @end smallexample
 
 Finally, we provide two trap rules for diagnostic purposes:
 
 @smallexample
 rule scp-to-trap
-  command ^scp (-v )?-t
-  exit Error: Uploads to this directory prohibited
+  match $command ~ "^scp (-v )?-t"
+  exit "Error: Uploads to this directory prohibited"
 
-rule scp-from  
-  command ^scp (-v )?-f
+rule scp-from
+  match $command ~ "^scp (-v )?-f"
   exit Error: Downloads from this directory prohibited
 @end smallexample
 
@@ -2209,47 +2280,42 @@ the two rules will be:
 
 @smallexample
 rule rsync-incoming
-  command ^rsync --server
-  command ! --sender
-  match[$] /incoming/
-  match[$] ! \.\./
-  transform[0] s|^|/usr/bin/|
-  transform[$] s|^|/home/ftp/|
+  match $command ~ "^rsync --server" && $command !~ --sender \
+        && $@{-1@} ~ "/incoming/" && $@{-1@} !~ "\\.\\./"
+  set [0] =~ "s|^|/usr/bin/|"
+  set [-1] =~ "s|^|/home/ftp/|"
 
 rule rsync-home
-  command ^rsync
-  match[$] ! ^[^/]
-  match[$] ! \.\./
-  transform[0] s|^|/usr/bin/|
-  transform[$] s|^|public_html/|
-  chdir ~
+  match $command ~ "^rsync" && $@{-1@} !~ "^[^/]" && $@{-1@} !~ "\\.\\./"
+  set [0] = "s|^|/usr/bin/|"
+  set [-1] =~ "s|^|public_html/|"
+  chdir "~"
 @end smallexample
 
 The trap rules for @command{rsync} are trivial:
 
 @smallexample
 rule rsync-to-trap
-  command ^rsync
-  command --sender
-  exit Error: Downloads from this directory prohibited
+  match $command ~ "^rsync.*--sender"
+  exit "Error: Downloads from this directory prohibited"
 
 rule rsync-from-trap
-  command ^rsync
-  exit Error: Uploads to this directory prohibited
+  match $command ~ "^rsync"
+  exit "Error: Uploads to this directory prohibited"
 @end smallexample
 
 @node sftp
 @section sftp
 @cindex sftp
 Executing @command{sftp} on the client machine invokes
-@command{sftp-server}, without arguments, on the server. 
+@command{sftp-server}, without arguments, on the server.
 
 We want to allow our users to use @command{sftp} to manage their
 @file{public_html} directories.  The @command{sftp-server} will be
 executed with the user's home directory as root, in a chrooted
 environment.  For this to work, each user's home must contain a copy
 of @command{sftp-server} (which we'll place in @file{~/bin}
-subdirectory) and all files it needs for normal execution: 
+subdirectory) and all files it needs for normal execution:
 @file{/etc/group} and @file{/etc/passwd} with one entry
 (for the user and his group), and, unless the binary is linked
 statically, all the shared libraries it is linked with, in the
@@ -2260,10 +2326,10 @@ Given these prerequisites, the following rule will ensure proper
 
 @smallexample
 rule sftp-incoming
-  command ^.*/sftp-server
-  set[0] /bin/sftp-server
-  chroot ~
-  chdir public_html
+  match $command ~ "^.*/sftp-server"
+  set [0] = "/bin/sftp-server"
+  chroot "~"
+  chdir "public_html"
 @end smallexample
 
 Notice the last action.  Due to it, users don't have to type @code{cd
@@ -2272,6 +2338,9 @@ public_html} at the beginning of their sftp sessions.
 @node cvs
 @section cvs
 @cindex cvs
+@UNREVISED
+@FIXME{CVS is rarely used nowadays, so the utility of this section is
+doubtful. Rewrite it using some more widely used VCS (hg, for example)}.
 Using @command{cvs} over @code{ssh} invokes @command{cvs server} on
 the server machine.  In the simplest case, the following rule will do
 to give users access to @acronym{CVS} repositories:
@@ -2279,8 +2348,8 @@ to give users access to @acronym{CVS} repositories:
 @smallexample
 @group
 rule cvs
-  command ^cvs server
-  transform s|^cvs|/usr/bin/cvs -f
+  match $command ~ "^cvs server"
+  set command ~ "s|^cvs|/usr/bin/cvs -f"
 @end group
 @end smallexample
 
@@ -2292,13 +2361,13 @@ to run @command{cvs} in a chrooted environment.  Let's suppose we
 created an environment for @command{cvs} in directory @file{/var/cvs},
 with the @command{cvs} binary located in @file{/var/cvs/bin} and
 repository root directory being @file{/var/cvs/cvsroot}.  Then, we can
-use the following rule: 
+use the following rule:
 
 @smallexample
 rule cvs
-  command ^cvs server
-  set[0] /bin/cvs
-  chroot /var/cvs
+  match $command ~ "^cvs server"
+  set [0] = "/bin/cvs"
+  chroot "/var/cvs"
 @end smallexample
 
 @node svn
@@ -2312,17 +2381,18 @@ subset of root directories.  So, we can use the following rule:
 @smallexample
 @group
 rule svn
-  command ^svnserve -t
-  transform s|-r *[^ ]*||;s|^svnserve |/usr/bin/svnserve -r /svnroot|
+  match $command ~ "^svnserve -t"
+  set command =~ "s|-r *[^ ]*||"
+  set command =~ "s|^svnserve |/usr/bin/svnserve -r /svnroot|"
 @end group
 @end smallexample
 
-The @code{transform} action removes any @option{-r} options the user
+First @code{set command} action removes any @option{-r} options the user
 might have specified and enforces a single root directory.  A more
 restrictive action can be used to improve security:
 
 @smallexample
-  transform s|.*|/usr/bin/svnserve -r /svnroot|
+  set command =~ "s|.*|/usr/bin/svnserve -r /svnroot|"
 @end smallexample
 
 @node git
@@ -2338,8 +2408,8 @@ The simplest rule for Git is:
 @smallexample
 @group
 rule git
-  command ^git-(receive|upload)-pack
-  transform[0] s|^|/usr/bin/|
+  set $command ~ "^git-(receive|upload)-pack"
+  set [0] =~ "s|^|/usr/bin/|"
 @end group
 @end smallexample
 
@@ -2348,15 +2418,15 @@ of Git binaries to use.  This example supposes they are placed in
 @file{/usr/bin}, you will have to tailor it if they are located
 elsewhere on your system.
 
-To limit Git accesses to repositories under @file{/gitroot} directory, use
-@code{match[1]} construct, as shown in the example below:
+To limit Git accesses to repositories under @file{/gitroot} directory,
+modify the @samp{$1}, as shown in the example below:
 
 @smallexample
 @group
 rule git
-  command ^git-(receive|upload)-pack
-  match[1] ^/gitroot[^ ]+\.git$
-  transform[0] s|^|/usr/bin/|
+  match $command ~ "^git-(receive|upload)-pack"
+  set [1] =~ "^/gitroot[^ ]+\.git$"
+  set [0] =~ "s|^|/usr/bin/|"
 @end group
 @end smallexample
 
@@ -2367,8 +2437,8 @@ trap rule (@pxref{Exit, trap rules}):
 @group
 # @r{Trap the rest of Git requests:}
 rule git-trap
-  command ^git-.+
-  exit fatal: access to this repository is denied.
+  match $command ~ "^git-.+"
+  exit "fatal: access to this repository is denied."
 @end group
 @end smallexample
 
@@ -2378,10 +2448,10 @@ rule git-trap
 Rush rules.  Let's suppose we wish to receive emails for each upload
 by @code{scp-to} rule (@pxref{scp}).  To do so, we add the following
 fall through rule to the beginning of @file{rush.rc}:
-  
+
 @smallexample
 rule default
-  post-socket inet://localhost
+  post-socket "inet://localhost"
   fall-trough
 @end smallexample
 
@@ -2430,7 +2500,7 @@ EOT
   GNU Rush provides a special @dfn{test mode}, intended to test
 configuration files and to emulate execution of commands.  Test
 mode is enabled by @option{--test} command line option (aliases:
-@option{--lint}, @option{-t}).  When @command{rush} is given this option, the 
+@option{--lint}, @option{-t}).  When @command{rush} is given this option, the
 following occurs:
 
 @enumerate 1
@@ -2571,7 +2641,7 @@ GID of the user.
 
 @kwindex pw_dir, dump attribute
 @item pw_dir
-Home directory of the user, as set in the system user database. 
+Home directory of the user, as set in the system user database.
 
 @kwindex umask, dump attribute
 @item umask
@@ -2684,6 +2754,18 @@ $ rush --lint ./test.rc
 If the @option{-c} option is also specified, @command{rush} emulates the
 normal processing for the command, but does not execute it.
 
+@opindex -x, @r{rush}
+@opindex --trace, @r{rush}
+@item -t
+@item --trace
+Print parser traces.  When used twice, print lexical scanner traces as
+well.  This option is intended for debugging.
+
+@opindex -T, @r{rush}
+@item -T
+Test scanner mode.  This option is used by the @command{rush}
+testsuite.
+
 @opindex -u, @r{rush}
 @opindex --user, @r{rush}
 @item -u @var{name}
@@ -2730,7 +2812,7 @@ The information displayed is:
 The login name of the user.
 
 @item Rule
-The tag of the rule he is served under (@pxref{Rule, tag}).  
+The tag of the rule he is served under (@pxref{Rule, tag}).
 
 @item Start
 Time when the rule began execution.
@@ -2800,7 +2882,7 @@ Display program version.
 @opindex -h, @r{rushwho}
 @opindex --help, @r{rushwho}
 @item -h
-@itemx --help 
+@itemx --help
 Display a short help message.
 
 @opindex --usage, @r{rushwho}
@@ -2919,7 +3001,7 @@ Print the user login name.
        [:empty @var{repl}] [:right] [:format @var{date-format}]
 @deffnx {Format Spec} start-time @var{width} @var{title} @
        [:empty @var{repl}] [:right] [:format @var{date-format}]
-       
+
 Date and time when the session started.
 
 The @code{:format} keyword introduces the @code{strftime} format string
@@ -2961,8 +3043,8 @@ line option (@pxref{format option}):
 
 @smallexample
 (user 10 Login)" "
-(rule 8 Rule)" " 
-(start-time 0 Start)" " 
+(rule 8 Rule)" "
+(start-time 0 Start)" "
 (duration 9 Time)" "
 (pid 10 PID)" "
 (command 28 Command)
@@ -3068,7 +3150,7 @@ Display program version.
 @opindex -h, @r{rushlast}
 @opindex --help, @r{rushlast}
 @item -h
-@itemx --help 
+@itemx --help
 Display a short help message.
 
 @opindex --usage, @r{rushlast}
@@ -3118,19 +3200,19 @@ shown in the following @file{logrotate.conf} snippet:
 
   Accounting files are owned by @samp{root} and normally have permissions
 @samp{600}.  You may change the default permissions using the
-following configuration file statements:
+following global configuration file statements:
 
-@deffn {Rule Config} acct-umask @var{mask}
+@deffn {global} acct-umask @var{mask}
 Set umask used when accessing accounting database files.  Default
 value is @samp{022}.
 @end deffn
 
-@deffn {Rule Config} acct-dir-mode @var{mode}
+@deffn {global} acct-dir-mode @var{mode}
 Set mode bits for the accounting directory.  The @var{mode} argument
 is the mode in octal.
 @end deffn
 
-@deffn {Rule Config} acct-file-mode @var{mode}
+@deffn {global} acct-file-mode @var{mode}
 Set mode bits for @file{wtmp} and @file{utmp} files.
 @end deffn
 
@@ -3232,7 +3314,7 @@ task, the following list shows the basic set of information that is
 needed in order to find the bug:
 
 @itemize
-@item Package version you use.  
+@item Package version you use.
 @item A detailed description of the bug.
 @item Conditions under which the bug appears.
 @item It is often helpful to send the contents of @file{config.log}
@@ -3256,4 +3338,3 @@ This is a general index of all issues discussed in this manual.
 @printindex cp
 
 @bye
-
