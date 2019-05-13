@@ -206,7 +206,7 @@ struct envar {
 };
 
 struct rush_rule {
-	struct rush_rule *next;      /* Next config in the list */
+	struct rush_rule *next;      /* Next rule in the list */
 
 	char *tag;
 	int fall_through;

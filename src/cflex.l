@@ -380,14 +380,14 @@ static int noinc(void);
 				stringbuf_init(&sb);
 				stringbuf_add_array(&sb, yytext, yyleng);
 				pushstart(VAR); }
-\$[0-9]|\$\{[0-9]+\}          { yylval.str = xstrdup(yytext);
+\$[0-9]|\$\{-?[0-9]+\}          { yylval.str = xstrdup(yytext);
 				return tok(STRING); }
-\$\{[0-9]+:?[-+=\?]           {
+\$\{-?[0-9]+:?[-+=\?]           {
 				stringbuf_init(&sb);
 				stringbuf_add_array(&sb, yytext, yyleng);
 				pushstart(VAR); }
 
-%[0-9]                   { yylval.str = xstrdup(yytext);
+%([0-9]|(\{[0-9]+\}))    { yylval.str = xstrdup(yytext);
 			   return tok(STRING); }
 \"[^\\\"\n]*\"           { yylval.str = xmalloc(yyleng-1);
 			   memcpy(yylval.str, yytext + 1, yyleng - 2);
@@ -444,12 +444,10 @@ static int noinc(void);
 					return tok(STRING);
 				}
 			      }
-\$[A-Za-z_][A-Za-z_0-9-]*     { stringbuf_add_array(&sb, yytext, yyleng); }
-\$\{[A-Za-z_][A-Za-z_0-9-]*\} ;
-\$\{[A-Za-z_][A-Za-z_0-9-]*:?[-+=\?] {
+\$([0-9]|(\{-?[0-9]+\})|([A-Za-z_][A-Za-z_0-9-]*)|(\{[A-Za-z_][A-Za-z_0-9-]*\}))  { stringbuf_add_array(&sb, yytext, yyleng); }
+\$\{((-?[0-9]+)|([A-Za-z_][A-Za-z_0-9-]*)):?[-+=\?] {
 				stringbuf_add_array(&sb, yytext, yyleng);
 				pushstart(VAR); }
-%[0-9]                        { stringbuf_add_array(&sb, yytext, yyleng); }
 \"[^\\\"\n]*\"                { stringbuf_add_array(&sb, yytext, yyleng); }
 \"[^\\\"\n]*\\.|\"[^\\\"\n]*\\\n { stringbuf_add_escape_dfl(&sb, yytext, yyleng);
                                    pushstart(QSTR); }

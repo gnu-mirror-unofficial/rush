@@ -1,5 +1,5 @@
 /* wordsplit - a word splitter
-   Copyright (C) 2009-2018 Sergey Poznyakoff
+   Copyright (C) 2009-2019 Sergey Poznyakoff
 
    This program is free software; you can redistribute it and/or modify it
    under the terms of the GNU General Public License as published by the
@@ -52,6 +52,8 @@
 
 #define ISVARBEG(c) (ISALPHA(c) || c == '_')
 #define ISVARCHR(c) (ISALNUM(c) || c == '_')
+
+#define ISPOSBEG(s) (ISDIGIT((s)[0]) || ((s)[0] == '-' && ISDIGIT((s)[1])))
 
 #define WSP_RETURN_DELIMS(wsp) \
  ((wsp)->ws_flags & WRDSF_RETURN_DELIMS || ((wsp)->ws_options & WRDSO_MAXWORDS))
@@ -1182,12 +1184,12 @@ expvar (struct wordsplit *wsp, const char *str, size_t len,
 	  break;
       *pend = str + i - 1;
     }
-  else if (ISDIGIT (str[0]))
+  else if (ISPOSBEG (&str[0]))
     {
       i = 1;
       *pend = str;
     }
-  else if (str[0] == '{' && (ISVARBEG (str[1]) || ISDIGIT (str[1])))
+  else if (str[0] == '{' && (ISVARBEG (str[1]) || ISPOSBEG (&str[1])))
     {
       str++;
       len--;
@@ -1219,7 +1221,7 @@ expvar (struct wordsplit *wsp, const char *str, size_t len,
 	      *pend = str + j;
 	      break;
 	    }
-	  else if (ISDIGIT (str[1]))
+	  else if (ISPOSBEG (&str[1]))
 	    {
 	      if (!ISDIGIT (str[i]))
 		{

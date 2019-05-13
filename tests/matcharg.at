@@ -21,18 +21,47 @@ AT_RUSH_TEST([
 rush 2.0
 rule
   match \$1 ~ "^fo+\$"
+  set RULE = 1
+
+rule
+  match \${1} ~ "^ba"
+  set RULE = 2
+
+rule
+  match \${-1} ~ "/"
+  set RULE = 3
 ],
-[cmdline,argv,prog],
+[cmdline,vars],
 
 [/usr/bin/echo foo],
 [0],
 [{
     "cmdline":"/usr/bin/echo foo",
-    "argv":[[
-        "/usr/bin/echo",
-        "foo"
-    ]],
-    "prog":null
+    "vars":{
+        "RULE":"1"
+    }
+}
+],
+[],
+
+[/usr/bin/echo bar],
+[0],
+[{
+    "cmdline":"/usr/bin/echo bar",
+    "vars":{
+        "RULE":"2"
+    }
+}
+],
+[],
+
+[/usr/bin/echo /var],
+[0],
+[{
+    "cmdline":"/usr/bin/echo /var",
+    "vars":{
+        "RULE":"3"
+    }
 }
 ],
 [],
@@ -41,7 +70,9 @@ rule
 [1],
 [],
 [rush: Error: no matching rule for "/usr/bin/echo for", user $MY_USER
-])
+],
+
+)
 
 AT_CLEANUP
 

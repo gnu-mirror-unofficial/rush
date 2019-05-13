@@ -672,8 +672,6 @@ A system error occurred while attempting to execute command.
 @cindex regular expressions
 @cindex extended regular expressions
 @cindex basic regular expressions
-@FIXME{Remove the Regex anchor when all references have been cleaned up}
-@anchor{Regex}
 The @code{regexp} statement configures the flavor of regular
 expressions for use by subsequent @code{match} and
 @code{set} statements.

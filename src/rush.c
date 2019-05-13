@@ -1009,7 +1009,7 @@ run_rule(struct rush_rule *rule, struct rush_request *req)
 	if (req->fork == rush_true) 
 		fork_process(rule, req);
 
-	setowner (req);
+	setowner(req);
 	
         umask(req->umask);
 
