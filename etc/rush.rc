@@ -2,54 +2,59 @@
 # Lines beginning with # and empty lines are ignored.
 # See `info rush' for a detailed description.
 
-# Set verbosity level. 
-debug 1
+rush 2.0
+
+global
+  # Set verbosity level. 
+  debug 1
 
 rule default
   limits t10r20
   umask 002
-  env - USER LOGNAME HOME PATH+=:/usr/local/bin
+  clrenv
+  keepenv USER LOGNAME HOME PATH
+  setenv PATH="$PATH:/usr/local/bin"
   fall-through
-	
+
 rule cvs
-  command ^cvs server
-  set[0] /usr/bin/cvs
+  match $command ~ "^cvs server"
+  set [0] = "/usr/bin/cvs"
 
 # Secure cp requests
 rule scp-to
-  command ^scp (-v )?-t /incoming/(alpha|ftp)
-  set[0] /bin/scp
-  chroot /var/spool/sftp-upload
-  chdir /incoming
+  match $command ~ "^scp (-v )?-t /incoming/(alpha|ftp)"
+  set [0] = "/bin/scp"
+  chroot "/var/spool/sftp-upload"
+  chdir "/incoming"
 
 # A trap rule for outbound scp requests
 rule scp-from
-  command ^scp (-v )?-f
-  exit Error: Secure copy from this server is not allowed
+  match command ~ "^scp (-v )?-f"
+  exit "Error: Secure copy from this server is not allowed"
   
 # Svn server: force full binary path and root directory.  
 rule svn
-  command ^svnserve -t
-  transform s|-r *[^ ]*||;s|^svnserve |/usr/bin/svnserve -r /svnroot |
+  match $command ~ "^svnserve -t"
+  set command =~ "s|-r *[^ ]*||;s|^svnserve |/usr/bin/svnserve -r /svnroot |"
 
 # For git requests, allow access to repositories located under
 # /vcs-roots/git
 rule git
-  command ^git-(receive|upload)-pack
-  match[1] ^/vcs-roots/git/[^ ]+\.git$
-  transform[0] s|^|/usr/bin/|
+  match $command ~ "^git-(receive|upload)-pack"
+  match $1 ~ "^/vcs-roots/git/[^ ]+\\.git$"
+  set command =~ "s|^|/usr/bin/|"
   
 # Trap the rest of Git requests:
 rule git-trap
-  command ^git-(receive|upload)-pack
-  exit fatal: access to this repository is denied.
+  match $command ~ "^git-(receive|upload)-pack"
+  exit "fatal: access to this repository is denied."
   
 # Sftp-server requests: chroot into the user's home directory, set umask
 # 002 and execute bin/sftp-server.
 rule sftp
-  command ^.*/sftp-server
-  set[0] bin/sftp-server
+  match $program ~ "^.*/sftp-server"
+  set [0] = "bin/sftp-server"
   umask 002
-  chroot ~
-  chdir /
+  chroot "~"
+  chdir "/"
 
