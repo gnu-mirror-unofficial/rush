@@ -20,7 +20,7 @@ AT_KEYWORDS([match compound])
 AT_RUSH_TEST([
 rush 2.0
 rule
-  match \$0 == "/bin/ls" && \$argc == 2 && (\$1 ~ "^/usr" || \$1 == "/")
+  match \$0 == "/bin/ls" && \$# == 2 && (\$1 ~ "^/usr" || \$1 == "/")
 ],
 [cmdline,argv,prog],
 

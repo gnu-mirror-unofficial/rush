@@ -387,8 +387,8 @@ static int noinc(void);
 				stringbuf_add_array(&sb, yytext, yyleng);
 				pushstart(VAR); }
 
-%([0-9]|(\{[0-9]+\}))    { yylval.str = xstrdup(yytext);
-			   return tok(STRING); }
+\$[#@*]|%([0-9]|(\{[0-9]+\})) { yylval.str = xstrdup(yytext);
+			        return tok(STRING); }
 \"[^\\\"\n]*\"           { yylval.str = xmalloc(yyleng-1);
 			   memcpy(yylval.str, yytext + 1, yyleng - 2);
 			   yylval.str[yyleng - 2] = 0;

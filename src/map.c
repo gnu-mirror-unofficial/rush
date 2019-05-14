@@ -143,13 +143,6 @@ var_command(struct rush_request *req)
 	return req->cmdline;
 }
 
-static const char *
-var_argc(struct rush_request *req)
-{
-	static char buf[INT_BUFSIZE_BOUND(uintmax_t)];
-	return umaxtostr(req->argc, buf);
-}
-
 struct vardef {
 	char *name;
 	const char *(*expand)(struct rush_request *);
@@ -164,7 +157,6 @@ static struct vardef request_vars[] = {
 	{ "gecos",   var_gecos },
 	{ "program", var_program },
 	{ "command", var_command },
-	{ "argc",    var_argc },
 	{ NULL }
 };
 

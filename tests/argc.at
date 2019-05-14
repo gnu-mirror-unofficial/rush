@@ -20,7 +20,7 @@ AT_KEYWORDS([argc])
 AT_RUSH_TEST([
 rush 2.0
 rule
-  match \$argc == 2
+  match \$# == 2
 ],
 
 [cmdline,argv,prog,interactive,fork,acct],

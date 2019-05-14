@@ -939,8 +939,8 @@ user request:
 @item $program       @tab Executable program name
 @vindex command
 @item $command       @tab Entire command line
-@vindex $argc
-@item $argc          @tab Number of arguments in @samp{$command}
+@vindex $#
+@item $#             @tab Number of arguments in @samp{$command}
 @end multitable
 
 @node User-defined variables
@@ -1102,7 +1102,7 @@ the arguments):
 
 @example
 rule
-  match $argc >= 2
+  match $# >= 2
 @end example
 
 The @samp{==} and @samp{!=} can operate both on strings and on

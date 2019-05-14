@@ -415,7 +415,7 @@ _parse_argc(input_buf_ptr ibuf, struct rush_rule *rule,
 	struct test_node *node = new_test_node(test_cmpn);
 	env->node = node;
 	val = _parse_negation(&env->node, env->val);
-	node->v.cmp.larg = "$argc";
+	node->v.cmp.larg = "$#";
 	return parse_numtest(ibuf, node, val, numstrtonum);
 }
 

@@ -30,16 +30,16 @@ typedef struct wordsplit wordsplit_t;
    must be set (or unset, if starting with !) in ws_flags (if starting with
    WRDSF_) or ws_options (if starting with WRDSO_) to initialize or use the
    given member.
-   
+
    If not redefined explicitly, most of them are set to some reasonable
    default value upon entry to wordsplit(). */
-struct wordsplit            
+struct wordsplit
 {
   size_t ws_wordc;          /* [Output] Number of words in ws_wordv. */
   char **ws_wordv;          /* [Output] Array of parsed out words. */
   size_t ws_offs;           /* [Input] (WRDSF_DOOFFS) Number of initial
 			       elements in ws_wordv to fill with NULLs. */
-  size_t ws_wordn;          /* Number of elements ws_wordv can accomodate. */ 
+  size_t ws_wordn;          /* Number of elements ws_wordv can accomodate. */
   int ws_flags;             /* [Input] Flags passed to wordsplit. */
   int ws_options;           /* [Input] (WRDSF_OPTIONS)
 			       Additional options. */
@@ -53,15 +53,15 @@ struct wordsplit
   const char *ws_escape[2]; /* [Input] (WRDSF_ESCAPE) Characters to be escaped
 			       with backslash. */
   void (*ws_alloc_die) (wordsplit_t *wsp);
-                            /* [Input] (WRDSF_ALLOC_DIE) Function called when
+			    /* [Input] (WRDSF_ALLOC_DIE) Function called when
 			       out of memory.  Must not return. */
   void (*ws_error) (const char *, ...)
-                   __attribute__ ((__format__ (__printf__, 1, 2)));
-                            /* [Input] (WRDSF_ERROR) Function used for error
+		   __attribute__ ((__format__ (__printf__, 1, 2)));
+			    /* [Input] (WRDSF_ERROR) Function used for error
 			       reporting */
   void (*ws_debug) (const char *, ...)
-                   __attribute__ ((__format__ (__printf__, 1, 2)));
-                            /* [Input] (WRDSF_DEBUG) Function used for debug
+		   __attribute__ ((__format__ (__printf__, 1, 2)));
+			    /* [Input] (WRDSF_DEBUG) Function used for debug
 			       output. */
   const char **ws_env;      /* [Input] (WRDSF_ENV, !WRDSF_NOVAR) Array of
 			       environment variables. */
@@ -80,14 +80,14 @@ struct wordsplit
 			       parameters */
   size_t ws_paramc;         /* Number of positional parameters */
 
-        /* Temporary storage for parameters. Works similarly to ws_enbuf.
+	/* Temporary storage for parameters. Works similarly to ws_enbuf.
 	 */
   char **ws_parambuf;
   size_t ws_paramidx;
   size_t ws_paramsiz;
-  
+
   int (*ws_getvar) (char **ret, const char *var, size_t len, void *clos);
-                            /* [Input] (WRDSF_GETVAR, !WRDSF_NOVAR) Looks up
+			    /* [Input] (WRDSF_GETVAR, !WRDSF_NOVAR) Looks up
 			       the name VAR (LEN bytes long) in the table of
 			       variables and if found returns in memory
 			       location pointed to by RET the value of that
@@ -96,13 +96,13 @@ struct wordsplit
 			       on error.  User-specific errors can be returned
 			       by storing the error diagnostic string in RET
 			       and returning WRDSE_USERERR.
-                               Whatever is stored in RET, it must be allocated
+			       Whatever is stored in RET, it must be allocated
 			       using malloc(3). */
   void *ws_closure;         /* [Input] (WRDSF_CLOSURE) Passed as the CLOS
 			       argument to ws_getvar and ws_command. */
   int (*ws_command) (char **ret, const char *cmd, size_t len, char **argv,
-                     void *clos);
-	                    /* [Input] (!WRDSF_NOCMD) Returns in the memory
+		     void *clos);
+			    /* [Input] (!WRDSF_NOCMD) Returns in the memory
 			       location pointed to by RET the expansion of
 			       the command CMD (LEN bytes long).  On input,
 			       ARGV contains CMD split out to words.
@@ -110,7 +110,7 @@ struct wordsplit
 			       See ws_getvar for a discussion of possible
 			       return values. */
 
-  const char *ws_input;     /* Input string (the S argument to wordsplit. */  
+  const char *ws_input;     /* Input string (the S argument to wordsplit. */
   size_t ws_len;            /* Length of ws_input. */
   size_t ws_endp;           /* Points past the last processed byte in
 			       ws_input. */
@@ -119,7 +119,8 @@ struct wordsplit
 			       the error, if ws_errno is WRDSE_USERERR.  Must
 			       be allocated with malloc(3). */
   struct wordsplit_node *ws_head, *ws_tail;
-                            /* Doubly-linked list of parsed out nodes. */
+			    /* Doubly-linked list of parsed out nodes. */
+  char ws_sep[2];           /* Temporary storage used during splitting */
   int ws_lvl;               /* Invocation nesting level. */
 };
 
@@ -242,9 +243,9 @@ struct wordsplit
    parameter) */
 #define WRDSO_PARAM_NEGIDX   0x00008000
 
-#define WRDSO_BSKEEP          WRDSO_BSKEEP_WORD     
-#define WRDSO_OESC            WRDSO_OESC_WORD       
-#define WRDSO_XESC            WRDSO_XESC_WORD       
+#define WRDSO_BSKEEP          WRDSO_BSKEEP_WORD
+#define WRDSO_OESC            WRDSO_OESC_WORD
+#define WRDSO_XESC            WRDSO_XESC_WORD
 
 /* Indices into ws_escape */
 #define WRDSX_WORD  0
