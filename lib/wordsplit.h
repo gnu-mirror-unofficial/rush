@@ -75,6 +75,16 @@ struct wordsplit
   char **ws_envbuf;         /* Storage for variables */
   size_t ws_envidx;         /* Index of first free slot */
   size_t ws_envsiz;         /* Size of the ws_envbuf array */
+
+  char const **ws_paramv;   /* [WRDSO_PARAMV] User-supplied positional
+			       parameters */
+  size_t ws_paramc;         /* Number of positional parameters */
+
+        /* Temporary storage for parameters. Works similarly to ws_enbuf.
+	 */
+  char **ws_parambuf;
+  size_t ws_paramidx;
+  size_t ws_paramsiz;
   
   int (*ws_getvar) (char **ret, const char *var, size_t len, void *clos);
                             /* [Input] (WRDSF_GETVAR, !WRDSF_NOVAR) Looks up
@@ -99,7 +109,7 @@ struct wordsplit
 
 			       See ws_getvar for a discussion of possible
 			       return values. */
-	
+
   const char *ws_input;     /* Input string (the S argument to wordsplit. */  
   size_t ws_len;            /* Length of ws_input. */
   size_t ws_endp;           /* Points past the last processed byte in
@@ -201,9 +211,7 @@ struct wordsplit
 #define WRDSO_FAILGLOB        0x00000002
 /* Allow a leading period to be matched by metacharacters. */
 #define WRDSO_DOTGLOB         0x00000004
-#if 0 /* Unused value */
-#define WRDSO_ARGV            0x00000008
-#endif
+/* Unused value:              0x00000008 */
 /* Keep backslash in unrecognized escape sequences in words */
 #define WRDSO_BSKEEP_WORD     0x00000010
 /* Handle octal escapes in words */
@@ -220,6 +228,19 @@ struct wordsplit
 #define WRDSO_OESC_QUOTE      0x00000200
 /* Handle hex escapes in quoted strings */
 #define WRDSO_XESC_QUOTE      0x00000400
+/* Unused: 0x00000800 */
+/* Don't split variable references, even if they contain whitespace
+   (e.g. ${VAR:-foo bar}) */
+#define WRDSO_NOVARSPLIT     0x00001000
+/* Don't split commands, even containing whitespace, e.g.
+   $(echo foo bar) */
+#define WRDSO_NOCMDSPLIT     0x00002000
+
+/* Enable positional parameters */
+#define WRDSO_PARAMV         0x00004000
+/* Enable negative positional indices (${-1} is the last positional
+   parameter) */
+#define WRDSO_PARAM_NEGIDX   0x00008000
 
 #define WRDSO_BSKEEP          WRDSO_BSKEEP_WORD     
 #define WRDSO_OESC            WRDSO_OESC_WORD       
@@ -245,12 +266,14 @@ struct wordsplit
 #define WRDSE_PAREN      7
 #define WRDSE_GLOBERR    8
 #define WRDSE_USERERR    9
+#define WRDSE_BADPARAM  10
 
 int wordsplit (const char *s, wordsplit_t *ws, int flags);
 int wordsplit_len (const char *s, size_t len, wordsplit_t *ws, int flags);
 void wordsplit_free (wordsplit_t *ws);
 void wordsplit_free_words (wordsplit_t *ws);
 void wordsplit_free_envbuf (wordsplit_t *ws);
+void wordsplit_free_parambuf (struct wordsplit *ws);
 int wordsplit_get_words (wordsplit_t *ws, size_t *wordc, char ***wordv);
 
 static inline void wordsplit_getwords (wordsplit_t *ws, size_t *wordc, char ***wordv)

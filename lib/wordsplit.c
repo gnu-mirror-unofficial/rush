@@ -27,6 +27,7 @@
 #include <stdarg.h>
 #include <pwd.h>
 #include <glob.h>
+#include <limits.h>
 
 #if ENABLE_NLS
 # include <gettext.h>
@@ -53,10 +54,11 @@
 #define ISVARBEG(c) (ISALPHA(c) || c == '_')
 #define ISVARCHR(c) (ISALNUM(c) || c == '_')
 
-#define ISPOSBEG(s) (ISDIGIT((s)[0]) || ((s)[0] == '-' && ISDIGIT((s)[1])))
-
 #define WSP_RETURN_DELIMS(wsp) \
  ((wsp)->ws_flags & WRDSF_RETURN_DELIMS || ((wsp)->ws_options & WRDSO_MAXWORDS))
+
+#define to_num(c) \
+  (ISDIGIT(c) ? c - '0' : (ISXDIGIT(c) ? toupper(c) - 'A' + 10 : 255 ))
 
 #define ALLOC_INIT 128
 #define ALLOC_INCR 128
@@ -286,6 +288,14 @@ wordsplit_init (struct wordsplit *wsp, const char *input, size_t len,
 	  wsp->ws_options |= WRDSO_BSKEEP_QUOTE;
 	}
     }
+
+  if (!(wsp->ws_options & WRDSO_PARAMV))
+    {
+      wsp->ws_paramv = NULL;
+      wsp->ws_paramc = 0;
+    }
+  wsp->ws_paramidx = wsp->ws_paramsiz = 0;
+  wsp->ws_parambuf = NULL;
   
   wsp->ws_endp = 0;
   wsp->ws_wordi = 0;
@@ -830,9 +840,12 @@ wordsplit_finish (struct wordsplit *wsp)
 	  goto again;
 	}
 
-      if (wordsplit_add_segm (wsp, 0, 0, _WSNF_EMPTYOK))
-	return wsp->ws_errno;
-      n = 1;
+      if (wsp->ws_flags & WRDSF_NOSPLIT)
+	{
+	  if (wordsplit_add_segm (wsp, 0, 0, _WSNF_EMPTYOK))
+	    return wsp->ws_errno;
+	  n = 1;
+	}
     }
 
   if (alloc_space (wsp, n + 1))
@@ -1035,7 +1048,7 @@ wordsplit_find_env (struct wordsplit *wsp, const char *name, size_t len,
 
 static int
 wsplt_assign_var (struct wordsplit *wsp, const char *name, size_t namelen,
-		  char *value)
+		  char const *value)
 {
   int n = (wsp->ws_flags & WRDSF_ENV_KV) ? 2 : 1;
   char *v;
@@ -1070,7 +1083,7 @@ wsplt_assign_var (struct wordsplit *wsp, const char *name, size_t namelen,
 		    {
 		      for (; j > 1; j--)
 			free (newenv[j-1]);
-		      free (newenv[j-1]);
+		      free (newenv);
 		      return _wsplt_nomem (wsp);
 		    }
 		}
@@ -1141,6 +1154,70 @@ wsplt_assign_var (struct wordsplit *wsp, const char *name, size_t namelen,
   return WRDSE_OK;
 }
 
+int
+wsplt_assign_param (struct wordsplit *wsp, int param_idx, char *value)
+{
+  char *v;
+  
+  if (param_idx < 0)
+    return WRDSE_BADPARAM;
+  if (param_idx == wsp->ws_paramc)
+    {
+      char **parambuf;
+      if (!wsp->ws_parambuf)
+	{
+	  size_t i;
+	  
+	  parambuf = calloc ((size_t)param_idx + 1, sizeof (parambuf[0]));
+	  if (!parambuf)
+	    return _wsplt_nomem (wsp);
+
+	  for (i = 0; i < wsp->ws_paramc; i++)
+	    {
+	      parambuf[i] = strdup (wsp->ws_paramv[i]);
+	      if (!parambuf[i])
+		{
+		  for (; i > 1; i--)
+		    free (parambuf[i-1]);
+		  free (parambuf);
+		  return _wsplt_nomem (wsp);
+		}
+	    }
+	  
+	  wsp->ws_parambuf = parambuf;
+	  wsp->ws_paramidx = param_idx;
+	  wsp->ws_paramsiz = param_idx + 1;
+	}
+      else
+	{
+	  size_t n = wsp->ws_paramsiz;
+	  
+	  if ((size_t) -1 / 3 * 2 / sizeof (wsp->ws_parambuf[0]) <= n)
+	    return _wsplt_nomem (wsp);
+	  n += (n + 1) / 2;
+	  parambuf = realloc (wsp->ws_parambuf, n * sizeof (wsp->ws_parambuf[0]));
+	  if (!parambuf)
+	    return _wsplt_nomem (wsp);
+	  wsp->ws_parambuf = parambuf;
+	  wsp->ws_paramsiz = n;
+	  wsp->ws_parambuf[param_idx] = NULL;
+	}
+
+      wsp->ws_paramv = (const char**) wsp->ws_parambuf;
+      wsp->ws_paramc = param_idx + 1;
+    }
+  else if (param_idx > wsp->ws_paramc)
+    return WRDSE_BADPARAM;
+  
+  v = strdup (value);
+  if (!v)
+    return _wsplt_nomem (wsp);
+    
+  free (wsp->ws_parambuf[param_idx]);
+  wsp->ws_parambuf[param_idx] = v;
+  return WRDSE_OK;
+}
+
 /* Recover from what looked like a variable reference, but turned out
    not to be one. STR points to first character after '$'. */
 static int
@@ -1176,6 +1253,8 @@ expvar (struct wordsplit *wsp, const char *str, size_t len,
   const char *start = str - 1;
   int rc;
   struct wordsplit ws;
+  int is_param = 0;
+  long param_idx = 0;
   
   if (ISVARBEG (str[0]))
     {
@@ -1184,16 +1263,39 @@ expvar (struct wordsplit *wsp, const char *str, size_t len,
 	  break;
       *pend = str + i - 1;
     }
-  else if (ISPOSBEG (&str[0]))
+  else if ((wsp->ws_options & WRDSO_PARAMV) && ISDIGIT (str[0]))
     {
       i = 1;
       *pend = str;
+      is_param = 1;
+      param_idx = to_num (str[0]);
     }
-  else if (str[0] == '{' && (ISVARBEG (str[1]) || ISPOSBEG (&str[1])))
+  else if ((wsp->ws_options & WRDSO_PARAMV) && str[0] == '#')
+    {
+      char b[16];
+      snprintf (b, sizeof(b), "%d", (int) wsp->ws_paramc);
+      value = strdup (b);
+      if (!value)
+	return _wsplt_nomem (wsp);
+      if (wsnode_new (wsp, &newnode))
+	return 1;
+      wsnode_insert (wsp, newnode, *ptail, 0);
+      *ptail = newnode;
+      newnode->flags = _WSNF_WORD | _WSNF_NOEXPAND | flg;
+      newnode->v.word = value;
+      return 0;
+    }
+  else if (str[0] == '{'
+	   && (ISVARBEG (str[1])
+	       || (is_param = (((wsp->ws_options & WRDSO_PARAMV)
+				&& ISDIGIT (str[1]))
+			       || ((wsp->ws_options & WRDSO_PARAM_NEGIDX)
+				   && (str[1] == '-'
+				       && ISDIGIT (str[2]))))) != 0))
     {
       str++;
       len--;
-      for (i = 1; i < len; i++)
+      for (i = str[0] == '-' ? 1 : 0; i < len; i++)
 	{
 	  if (str[i] == ':')
 	    {
@@ -1221,9 +1323,16 @@ expvar (struct wordsplit *wsp, const char *str, size_t len,
 	      *pend = str + j;
 	      break;
 	    }
-	  else if (ISPOSBEG (&str[1]))
+	  else if (is_param)
 	    {
-	      if (!ISDIGIT (str[i]))
+	      if (ISDIGIT (str[i]))
+		{
+		  param_idx = param_idx * 10 + to_num (str[i]);
+		  if ((str[0] == '-' && -param_idx < INT_MIN)
+		      || param_idx > INT_MAX)
+		    return expvar_recover (wsp, str - 1, ptail, pend, flg);
+		}
+	      else
 		{
 		  return expvar_recover (wsp, str - 1, ptail, pend, flg);
 		}
@@ -1233,6 +1342,10 @@ expvar (struct wordsplit *wsp, const char *str, size_t len,
 	      return expvar_recover (wsp, str - 1, ptail, pend, flg);
 	    }
 	}
+      
+      if (is_param && str[0] == '-')
+	param_idx = wsp->ws_paramc - param_idx;
+      
       if (i == len)
 	return _wsplt_seterr (wsp, WRDSE_CBRACE);
     }
@@ -1253,23 +1366,39 @@ expvar (struct wordsplit *wsp, const char *str, size_t len,
     }
   else
     {
-      rc = wordsplit_find_env (wsp, str, i, &vptr);
-      if (rc == WRDSE_OK)
+      if (is_param)
 	{
-	  if (vptr)
+	  if (param_idx >= 0 && param_idx < wsp->ws_paramc)
 	    {
-	      value = strdup (vptr);
+	      value = strdup (wsp->ws_paramv[param_idx]);
 	      if (!value)
 		rc = WRDSE_NOSPACE;
+	      else
+		rc = WRDSE_OK;
 	    }
 	  else
 	    rc = WRDSE_UNDEF;
 	}
-      else if (wsp->ws_flags & WRDSF_GETVAR)
-	rc = wsp->ws_getvar (&value, str, i, wsp->ws_closure);
       else
-	rc = WRDSE_UNDEF;
-
+	{
+	  rc = wordsplit_find_env (wsp, str, i, &vptr);
+	  if (rc == WRDSE_OK)
+	    {
+	      if (vptr)
+		{
+		  value = strdup (vptr);
+		  if (!value)
+		    rc = WRDSE_NOSPACE;
+		}
+	      else
+		rc = WRDSE_UNDEF;
+	    }
+	  else if (wsp->ws_flags & WRDSF_GETVAR)
+	    rc = wsp->ws_getvar (&value, str, i, wsp->ws_closure);
+	  else
+	    rc = WRDSE_UNDEF;
+	}
+      
       if (rc == WRDSE_OK
 	  && (!value || value[0] == 0)
 	  && defstr && defstr[-1] == ':')
@@ -1320,7 +1449,17 @@ expvar (struct wordsplit *wsp, const char *str, size_t len,
 	      wordsplit_free (&ws);
 	      
 	      if (defstr[-1] == '=')
-		wsplt_assign_var (wsp, str, i, value);
+		{
+		  if (is_param)
+		    rc = wsplt_assign_param (wsp, param_idx, value);
+		  else
+		    rc = wsplt_assign_var (wsp, str, i, value);
+		}
+	      if (rc)
+		{
+		  free (value);
+		  return rc;
+		}
 	    }
 	  else 
 	    {
@@ -1457,7 +1596,7 @@ expvar (struct wordsplit *wsp, const char *str, size_t len,
 static int
 begin_var_p (int c)
 {
-  return c == '{' || ISVARBEG (c) || ISDIGIT (c);
+  return c == '{' || c == '#' || ISVARBEG (c) || ISDIGIT (c);
 }
 
 static int
@@ -2057,11 +2196,13 @@ scan_word (struct wordsplit *wsp, size_t start, int consume_all)
 
 	  if (command[i] == '$')
 	    {
-	      if (!(wsp->ws_flags & WRDSF_NOVAR)
+	      if ((!(wsp->ws_flags & WRDSF_NOVAR)
+		   || (wsp->ws_options & WRDSO_NOVARSPLIT))
 		  && command[i+1] == '{'
 		  && find_closing_paren (command, i + 2, len, &i, "{}") == 0)
 		continue;
-	      if (!(wsp->ws_flags & WRDSF_NOCMD)
+	      if ((!(wsp->ws_flags & WRDSF_NOCMD)
+		   || (wsp->ws_options & WRDSO_NOCMDSPLIT))
 		  && command[i+1] == '('
 		  && find_closing_paren (command, i + 2, len, &i, "()") == 0)
 		continue;
@@ -2102,9 +2243,6 @@ scan_word (struct wordsplit *wsp, size_t start, int consume_all)
   
   return _WRDS_OK;
 }
-
-#define to_num(c) \
-  (ISDIGIT(c) ? c - '0' : (ISXDIGIT(c) ? toupper(c) - 'A' + 10 : 255 ))
 
 static int
 xtonum (int *pval, const char *src, int base, int cnt)
@@ -2495,7 +2633,7 @@ wordsplit_free_words (struct wordsplit *ws)
 void
 wordsplit_free_envbuf (struct wordsplit *ws)
 {
-  if (ws->ws_flags & WRDSF_NOCMD)
+  if (!(ws->ws_flags & WRDSF_ENV))
     return;
   if (ws->ws_envbuf)
     {
@@ -2506,6 +2644,23 @@ wordsplit_free_envbuf (struct wordsplit *ws)
       free (ws->ws_envbuf);
       ws->ws_envidx = ws->ws_envsiz = 0;
       ws->ws_envbuf = NULL;
+    }
+}
+
+void
+wordsplit_free_parambuf (struct wordsplit *ws)
+{
+  if (!(ws->ws_options & WRDSO_PARAMV))
+    return;
+  if (ws->ws_parambuf)
+    {
+      size_t i;
+
+      for (i = 0; ws->ws_parambuf[i]; i++)
+	free (ws->ws_parambuf[i]);
+      free (ws->ws_parambuf);
+      ws->ws_paramidx = ws->ws_paramsiz = 0;
+      ws->ws_parambuf = NULL;
     }
 }
 
@@ -2526,6 +2681,7 @@ wordsplit_free (struct wordsplit *ws)
   free (ws->ws_wordv);
   ws->ws_wordv = NULL;
   wordsplit_free_envbuf (ws);
+  wordsplit_free_parambuf (ws);
 }
 
 int
@@ -2554,7 +2710,9 @@ const char *_wordsplit_errstr[] = {
   N_("undefined variable"),
   N_("input exhausted"),
   N_("unbalanced parenthesis"),
-  N_("globbing error")
+  N_("globbing error"),
+  N_("user-defined error"),
+  N_("invalid parameter number in assignment")
 };
 int _wordsplit_nerrs =
   sizeof (_wordsplit_errstr) / sizeof (_wordsplit_errstr[0]);

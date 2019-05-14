@@ -223,42 +223,25 @@ getvar(char **ret, const char *var, size_t len, void *clos)
 	struct rush_request *req = clos;
 	const char *s = NULL;
 	char *p;
+	struct vardef *vd;
 
-	if (*var == '-') {
-		unsigned long n;
-		errno = 0;
-		n = strtoul(var + 1, NULL, 10);
-		if (errno || n == 0 || n > req->argc)
-			return WRDSE_UNDEF;
-		n = req->argc - n;
-		s = req->argv[n];
-	} else if (c_isdigit(*var)) {
-		unsigned long n;
-		errno = 0;
-		n = strtoul(var, NULL, 10);
-		if (errno || n >= req->argc)
-			return WRDSE_UNDEF;
-		s = req->argv[n];
-	} else {
-		struct vardef *vd;
-		for (vd = request_vars; vd->name; vd++) {
-			if (strncmp(vd->name, var, len) == 0) {
-				s = vd->expand(clos);
-				break;
-			}
+	for (vd = request_vars; vd->name; vd++) {
+		if (strncmp(vd->name, var, len) == 0) {
+			s = vd->expand(clos);
+			break;
 		}
+	}
 
-		if (!s && req->env_count) {
-			/* Look up in the environment */
-			int i;
-
-			for (i = 0; req->env[i]; i++) {
-				if (strlen(req->env[i]) > len
-				    && req->env[i][len] == '='
-				    && memcmp(req->env[i], var, len) == 0) {
-					s = req->env[i] + len + 1;
-					break;
-				}
+	if (!s && req->env_count) {
+		/* Look up in the environment */
+		int i;
+		
+		for (i = 0; req->env[i]; i++) {
+			if (strlen(req->env[i]) > len
+			    && req->env[i][len] == '='
+			    && memcmp(req->env[i], var, len) == 0) {
+				s = req->env[i] + len + 1;
+				break;
 			}
 		}
 	}
@@ -283,18 +266,29 @@ rush_expand_string(const char *string, struct rush_request *req)
 		      | WRDSF_CLOSURE
 		      | WRDSF_OPTIONS;
 	char *result;
-
+	
 	ws.ws_getvar = getvar;
 	ws.ws_closure = req;
-	ws.ws_options = WRDSO_BSKEEP_QUOTE;
+	ws.ws_paramv = (char const**) req->argv;
+	ws.ws_paramc = req->argc;
+	ws.ws_options = WRDSO_BSKEEP_QUOTE | WRDSO_NOCMDSPLIT
+		      | WRDSO_PARAMV | WRDSO_PARAM_NEGIDX;
 	if (req->var_kv) {
 		ws.ws_env = (const char **)req->var_kv;
 		wsflags |= WRDSF_ENV|WRDSF_ENV_KV;
 	}
 
 	result = expandref(string, &req->backref[req->backref_cur], "%");
-	if (wordsplit(result, &ws, wsflags))
+	switch (wordsplit(result, &ws, wsflags)) {
+	case 0:
+		break;
+	case WRDSE_UNDEF:
+		die(config_error, &req->i18n, "%s", wordsplit_strerror(&ws));
+		break;
+	default:
 		die(system_error, &req->i18n, "%s", wordsplit_strerror(&ws));
+	}
+	
 	free(result);
 	result = ws.ws_wordv[0];
 	ws.ws_wordv[0] = NULL;
