@@ -206,9 +206,9 @@ wrong arguments are supplied, the shell aborts.
 
 @cindex request
   The third argument to @command{rush} supplies a command line to be
-executed.  This command line along with the password database entry
-for the user who executes @command{rush} are said to form a
-@dfn{request}.
+executed.  This command line along with the shell environment for its
+execution and the password database entry for the user who executes
+@command{rush} are said to form a @dfn{request}.
 
 @cindex rule
 @cindex conditions
@@ -357,7 +357,7 @@ end of the physical line is ignored.  Comments are treated as newlines.
 
 @anchor{word}
 @anchor{token}
-The following classes of tokens are recogized.
+The following classes of tokens are recognized.
 
 @table @dfn
 @item Newlines
@@ -420,8 +420,8 @@ backslash and the character are retained verbatim.
 @anchor{backreference}
 During @dfn{backreference interpretation}, references to parenthesized
 groups in regular expression are replaced with the actual content of
-the corresponding group in the most recently matched string. A
-reference is @samp{%@{@var{n}@}} where @var{n} is a decimal number. If
+the corresponding group in the most recently matched string.  A
+reference is @samp{%@{@var{n}@}} where @var{n} is a decimal number.  If
 @var{n} is one digit, curly braces can be omitted: @samp{%@var{n}}.
 If the @samp{%} character results from previous backslash
 interpretation, no backreference interpretation occurs.
@@ -434,7 +434,7 @@ subject to variable expansion.  This is discussed in detail in
 Variable references consist of a @samp{$} sign, followed by the
 positional argument number or variable name, optionally enclosed in
 curly braces.  Positional arguments greater than 9 must be enclosed in
-curly braces. The variable name must follow the rules for valid
+curly braces.  The variable name must follow the rules for valid
 identifiers: it must begin with a letter and consist of letters,
 digits and underscores.  Variable name in curly braces can be followed
 by @samp{-}, @samp{=}, @samp{?}, or @samp{+}, optionally preceded by
@@ -555,17 +555,18 @@ an undefined variable is expanded (@pxref{Variable expansion}).
 
 @deffn {global} expand-undefined @var{bool}
 If @var{bool} is @samp{true}, expand undefined variables to empty
-value. If it is @samp{false} (the default), issue an error and abort.
+value.  If it is @samp{false} (the default), issue an error and abort.
 
-The following values can be used as a synonim for @samp{true}:
+The following values can be used as a synonym for @samp{true}:
 @samp{yes}, @samp{on}, @samp{t}, @samp{1}.
 
-The following values can be used as a synonim for @samp{false}:
+The following values can be used as a synonym for @samp{false}:
 @samp{no}, @samp{off}, @samp{nil}, @samp{0}.
 @end deffn
 
-@FIXME{Describe the recommended use of $@{VAR:-""@} to prevent errors
-during expansion}.
+@xref{handling of undefined variables}, for a detailed discussion of
+how @command{rush} processes undefined variables and for the
+recommended techniques of handling them.
 
 @node Debugging
 @subsection Debugging
@@ -764,7 +765,7 @@ Each of the above keywords may be prefixed by @samp{no}, which
 reverses its meaning.  The special keyword @samp{none} disables all
 checks.  Each keyword adds or removes a particular test to the
 existing check list, which is initialized as described in
-@ref{security checks}.  Thus, the followning statement results in all
+@ref{security checks}.  Thus, the following statement results in all
 checks, except for the file ownership:
 
 @smallexample
@@ -852,6 +853,7 @@ line arguments and other parts of the request.
 @menu
 * Positional variables::
 * Request variables::
+* User-defined variables::
 * Variable expansion::
 @end menu
 
@@ -941,7 +943,17 @@ user request:
 @item $argc          @tab Number of arguments in @samp{$command}
 @end multitable
 
-@FIXME{Mention the user-defined and environment variables.}
+@node User-defined variables
+@subsubsection User-defined variables
+
+In addition to the built-in variables, arbitrary variables can be
+defined and used in the configuration file.  These @dfn{user-defined}
+variables are defined using the @code{set} statement (@pxref{set}) and
+accessed using the same syntax as the built-in variables.
+
+User-defined variables are normally used to pass information between
+rules.  They are invisible to whatever command @command{rush} executes
+as the final result of processing.
 
 @node Variable expansion
 @subsubsection Variable Expansion
@@ -969,30 +981,69 @@ variable is undefined or expands to an empty value:
 
 @table @asis
 @item $@{@var{variable}:-@var{word}@}
-@dfn{Use Default Values}. If @var{variable} is unset or null, the expansion
-of @var{word} is  substituted. Otherwise, the value of @var{variable} is
+@dfn{Use Default Values}.  If @var{variable} is unset or null, the expansion
+of @var{word} is  substituted.  Otherwise, the value of @var{variable} is
 substituted.
 
 @item $@{@var{variable}:=@var{word}@}
-@dfn{Assign Default Values}. If @var{variable} is unset or null, the
-expansion  of @var{word} is assigned to variable. The value of
+@dfn{Assign Default Values}.  If @var{variable} is unset or null, the
+expansion  of @var{word} is assigned to variable.  The value of
 @var{variable} is then substituted.
 
 @item $@{@var{variable}:?@var{word}@}
-@dfn{Display Error if Null or Unset}. If @var{variable} is null or unset,
+@dfn{Display Error if Null or Unset}.  If @var{variable} is null or unset,
 the expansion of @var{word} (or a message to that effect if @var{word} is
-not present) is output to the current logging channel. Otherwise, the
+not present) is output to the current logging channel.  Otherwise, the
 value of @var{variable} is substituted.
 
 @item $@{@var{variable}:+@var{word}@}
-@dfn{Use Alternate Value}. If @var{variable} is null or unset, nothing is
+@dfn{Use Alternate Value}.  If @var{variable} is null or unset, nothing is
 substituted, otherwise the expansion of @var{word} is substituted.
 @end table
 
-These constructs test for a variable that is unset or null. Omitting
+These constructs test for a variable that is unset or null.  Omitting
 the colon results in a test only for a variable that is unset.
 
-@FIXME{Describe expansion of undefined variables}.
+@anchor{handling of undefined variables}
+@cindex expansion of undefined variables
+@cindex undefined variable, expansion
+If an undefined variable is encountered during variable expansion, the
+default @command{rush} behavior is to report the error of
+@samp{config-error} class (@pxref{Error Messages}) and exit.  To
+gracefully handle such cases, use the @dfn{default value construct},
+defined above.  For example, the following statement safely appends
+the string @samp{/opt/man} to the value of the @env{MANPATH}
+environment variable:
+
+@example
+setenv MANPATH = "$@{MANPATH:-""@}$@{MANPATH:+:@}/opt/man"
+@end example
+
+@noindent
+The @samp{$@{MANPATH:-""@}} reference ensures no error is reported if
+the variable is undefined.  The @samp{$@{MANPATH:+:@}} reference
+appends a semicolon to the value, if the variable is defined.  Finally
+the string @samp{/opt/man} is appended to the resulting value.
+
+Another way to gracefully handle undefined variables, is to use the
+@code{expand-undefined} global setting.  If you place the following
+statement at the beginning of your configuration file, any undefined
+variable will be silently expanded to empty string:
+
+@example
+global
+  expand-undefined true
+@end example
+
+This statement affects variable expansion in statements that follow it
+in the configuration file.  So you can place it in some point after
+which this behavior is needed, and then disable it where it is no
+longer desired, by using the following global statement:
+
+@example
+global
+  expand-undefined false
+@end example
 
 @node Matching Conditions
 @subsection Matching Conditions
@@ -1166,7 +1217,6 @@ or user-defined variable.
 
 @deffn {rule} set @var{name} = @var{value}
 @deffnx {rule} set [@var{n}] = @var{value}
-@FIXME{Describe set @var{name} = @var{value} ~ @var{s-expr}}
 Sets the variable @var{name} to @var{value}.  Prior to use,
 @var{value} undergoes backreference interpretation
 (@pxref{backreference}) and variable expansion (@pxref{Variable
@@ -1176,6 +1226,14 @@ The second form assigns to the positional variable @samp{$@var{n}}.
 It is defined in more detail in @ref{Transformations}.
 @end deffn
 
+@deffn {rule} set @var{name} = @var{value} ~ @var{s-expr}
+@deffnx {rule} set [@var{n}] = @var{value} ~ @var{s-expr}
+Applies the @command{sed} search-and-replace expression @var{s-expr}
+to @var{value} and assigns the result to the variable @var{name} or
+argument @var{n}.  Both @var{value} and @var{s-expr} are subject to
+variable expansion.
+@end deffn
+
 @deffn {rule} set @var{name} =~ @var{s-expr}
 @deffnx {rule} set [@var{n}] =~ @var{s-expr}
 Applies the @command{sed}-like search-and-replace expression
@@ -1183,10 +1241,20 @@ Applies the @command{sed}-like search-and-replace expression
 stores the resulting string as its new value.  Prior to use,
 @var{s-expr} undergoes backreference interpretation
 (@pxref{backreference}) and variable expansion (@pxref{Variable
-expansion}).
+expansion}).  This is a shortcut for
+
+@example
+set @var{name} = $@{@var{name}:-""@} ~ @var{s-expr}
+@end example
 
 The second form modifies the value of the positional variable
-@samp{$@var{n}}.  @xref{Transformations}, for more detail on this form.
+@samp{$@var{n}}.  It is a shortcut for
+
+@example
+set [@var{n}] = $@{@var{n}:-""@} ~ @var{s-expr}
+@end example
+
+@xref{Transformations}, for more detail on this form.
 @end deffn
 
 @cindex s-expression
@@ -1237,7 +1305,7 @@ the interaction is defined to be: ignore matches before the
 @end table
 
 Notice, that normally the @var{s-expr} is quoted, which means that
-it is subject to backslash interpretation. Consequently, pay attention
+it is subject to backslash interpretation.  Consequently, pay attention
 to properly escaping the backslash characters in @var{s-expr}, in
 particular when using back-references to parenthesized groups in its
 @var{regexp} part.
@@ -1345,7 +1413,7 @@ or particular arguments from it (positional variables).
 the previous section: these are @code{set} and @code{map} commands
 with @samp{command} given as first argument.
 
-@FIXME{Move the [n] forms here. Mention re-splitting the command line
+@FIXME{Move the [n] forms here.  Mention re-splitting the command line
 after modification and rebuilding it after changes to any of the arguments}.
 
   Let's consider several examples.
@@ -1438,9 +1506,9 @@ numeric value or a name of an existing group.
 Change the root directory to that specified in @var{dir}.  This
 directory will be used for file names beginning with @samp{/}.
 The argument is subject to tilde, variable, and backreference
-expansions. During tilde expansion, a tilde (@samp{~}) at the start of
+expansions.  During tilde expansion, a tilde (@samp{~}) at the start of
 string is replaced with the absolute pathname of the user's home
-directory. The two other expansions are described in @ref{Variable
+directory.  The two other expansions are described in @ref{Variable
 expansion}, and @ref{backreference}.
 @end deffn
 
@@ -1517,7 +1585,6 @@ The use of @samp{L} resource automatically enables @dfn{forked mode}.
 
 @node Environment
 @subsection Environment
-@UNREVISED
 @cindex Environment
 
 The following actions modify the environment in which the
@@ -1550,7 +1617,7 @@ setenv PATH = "$PATH:/opt/bin"
 @end deffn
 
 @deffn {rule} unsetenv @var{list}
-Unset environment variables from the @var{list}.
+Unset environment variables listed as arguments.
 
 A variable name can be followed by an equals sign and a value, in
 which case it will be unset only if its actual value equals the
@@ -1940,7 +2007,7 @@ compile time and defaults to @file{@var{prefix}/share/locale}, where
 GNU Rush is shipped with several localization files, which are installed
 by default.  As of version @value{VERSION}, these files cover the
 following languages: Chinese, Danish, Dutch, Finnish, French, Galician,
-German, Polish, Portuguese, Serbian, Spanish, Svedish, Ukrainian, and
+German, Polish, Portuguese, Serbian, Spanish, Swedish, Ukrainian, and
 Vietnamese.  If the localization you need is not in this list, visit
 @uref{http://translationproject.org/domain/rush.html}.  If it is not
 there either, consider writing it (see @ref{Translators,,,gettext, GNU
@@ -2014,7 +2081,7 @@ gettext utilities}, for a description of its format.
 configuration file and produces a valid @acronym{PO} file.  It takes
 the name of the rush configuration file as its argument and produces
 the PO file on the standard output, or in the file given with the
-@option{-o} (@option{--output}) option. E.g., to create a PO file
+@option{-o} (@option{--output}) option.  E.g., to create a PO file
 from your configuration file, run:
 
 @smallexample
@@ -2059,12 +2126,12 @@ naming}.
 that file location:
 
 @deffn {rule} include @var{file}
-  Include file @var{file}
+Include file @var{file}.
 @end deffn
 
 @cindex tilde expansion
 The statement is evaluated when parsing the configuration file,
-consequently the @var{file} undergoes only @dfn{tilde expansion}:
+which means that @var{file} undergoes only @dfn{tilde expansion}:
 if it starts with a tilde character, followed by
 a slash (@samp{~/}), these two characters are replaced with the
 full path name of the current user's home directory.
@@ -2077,16 +2144,13 @@ In any case, if the file named by @var{file} (after tilde expansion)
 does not exist, no error is reported, and parsing of the configuration
 file continues.
 
-The @code{rule} and @code{global} statements cannot be used in
-included files.
-
 Before including the file @command{rush} checks if it is secure, using
 the same rules as for the main configuration file (@pxref{security
 checks}).  The exact list of checks can be tuned using the
 @code{include-security} statement (@pxref{include-security}).
 
-The @code{include} statement can appear in any place of the
-configuration file, both within or outside of a rule.
+The @code{include} statement can be used only within a rule.  The
+included file may not contain @code{rule} and @code{global} statements.
 
 This statement provides a convenient way for user-dependent
 @command{rush} configuration.  For example, the following fall-through
@@ -2338,7 +2402,7 @@ public_html} at the beginning of their sftp sessions.
 @cindex cvs
 @UNREVISED
 @FIXME{CVS is rarely used nowadays, so the utility of this section is
-doubtful. Rewrite it using some more widely used VCS (hg, for example)}.
+doubtful.  Rewrite it using some more widely used VCS (hg, for example)}.
 Using @command{cvs} over @code{ssh} invokes @command{cvs server} on
 the server machine.  In the simplest case, the following rule will do
 to give users access to @acronym{CVS} repositories:
