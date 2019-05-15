@@ -375,7 +375,7 @@ test_eval(struct test_node *node,
 	case test_in:
 		return eval_in(node, rule, req);
 
-	case test_member:
+	case test_group:
 		return eval_member(node, rule, req);
 		
 	case test_and:

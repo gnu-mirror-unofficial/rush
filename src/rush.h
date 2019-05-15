@@ -136,7 +136,7 @@ enum test_type {
 	test_cmpn,
 	test_cmps,
 	test_in,
-	test_member,
+	test_group,
 	test_and,
 	test_or,
 	test_not

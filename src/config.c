@@ -508,7 +508,7 @@ _parse_group(input_buf_ptr ibuf, struct rush_rule *rule,
 	struct test_node *node;
 	size_t i;
 		
-	node = new_test_node(test_member);
+	node = new_test_node(test_group);
 	val = _parse_negation(&node, env->argv[0]);
 	node->v.groups = xcalloc(env->argc + 1, sizeof node->v.groups[0]);
 	node->v.groups[0] = xstrdup(val);

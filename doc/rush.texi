@@ -478,7 +478,7 @@ These are:
 @item @samp{~}       @tab Regexp matching
 @item @samp{!~}      @tab Negated regexp matching
 @item @samp{in}      @tab Membership in set of strings
-@item @samp{member}  @tab Membership in UNIX group
+@item @samp{group}   @tab Membership in UNIX group
 @item @samp{=}       @tab Assignment
 @item @samp{=~}      @tab Regular expression substitution
 @end multitable
@@ -1187,17 +1187,17 @@ For example:
   match $0 in ("scp" "rsync")
 @end example
 
-@kwindex @samp{member}
-  The @code{member} operator evaluates to @samp{true} if the requesting
+@kwindex @samp{group}
+  The @code{group} operator evaluates to @samp{true} if the requesting
 user is a member of at least one group listed in its right-hand side.
 It can have two forms:
 
 @table @code
-@item member @var{group}
+@item group @var{grp}
   Evaluate to @samp{true} if the user is a member of the group
-@var{group}.  The group can be given either by its name or GID.
+@var{grp}.  The group can be given either by its name or GID.
 
-@item member ( @var{list} )
+@item group ( @var{list} )
   Evaluate to @samp{true} if the user is a member of one of the groups
 in whitespace delimited @var{list}.  Members of @var{list} are group
 names or GIDs.
@@ -1232,7 +1232,7 @@ either the UID is 100 or the user is a member of the group @samp{git}:
 @group
 rule
   match $0 ~ "git-(receive|upload)-pack" && \
-             ($uid == 100 || member "git")
+             ($uid == 100 || group "git")
 @end group  
 @end example
 

@@ -104,12 +104,12 @@ static struct transform_node *new_set_node(enum transform_node_type type,
 %token XF "=~"
 %token NM "!~"
 %token IN "in"
-%token MEMBER "member"
+%token GROUP "group"
 
 %left OR
 %left AND
 %left NOT
-%nonassoc EQ NE LT LE GT GE NM XF '~' IN MEMBER
+%nonassoc EQ NE LT LE GT GE NM XF '~' IN GROUP
 
 %type <intval> fdescr index
 %type <str> literal string value defval ruleid
@@ -380,14 +380,14 @@ expr       : string '~' regex
 		     $$->v.cmp.larg = $1;
 		     $$->v.cmp.rarg.strv = $3.argv;
 	     }
-	   | MEMBER string
+	   | GROUP string
 	     {
 		     $$ = new_test_node(test_member);
 		     $$->v.groups = xcalloc(2, sizeof($$->v.groups[0]));
 		     $$->v.groups[0] = $2;
 		     $$->v.groups[1] = NULL;
 	     }
-	   | MEMBER strlist
+	   | GROUP strlist
 	     {
 		     $$ = new_test_node(test_member);
 		     $$->v.groups = $2.argv;

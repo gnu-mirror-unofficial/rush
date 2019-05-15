@@ -364,7 +364,7 @@ static int noinc(void);
 ">="                          return tok(GE);
 "!~"                          return tok(NM);
 "in"                          return tok(IN);
-"member"                      return tok(MEMBER);
+"group"                       return tok(GROUP);
 [+-]?[0-9]+                   { yylval.num.strval = xstrdup(yytext);
 				yylval.num.intval = atoi(yytext);
 				return tok(NUMBER); }
