@@ -255,6 +255,15 @@ getvar(char **ret, const char *var, size_t len, void *clos)
 	return WRDSE_OK;
 }
 
+void
+rush_ws_error (const char *fmt, ...)
+{
+        va_list ap;
+        va_start(ap, fmt);
+	vlogmsg(LOG_ERR, fmt, ap);
+	va_end(ap);
+}
+
 char *
 rush_expand_string(const char *string, struct rush_request *req)
 {
@@ -264,6 +273,7 @@ rush_expand_string(const char *string, struct rush_request *req)
 		      | (expand_undefined ? 0: WRDSF_UNDEF)
 		      | WRDSF_GETVAR
 		      | WRDSF_CLOSURE
+		      | WRDSF_ERROR
 		      | WRDSF_OPTIONS;
 	char *result;
 	
@@ -271,6 +281,7 @@ rush_expand_string(const char *string, struct rush_request *req)
 	ws.ws_closure = req;
 	ws.ws_paramv = (char const**) req->argv;
 	ws.ws_paramc = req->argc;
+	ws.ws_error = rush_ws_error;
 	ws.ws_options = WRDSO_BSKEEP_QUOTE | WRDSO_NOCMDSPLIT
 		      | WRDSO_PARAMV | WRDSO_PARAM_NEGIDX;
 	if (req->var_kv) {
@@ -283,7 +294,8 @@ rush_expand_string(const char *string, struct rush_request *req)
 	case 0:
 		break;
 	case WRDSE_UNDEF:
-		die(config_error, &req->i18n, "%s", wordsplit_strerror(&ws));
+		die(config_error, &req->i18n, "%s: %s",
+		    wordsplit_strerror(&ws), ws.ws_errctx);
 		break;
 	default:
 		die(system_error, &req->i18n, "%s", wordsplit_strerror(&ws));

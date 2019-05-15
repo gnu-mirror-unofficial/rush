@@ -107,6 +107,30 @@ _wsplt_nomem (struct wordsplit *wsp)
   return wsp->ws_errno;
 }
 
+static void
+_wsplt_store_errctx (struct wordsplit *wsp, char const *str, size_t len)
+{
+  free (wsp->ws_errctx);
+  wsp->ws_errctx = malloc (len + 1);
+  if (!wsp->ws_errctx)
+    {
+      wsp->ws_error ("%s",
+		     _("memory exhausted while trying to store error subject"));
+    }
+  else
+    {
+      memcpy (wsp->ws_errctx, str, len);
+      wsp->ws_errctx[len] = 0;
+    }
+}
+
+static inline int
+_wsplt_setctxerr (struct wordsplit *wsp, int ec, char const *str, size_t len)
+{
+  _wsplt_store_errctx (wsp, str, len);
+  return _wsplt_seterr (wsp, ec);
+}
+
 static int wordsplit_run (const char *command, size_t length,
 			  struct wordsplit *wsp,
 			  int flags, int lvl);
@@ -306,6 +330,8 @@ wordsplit_init (struct wordsplit *wsp, const char *input, size_t len,
   if (wsp->ws_flags & WRDSF_REUSE)
     wordsplit_free_nodes (wsp);
   wsp->ws_head = wsp->ws_tail = NULL;
+
+  wsp->ws_errctx = NULL;
 
   wordsplit_init0 (wsp);
 
@@ -837,7 +863,7 @@ wordsplit_finish (struct wordsplit *wsp)
 	    }
 	  else
 	    {
-	      wsp->ws_error = WRDSE_EOF;
+	      wsp->ws_errno = WRDSE_EOF;
 	      return WRDSE_EOF;
 	    }
 	  goto again;
@@ -1163,7 +1189,7 @@ wsplt_assign_param (struct wordsplit *wsp, int param_idx, char *value)
   char *v;
 
   if (param_idx < 0)
-    return WRDSE_BADPARAM;
+    return _wsplt_seterr (wsp, WRDSE_BADPARAM);
   if (param_idx == wsp->ws_paramc)
     {
       char **parambuf;
@@ -1210,7 +1236,7 @@ wsplt_assign_param (struct wordsplit *wsp, int param_idx, char *value)
       wsp->ws_paramc = param_idx + 1;
     }
   else if (param_idx > wsp->ws_paramc)
-    return WRDSE_BADPARAM;
+    return _wsplt_seterr (wsp, WRDSE_BADPARAM);
 
   v = strdup (value);
   if (!v)
@@ -1575,7 +1601,7 @@ expvar (struct wordsplit *wsp, const char *str, size_t len,
 	}
       else if (wsp->ws_flags & WRDSF_UNDEF)
 	{
-	  _wsplt_seterr (wsp, WRDSE_UNDEF);
+	  _wsplt_setctxerr (wsp, WRDSE_UNDEF, str, *pend - str + 1);
 	  return 1;
 	}
       else
@@ -1680,7 +1706,7 @@ expvar (struct wordsplit *wsp, const char *str, size_t len,
 static int
 begin_var_p (int c)
 {
-  return memchr("{#@*", c, 4) != NULL || ISVARBEG (c) || ISDIGIT (c);
+  return memchr ("{#@*", c, 4) != NULL || ISVARBEG (c) || ISDIGIT (c);
 }
 
 static int
@@ -2098,7 +2124,7 @@ wordsplit_pathexpand (struct wordsplit *wsp)
 
 	    default:
 	      free (pattern);
-	      return _wsplt_seterr (wsp, WRDSE_GLOBERR);
+	      return _wsplt_setctxerr (wsp, WRDSE_GLOBERR, pattern, slen);
 	    }
 
 	  prev = p;
@@ -2754,12 +2780,17 @@ wordsplit_clearerr (struct wordsplit *ws)
   if (ws->ws_errno == WRDSE_USERERR)
     free (ws->ws_usererr);
   ws->ws_usererr = NULL;
+
+  free (ws->ws_errctx);
+  ws->ws_errctx = NULL;
+
   ws->ws_errno = WRDSE_OK;
 }
 
 void
 wordsplit_free (struct wordsplit *ws)
 {
+  wordsplit_clearerr (ws);
   wordsplit_free_nodes (ws);
   wordsplit_free_words (ws);
   free (ws->ws_wordv);
@@ -2823,6 +2854,9 @@ wordsplit_perror (struct wordsplit *wsp)
       break;
 
     default:
-      wsp->ws_error ("%s", wordsplit_strerror (wsp));
+      if (wsp->ws_errctx)
+	wsp->ws_error ("%s: %s", wordsplit_strerror (wsp), wsp->ws_errctx);
+      else
+	wsp->ws_error ("%s", wordsplit_strerror (wsp));
     }
 }

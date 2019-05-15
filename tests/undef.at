@@ -27,7 +27,7 @@ rule first
 [ls],
 [1],
 [],
-[rush: Error: undefined variable
+[rush: Error: undefined variable: COMMAND
 ])
 
 AT_RUSH_TEST([

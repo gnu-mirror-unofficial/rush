@@ -362,6 +362,7 @@ char *rush_expand_string(const char *string, struct rush_request *req);
 char **rush_getvarptr(struct rush_request *req, char const *varname);
 void rush_request_delvar(struct rush_request *req, char const *varname);
 enum transform_target_type rush_variable_target(char const *varname);
+void rush_ws_error (const char *fmt, ...);
 
 /* dump.c */
 void dump_request(struct rush_request *req, FILE *fp);

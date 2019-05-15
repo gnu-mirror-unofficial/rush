@@ -110,7 +110,7 @@ struct wordsplit
 			       See ws_getvar for a discussion of possible
 			       return values. */
 
-  const char *ws_input;     /* Input string (the S argument to wordsplit. */
+  const char *ws_input;     /* Input string (the S argument to wordsplit). */
   size_t ws_len;            /* Length of ws_input. */
   size_t ws_endp;           /* Points past the last processed byte in
 			       ws_input. */
@@ -118,6 +118,10 @@ struct wordsplit
   char *ws_usererr;         /* Points to textual description of
 			       the error, if ws_errno is WRDSE_USERERR.  Must
 			       be allocated with malloc(3). */
+  char *ws_errctx;          /* Context in which the error occurred:
+			       For WRDSE_UNDEF - name of the undefined variable,
+			       For WRDSE_GLOBERR - pattern that caused error.
+			    */
   struct wordsplit_node *ws_head, *ws_tail;
 			    /* Doubly-linked list of parsed out nodes. */
   char ws_sep[2];           /* Temporary storage used during splitting */

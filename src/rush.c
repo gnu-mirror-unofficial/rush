@@ -658,6 +658,11 @@ rush_transform(struct transform_node *node, struct rush_request *req)
 		/* Environment variable */
 		die(system_error, NULL,
 		    _("environment transformation is not yet implemented"));
+
+	case target_readonly:
+		die(system_error, NULL,
+		    _("INTERNAL ERROR at %s:%d: can't modify read-only target"),
+		    __FILE__, __LINE__);
 	}
 
 	switch (node->type) {
@@ -1033,7 +1038,6 @@ main(int argc, char **argv)
         uid_t uid;
         struct rush_rule *rule;
         struct rush_request req;
-	struct wordsplit ws;
 
 	rush_set_program_name(argv[0]);
 	rush_i18n_init();
@@ -1110,16 +1114,8 @@ main(int argc, char **argv)
 	}
 
 	req.cmdline = xstrdup(command);
-
-	ws.ws_options = WRDSO_NOVARSPLIT | WRDSO_NOCMDSPLIT;
-	if (wordsplit(req.cmdline, &ws, WRDSF_DEFFLAGS|WRDSF_OPTIONS))
-		die(system_error, NULL,
-		    _("wordsplit(%s) failed: %s"),
-		    req.cmdline, wordsplit_strerror(&ws));
-	wordsplit_get_words(&ws, &req.argc, &req.argv);
-	wordsplit_free(&ws);
-
 	request_set_env(&req);
+	reparse_cmdline(&req);
 	
         req.pw = rush_pw;
 	req.umask = 022;
