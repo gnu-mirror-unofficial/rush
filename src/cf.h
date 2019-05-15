@@ -122,7 +122,7 @@ int yyparse(void);
 void cfparse(void);
 int parse_old_rc(void);
 
-struct rush_rule *new_rush_rule(void);
+struct rush_rule *new_rush_rule(char const *tag);
 struct transform_node *new_transform_node(struct rush_rule *rule,
 					  enum transform_node_type type);
 struct test_node *new_test_node(enum test_type type);

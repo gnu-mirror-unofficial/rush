@@ -84,7 +84,8 @@ rule
 [echo foo bar],
 [1],
 [],
-[rush: Error: Deleting argv[[0]] is prohibited
+[rush: Error: test.conf:4.10: \$0 cannot be deleted
+rush: Error: errors in configuration file
 ])
 
 AT_CLEANUP

@@ -648,7 +648,7 @@ rush_transform(struct transform_node *node, struct rush_request *req)
 
 	case target_var:
 		/* Variable */
-		target_ptr = rush_request_getvar(req, node->target.v.name);
+		target_ptr = rush_getvarptr(req, node->target.v.name);
 		target_src = *target_ptr;
 		debug(2, _("Transforming variable %s=%s"),
 		      node->target.v.name, target_src ? target_src : "(null)");

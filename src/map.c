@@ -146,26 +146,43 @@ var_command(struct rush_request *req)
 struct vardef {
 	char *name;
 	const char *(*expand)(struct rush_request *);
+	enum transform_target_type target;
 };
 
 static struct vardef request_vars[] = {
-	{ "user",    var_user },
-	{ "group",   var_group },
-	{ "uid",     var_uid },
-	{ "gid",     var_gid },
-	{ "home",    var_home },
-	{ "gecos",   var_gecos },
-	{ "program", var_program },
-	{ "command", var_command },
+	{ "user",    var_user,     target_readonly },
+	{ "group",   var_group,    target_readonly },
+	{ "uid",     var_uid,      target_readonly },
+	{ "gid",     var_gid,      target_readonly },
+	{ "home",    var_home,     target_readonly },
+	{ "gecos",   var_gecos,    target_readonly },
+	{ "program", var_program,  target_program },
+	{ "command", var_command,  target_command },
 	{ NULL }
 };
 
+static struct vardef const *
+find_request_var(char const *name)
+{
+	struct vardef *vd;
+	for (vd = request_vars; vd->name; vd++) {
+		if (strcmp(vd->name, name) == 0)
+			return vd;
+	}
+	return NULL;
+}
+
+enum transform_target_type
+rush_variable_target(char const *varname)
+{
+	struct vardef const *vd = find_request_var(varname);
+	return vd ? vd->target : target_var;
+}
+
 char **
-rush_request_getvar(struct rush_request *req, char const *varname)
+rush_getvarptr(struct rush_request *req, char const *varname)
 {
 	size_t i;
-	struct vardef *vd;
-	char const *s;
 
 	if (req->var_kv) {
 		for (i = 0; i < req->var_count; i += 2)
@@ -173,21 +190,12 @@ rush_request_getvar(struct rush_request *req, char const *varname)
 				return &req->var_kv[i+1];
 	}
 
-	s = NULL;
-	for (vd = request_vars; vd->name; vd++) {
-		if (strcmp(vd->name, varname) == 0) {
-			s = vd->expand(req);
-			break;
-		}
-	}
-
 	while (req->var_count + 3 >= req->var_max)
 		req->var_kv = x2nrealloc(req->var_kv, &req->var_max,
 					 sizeof(req->var_kv[0]));
 	req->var_kv[req->var_count++] = xstrdup(varname);
-	req->var_kv[req->var_count++] = s ? strdup(s) : NULL;
+	req->var_kv[req->var_count++] = NULL;
 	req->var_kv[req->var_count] = NULL;
-
 	return &req->var_kv[req->var_count - 1];
 }
 

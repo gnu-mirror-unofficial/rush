@@ -19,7 +19,6 @@ AT_KEYWORDS([unsetvar])
 AT_RUSH_TEST([
 rush 2.0
 rule first
-  set home = "$PWD"
   set count = 1
   set FOO = bar
   fall-through
@@ -37,10 +36,23 @@ rule last
 [{
     "cmdline":"bar ",
     "vars":{
-        "FOO":"bar",
-        "home":"$TESTDIR"
+        "FOO":"bar"
     }
 }
 ],
 [])
+
+AT_RUSH_TEST([
+rush 2.0
+rule first
+  unset home
+],
+[cmdline,vars],
+[ls],
+[1],
+[],
+[rush: Error: test.conf:4.9-12: attempt to modify a read-only variable
+rush: Error: errors in configuration file
+])
+
 AT_CLEANUP

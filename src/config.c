@@ -1202,7 +1202,6 @@ parse_input_buf(input_buf_ptr ibuf)
 	size_t size = 0;
 	int err = 0;
 	struct rush_rule *rule = NULL;
-	unsigned rule_num = 0;
 
 	debug(3, _("Parsing %s"), ibuf->loc.beg.filename);
 	while (read_line(&ibuf, &buf, &size)) {
@@ -1230,17 +1229,7 @@ parse_input_buf(input_buf_ptr ibuf)
 			val = NULL;
 		
 		if (strcmp(kw, "rule") == 0) {
-			rule_num++;
-			rule = new_rush_rule();
-			if (val && val[0])
-				rule->tag = xstrdup(val);
-			else {
-				char buf[INT_BUFSIZE_BOUND(unsigned)];
-				char *s = uinttostr(rule_num, buf);
-				rule->tag = xmalloc(strlen(s) + 2);
-				rule->tag[0] = '#';
-				strcpy(rule->tag + 1, s);
-			}
+			rule = new_rush_rule(val);
 			rule->file = ibuf->loc.beg.filename;
 			rule->line = ibuf->loc.beg.line;
 			continue;

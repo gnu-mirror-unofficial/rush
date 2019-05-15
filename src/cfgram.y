@@ -26,6 +26,9 @@ struct asgn {
 	char *value;
 };
 static void add_asgn_list(struct asgn *head, enum envar_type type);
+static struct transform_node *new_set_node(enum transform_node_type type,
+					   char *varname,
+					   struct cfloc const *loc);
 %}
 
 %error-verbose
@@ -122,7 +125,7 @@ static void add_asgn_list(struct asgn *head, enum envar_type type);
 
 %%
 rcfile     : skipeol select
-           ;
+	   ;
 
 select     : preface content
 	     {
@@ -137,7 +140,7 @@ select     : preface content
 	   ;
 
 preface    : RUSH T_VERSION EOL
-             {
+	     {
 		     if ($2.major == 2 && $2.minor == 0) {
 			     cflex_normal();
 		     } else {
@@ -145,15 +148,15 @@ preface    : RUSH T_VERSION EOL
 			     YYERROR;
 		     }
 	     }
-           ;
+	   ;
 
 skipeol    : /* empty */
-           | eol
-           ;
+	   | eol
+	   ;
 
 eol        : EOL
-           | eol EOL
-           ;
+	   | eol EOL
+	   ;
 
 content    : /* empty */
 	   | rulelist
@@ -218,10 +221,10 @@ arg        : literal
 
 rulehdr    : RULE ruleid eol
 	     {
-		     current_rule = new_rush_rule();
+		     current_rule = new_rush_rule($2);
 		     current_rule->file = @1.beg.filename;
 		     current_rule->line = @1.beg.line;
-		     current_rule->tag = $2;
+		     free($2);
 	     }
 	   ;
 
@@ -304,7 +307,7 @@ expr       : string '~' regex
 		     $$->v.cmp.larg = $1;
 		     $$->v.cmp.rarg.rx = $3;
 	     }
-           | string NM regex
+	   | string NM regex
 	     {
 		     struct test_node *np = new_test_node(test_cmps);
 		     np->v.cmp.op = cmp_match;
@@ -377,7 +380,7 @@ expr       : string '~' regex
 		     $$->v.cmp.larg = $1;
 		     $$->v.cmp.rarg.strv = $3.argv;
 	     }
-           | MEMBER string
+	   | MEMBER string
 	     {
 		     $$ = new_test_node(test_member);
 		     $$->v.groups = xcalloc(2, sizeof($$->v.groups[0]));
@@ -450,64 +453,52 @@ set_stmt   : SET index '=' value
 	     }
 	   | SET IDENT '=' value
 	     {
-		     struct transform_node *node;
-
-		     node = new_transform_node(current_rule, transform_set);
-		     if (strcmp($2, "command") == 0) {
-			     node->target.type = target_command;
-			     free($2);
-		     } else if (strcmp($2, "program") == 0) {
-			     node->target.type = target_program;
-			     free($2);
-		     } else {
-			     node->target.type = target_var;
-			     node->target.v.name = $2;
+		     struct transform_node *node =
+			     new_set_node(transform_set, $2, &@2);
+		     if (node) {
+			     node->v.xf.pattern = $4;
+			     node->v.xf.trans = NULL;
 		     }
-		     node->v.xf.pattern = $4;
-		     node->v.xf.trans = NULL;
 	     }
 	   | SET IDENT XF value
 	     {
-		     struct transform_node *node;
-
-		     node = new_transform_node(current_rule, transform_set);
-		     if (strcmp($2, "command") == 0) {
-			     node->target.type = target_command;
-			     free($2);
-		     } else if (strcmp($2, "program") == 0) {
-			     node->target.type = target_program;
-			     free($2);
-		     } else {
-			     node->target.type = target_var;
-			     node->target.v.name = $2;
+		     struct transform_node *node =
+			     new_set_node(transform_set, $2, &@2);
+		     if (node) {
+			     node->v.xf.pattern = NULL;
+			     node->v.xf.trans = compile_transform_expr($4, re_flags);
 		     }
-		     node->v.xf.pattern = NULL;
-		     node->v.xf.trans = compile_transform_expr($4, re_flags);
 	     }
 	   | SET IDENT '=' string '~' value
 	     {
-		     struct transform_node *node;
-
-		     node = new_transform_node(current_rule, transform_set);
-		     if (strcmp($2, "command") == 0) {
-			     node->target.type = target_command;
-			     free($2);
-		     } else if (strcmp($2, "program") == 0) {
-			     node->target.type = target_program;
-			     free($2);
-		     } else {
-			     node->target.type = target_var;
-			     node->target.v.name = $2;
+		     struct transform_node *node =
+			     new_set_node(transform_set, $2, &@2);
+		     if (node) {
+			     node->v.xf.pattern = $4;
+			     node->v.xf.trans = compile_transform_expr($6, re_flags);
 		     }
-		     node->v.xf.pattern = $4;
-		     node->v.xf.trans = compile_transform_expr($6, re_flags);
 	     }
 	   | UNSET IDENT
 	     {
 		     struct transform_node *node =
-			     new_transform_node(current_rule, transform_delete);
-		     node->target.type = target_var;
-		     node->target.v.name = $2;
+			     new_set_node(transform_delete, $2, &@2);
+		     if (node) {
+			     node->target.v.name = $2;
+		     }
+	     }
+	   | UNSET index
+	     {
+		     if ($2 == 0) {
+			     cferror(&@2, _("$0 cannot be unset"));
+			     errors++;
+		     } else {
+			     struct transform_node *node =
+				     new_transform_node(current_rule,
+							transform_delete);
+			     node->target.type = target_arg;
+			     node->target.v.arg = $2;
+			     node->v.arg_end = $2;
+		     }
 	     }
 	   ;
 
@@ -532,8 +523,7 @@ map_stmt   : MAP index value value value NUMBER NUMBER defval
 	     {
 		     struct transform_node *node;
 
-		     node = new_transform_node(current_rule, transform_map);
-		     node->target.type = target_var;
+		     node = new_set_node(transform_map, $2, &@2);
 		     node->target.v.name = $2;
 		     node->v.map.file = $3;
 		     node->v.map.delim = $4;
@@ -604,11 +594,17 @@ fdescr     : /* empty */
    ****************** */
 delete_stmt: DELETE range
 	     {
-		     struct transform_node *node =
-			     new_transform_node(current_rule, transform_delete);
-		     node->target.type = target_arg;
-		     node->target.v.arg = $2.start;
-		     node->v.arg_end = $2.end;
+		     if ($2.start == 0 || $2.end == 0) {
+			     cferror(&@2, _("$0 cannot be deleted"));
+			     errors++;
+		     } else {
+			     struct transform_node *node =
+				     new_transform_node(current_rule,
+							transform_delete);
+			     node->target.type = target_arg;
+			     node->target.v.arg = $2.start;
+			     node->v.arg_end = $2.end;
+		     }
 	     }
 	   ;
 
@@ -790,10 +786,23 @@ cfgram_debug(int v)
 }
 
 struct rush_rule *
-new_rush_rule(void)
+new_rush_rule(char const *tag)
 {
 	struct rush_rule *p = xzalloc(sizeof(*p));
 	LIST_APPEND(p, rule_head, rule_tail);
+	static unsigned rule_num = 0;
+
+	rule_num++;
+	if (tag && tag[0])
+		p->tag = xstrdup(tag);
+	else {
+		char buf[INT_BUFSIZE_BOUND(unsigned)];
+		char *s = uinttostr(rule_num, buf);
+		p->tag = xmalloc(strlen(s) + 2);
+		p->tag[0] = '#';
+		strcpy(p->tag + 1, s);
+	}
+
 	p->mask = NO_UMASK;
 	p->gid = NO_GID;
 	p->fork = rush_undefined;
@@ -855,4 +864,43 @@ add_asgn_list(struct asgn *head, enum envar_type type)
 		free(head->name);
 		free(head->value);
 	}
+}
+
+static struct transform_node *
+new_set_node(enum transform_node_type type,
+	     char *varname,
+	     struct cfloc const *loc)
+{
+	struct transform_node *node;
+	enum transform_target_type tgt;
+
+	tgt = rush_variable_target(varname);
+	if (tgt == target_readonly) {
+		cferror(loc, _("attempt to modify a read-only variable"));
+		errors++;
+		return NULL;
+	}
+	node = new_transform_node(current_rule, type);
+	node->target.type = tgt;
+	switch (tgt) {
+	case target_command:
+	case target_program:
+		free(varname);
+		if (type == transform_delete) {
+			cferror(loc,
+				_("attempt to unset a read-only variable"));
+			errors++;
+			return NULL;
+		}
+		break;
+	case target_var:
+		node->target.v.name = varname;
+		break;
+	default:
+		die(system_error, NULL,
+		    _("INTERNAL ERROR at %s:%d: invalid target type %d"),
+		    __FILE__, __LINE__,
+		    tgt);
+	}
+	return node;
 }

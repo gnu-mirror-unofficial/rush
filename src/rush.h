@@ -95,6 +95,7 @@ struct rush_map {
 };
 
 enum transform_target_type {
+	target_readonly,     /* Read-only variable */
 	target_command,      /* Command line */
 	target_program,      /* Executable program name */
 	target_arg,          /* Single command line argument */
@@ -358,8 +359,9 @@ int cfck_keyword(const char *name);
 /* map.c */
 char *map_string(struct rush_map *map, struct rush_request *req);
 char *rush_expand_string(const char *string, struct rush_request *req);
-char **rush_request_getvar(struct rush_request *req, char const *varname);
+char **rush_getvarptr(struct rush_request *req, char const *varname);
 void rush_request_delvar(struct rush_request *req, char const *varname);
+enum transform_target_type rush_variable_target(char const *varname);
 
 /* dump.c */
 void dump_request(struct rush_request *req, FILE *fp);
