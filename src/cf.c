@@ -794,7 +794,8 @@ rule_attrib_lookup(char const *name)
 static int
 glattrib_debug(int argc, struct argval *arghead)
 {
-	debug_level = arghead->intval;
+	if (debug_level == 0)
+		debug_level = arghead->intval;
 	return 0;
 }
 

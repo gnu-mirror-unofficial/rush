@@ -29,7 +29,7 @@ rule scp-to
 
 # A trap rule for outbound scp requests
 rule scp-from
-  match command ~ "^scp (-v )?-f"
+  match $command ~ "^scp (-v )?-f"
   exit "Error: Secure copy from this server is not allowed"
   
 # Svn server: force full binary path and root directory.  

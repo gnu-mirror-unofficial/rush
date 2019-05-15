@@ -251,7 +251,7 @@ are useful to set default values for subsequent rules.
   To give you the feel of GNU Rush possibilities, let's consider the
 following configuration file rule:
 
-@smallexample
+@example
 @group
 rule sftp
   # Matching condition
@@ -262,7 +262,7 @@ rule sftp
   chroot "~"
   chdir "/"
 @end group
-@end smallexample
+@end example
 
   The first clause, @code{rule}, defines a new rule.  Its argument
 serves as a rule tag and is used for diagnostic messages and in
@@ -594,10 +594,10 @@ A minimum debugging level, and the only one whose messages are logged
 using the priority @samp{notice}.  At this level, @command{rush} only
 logs requests and rules selected to handle them.  For example:
 
-@smallexample
+@example
 rush[16821]: Serving request "/usr/libexec/sftp-server"
 for sergiusz by rule sftp-savane
-@end smallexample
+@end example
 
 @item 2
 List all actions executed when serving requests.
@@ -635,9 +635,9 @@ Valid values for @var{class} are:
 This error is reported when @command{rush} has been invoked
 improperly.  The default text is:
 
-@smallexample
+@example
 You are not permitted to execute this command.
-@end smallexample
+@end example
 
 @cindex nologin-error
 @item nologin-error
@@ -646,9 +646,9 @@ there is no such user name in the password database.
 
 Default is:
 
-@smallexample
+@example
 You do not have interactive login access to this machine.
-@end smallexample
+@end example
 
 @cindex @code{config-error}
 @item config-error
@@ -657,9 +657,9 @@ Define a textual message which is returned to the remote party if the
 
 Default is:
 
-@smallexample
+@example
 Local configuration error occurred.
-@end smallexample
+@end example
 
 @cindex @code{system-error}
 @item system-error
@@ -668,9 +668,9 @@ a system error occurs.
 
 Default message is:
 
-@smallexample
+@example
 A system error occurred while attempting to execute command.
-@end smallexample
+@end example
 @end table
 
 @node regexp
@@ -707,10 +707,10 @@ insensitive.
 For example, the following statement enables @acronym{POSIX} extended,
 case insensitive matching:
 
-@smallexample
+@example
 global
   regex +extended +icase
-@end smallexample
+@end example
 
 @node include-security
 @subsection The @code{include-security} statement
@@ -773,18 +773,18 @@ existing check list, which is initialized as described in
 @ref{security checks}.  Thus, the following statement results in all
 checks, except for the file ownership:
 
-@smallexample
+@example
 global
   include-security noowner
-@end smallexample
+@end example
 
 In the example below, the check list is first cleared by using the
 @code{none} statement, and then a set of checks is added to it:
 
-@smallexample
+@example
 global
   include-security none owner iwoth iwgrp
-@end smallexample
+@end example
 
 @node Accounting control
 @subsection Accounting control statements
@@ -894,9 +894,9 @@ Arguments are numbered from @samp{0}.  The name of the command is
 argument @samp{$0}.  Consider, for example, the following
 command line:
 
-@smallexample
+@example
 /bin/scp -t /upload
-@end smallexample
+@end example
 
 Word splitting phase results in three positional variables being defined:
 
@@ -1337,9 +1337,9 @@ set [@var{n}] = $@{@var{n}:-""@} ~ @var{s-expr}
 The transformation expression, @var{s-expr}, is @command{sed}-like
 replace expression of the form:
 
-@smallexample
+@example
 s/@var{regexp}/@var{replace}/[@var{flags}]
-@end smallexample
+@end example
 
 @noindent
 where @var{regexp} is a @dfn{regular expression}, @var{replace} is a
@@ -1457,7 +1457,7 @@ tabulations).  Otherwise, exactly one delimiter delimits fields.
 
 @enumerate 1
 @item
-Variable expansion is performed over the @var{key} argument
+Variable expansion is performed on the @var{key} argument
 (@pxref{Variable expansion}) and the resulting value is used as lookup key.
 
 @item
@@ -1564,15 +1564,17 @@ file name.
 rule svn
   match $command ~ "^svnserve -t"
   set command =~ "s/-r *[^ ]*//"
-  set command =~ "s|^svnserve |/usr/bin/svnserve -r /svnroot |"
+  set command =~ \
+      "s|^svnserve |/usr/bin/svnserve -r /svnroot |"
 @end example
 
-  Notice the use of @samp{|} as a delimiter in s-command, in order to
-avoid escaping each @samp{/} in the pathname.  Without it, the second
-@code{set} command will be
+@noindent
+Notice the use of @samp{|} as a delimiter in s-command, in order to
+avoid escaping each @samp{/} in the pathname.  Without it, the
+expression in the second @code{set} command will be
 
 @example
-  set command =~ "s/^svnserve /\\/usr\\/bin\\/svnserve -r \\/svnroot /"
+"s/^svnserve /\\/usr\\/bin\\/svnserve -r \\/svnroot /"
 @end example
 
 @item The same rule, rewritten using the single @command{set} statement:
@@ -1580,7 +1582,8 @@ avoid escaping each @samp{/} in the pathname.  Without it, the second
 @example
 rule svn
   match $command ~ "^svnserve -t"
-  set command =~ "s|-r *[^ ]*||;s|^svnserve |/usr/bin/svnserve -r /svnroot |"
+  set command =~ "s|-r *[^ ]*||;\
+         s|^svnserve |/usr/bin/svnserve -r /svnroot |"
 @end example
 
 @item Override the executable program name.
@@ -1594,6 +1597,9 @@ rule cvs
 @end example
 @end enumerate
 
+@need 800
+@subsubheading Delete
+
 Another statement modifying the command line is @code{delete}:
 
 @deffn {rule} delete @var{n}
@@ -1601,7 +1607,8 @@ Delete @var{n}th argument.
 @end deffn
 
 @deffn {rule} delete @var{i} @var{j}
-Delete all positional arguments between @var{i} and @var{j}.
+Delete positional parameters between @samp{$@var{i}} and @samp{$@var{j}},
+inclusive.
 @end deffn
 
 Neither form can be used to delete the program name (@samp{$0}).
@@ -1647,14 +1654,14 @@ commands.  For example, the following rule defines execution of
 @command{sftp-server} in an environment chrooted to the user's home
 directory:
 
-@smallexample
+@example
 @group
 rule sftp
   match $program ~ "^.*/sftp-server"
   set [0] = "bin/sftp-server"
   chroot "~"
 @end group
-@end smallexample
+@end example
 
 For this to work, each user's home must contain the directory
 @file{bin} with a copy of @file{sftp-server} in it, as well as all
@@ -1695,9 +1702,9 @@ utility:
 
 For example:
 
-@smallexample
+@example
 limits T10 R20 U16 P20
-@end smallexample
+@end example
 
 @cindex simultaneous sessions
 @cindex limiting number of simultaneous sessions
@@ -1735,7 +1742,7 @@ Declare a fall-through rule.
 
 Usually this statement is placed as the last statement in a rule, e.g.:
 
-@smallexample
+@example
 @group
 rule default
   umask 002
@@ -1743,7 +1750,7 @@ rule default
   keepenv HOME USERNAME PATH
   fall-through
 @end group
-@end smallexample
+@end example
 
 Fall-through rules provide a way to set default values for subsequent
 rules.  For example, any rules that follow the @samp{default} rule
@@ -1752,13 +1759,13 @@ shown above, will inherit the umask and environment set there.
 One can also use fall-through rules to ``normalize'' command lines.
 For example, consider this rule:
 
-@smallexample
+@example
 @group
 rule default
   set [0] =~ "s|.*/||"
   fall-through
 @end group
-@end smallexample
+@end example
 
 It will remove all path components from the first command line argument.
 As a result, all subsequent rules may expect a bare binary name as the
@@ -1767,13 +1774,13 @@ first argument.
 Yet another common use for such rules is to enable accounting (see the
 next subsection), or set resource limits for the rest of rules:
 
-@smallexample
+@example
 @group
 rule default
   limit l1
   fall-through
 @end group
-@end smallexample
+@end example
 
 @node Accounting and Forked Mode
 @subsection Accounting and Forked Mode
@@ -1818,11 +1825,11 @@ before it.  In fact, in most cases the accounting should affect all
 rules, therefore we suggest to enable it in a fall-through rule at the
 beginning of the configuration file, e.g.:
 
-@smallexample
+@example
 rule default
   acct on
   fall-through
-@end smallexample
+@end example
 
 If the need be, you can disable it for some of the subsequent rules by
 placing @code{acct off} in it.  Notice, that this will disable
@@ -1871,12 +1878,12 @@ Connect to a @acronym{UNIX} socket @var{filename}.
 
 For example:
 
-@smallexample
+@example
 @group
 rule default
   post-socket "inet://localhost"
 @end group
-@end smallexample
+@end example
 @end deffn
 
   The GNU Rush notification protocol is based on @acronym{TCPMUX}
@@ -1923,19 +1930,19 @@ interpretation and variable expansion prior to being used.
 
 For example (note the use of line continuation character):
 
-@smallexample
+@example
 exit "\
     \r\nYou are not allowed to execute that command.\r\n\
     \r\nIf you think this is wrong, ask <foo@@bar.com> for assistance.\r\n"
-@end smallexample
+@end example
 
   If @var{message} is an identifier, it must be the name of a
 predefined error message (@pxref{Error Messages}).  The corresponding
 message text will be printed.  For example:
 
-@smallexample
+@example
   exit nologin-message
-@end smallexample
+@end example
 
   If the identifier does not match any predefined error message name,
 an error of type @samp{config-error} is signaled and @command{rush}
@@ -1947,13 +1954,13 @@ are intended to trap incorrect or prohibited command lines and to return
 customized reply messages in such cases.  Consider the following
 rule:
 
-@smallexample
+@example
 @group
 rule git
   match $program ~ "^git-.+" && $1 ~ "^/sources/[^ ]+\.git$"
   set command =~ "s|.*|/usr/bin/git-shell -c \"&\"|"
 @end group
-@end smallexample
+@end example
 
 It allows the client to use only those Git repositories that are
 located under @file{/sources} directory@footnote{@xref{git}, for a
@@ -1964,13 +1971,13 @@ message, saying @samp{You are not permitted to execute this command}
 more convenient message in this case.  To do so, place the following
 after the @samp{git} rule:
 
-@smallexample
+@example
 @group
 rule git-trap
   match $command ~ "^git-.+"
   exit "fatal: Use of this repository is prohibited."
 @end group
-@end smallexample
+@end example
 
 @noindent
 This rule will trap all git invocations that do not match the
@@ -1998,7 +2005,7 @@ the command being executed prefixed by a dash sign.
 
 Consider the following example:
 
-@smallexample
+@example
 rule login
   interactive true
   group rshell
@@ -2008,7 +2015,7 @@ rule login
 rule nologin
   interactive true
   exit You don't have interactive access to this machine.
-@end smallexample
+@end example
 
 The @samp{login} rule will match interactive user requests if the user
 is a member of the group @samp{rshell}.  It uses
@@ -2021,9 +2028,9 @@ output the given diagnostics message and terminate @command{rush}.
 
 To test interactive access, use the @option{-i} option:
 
-@smallexample
+@example
 rush --test -i
-@end smallexample
+@end example
 
 @node Localization
 @subsection Localization
@@ -2067,9 +2074,9 @@ predefined set of directories is searched for the matching file.
 Given these parameters, the name of the full pathname of the
 localization file is defined as:
 
-@smallexample
+@example
 @var{locale_dir}/@var{locale}/LC_MESSAGES/@var{domain}.mo
-@end smallexample
+@end example
 
 GNU Rush produces three kinds of messages:
 
@@ -2094,6 +2101,8 @@ compile time and defaults to @file{@var{prefix}/share/locale}, where
 @var{prefix} stands for the installation prefix, which is
 @file{/usr/local}, by default.
 
+@c Makeinfo 5.2 is unable to cope with the @uref below
+@urefbreakstyle none
 GNU Rush is shipped with several localization files, which are installed
 by default.  As of version @value{VERSION}, these files cover the
 following languages: Chinese, Danish, Dutch, Finnish, French, Galician,
@@ -2134,14 +2143,14 @@ Sets the textual domain name.
 
 The following configuration fragment illustrates their use:
 
-@smallexample
+@example
 @group
 rule l10n
   locale "pl_PL"
   text-domain "rush-config"
   fall-through
 @end group
-@end smallexample
+@end example
 
 Different users may have different localization
 preferences.  @xref{per-user l10n}, for a description of how to
@@ -2153,7 +2162,7 @@ implement this.
 if it implements exit rules (@pxref{Exit}) and changes user locale
 (@pxref{Localization Directives, locale}).
 
-  Preparing localization consists of three stages: extracting exit
+  Preparing a localization consists of three stages: extracting exit
 messages and forming a @acronym{PO} file, editing this file, compiling and
 installing it.  The discussion below describes these stages in detail.
 
@@ -2174,9 +2183,9 @@ the PO file on the standard output, or in the file given with the
 @option{-o} (@option{--output}) option.  E.g., to create a PO file
 from your configuration file, run:
 
-@smallexample
+@example
 rush-po -o myconf.po /usr/local/etc/rush.rc
-@end smallexample
+@end example
 
 @item Editing the @acronym{PO} file
 
@@ -2195,22 +2204,21 @@ When ready, the @acronym{PO} file needs be compiled into a
 by @command{rush}.  This is done using @command{msgfmt} utility from
 GNU gettext:
 
-@smallexample
+@example
   msgfmt -o myconf.mo myconf.po
-@end smallexample
+@end example
 
 @xref{msgfmt Invocation,,,gettext, GNU gettext utilities}, for a
 detailed description of the @command{msgfmt} utility.
 
 After creating the @acronym{MO} file, copy it into appropriate
 directory.  It is important that the installed @acronym{MO} file uses
-the naming scheme described in @ref{mo-name, localization file
+the naming scheme described in @ref{mo-name,, localization file
 naming}.
 @end enumerate
 
 @node Include
 @section Include
-@UNREVISED
 @cindex include
   The @code{include} statement forces inclusion of the named file in
 that file location:
@@ -2222,9 +2230,8 @@ Include file @var{file}.
 @cindex tilde expansion
 The statement is evaluated when parsing the configuration file,
 which means that @var{file} undergoes only @dfn{tilde expansion}:
-if it starts with a tilde character, followed by
-a slash (@samp{~/}), these two characters are replaced with the
-full path name of the current user's home directory.
+the two characters @samp{~/} appearing at the beginning of @var{file}
+are replaced with the full path name of the current user's home directory.
 
 If @var{file} is a directory, that directory is searched for a file
 whose name coincides with the current user name.  If such a file is
@@ -2245,16 +2252,16 @@ included file may not contain @code{rule} and @code{global} statements.
 This statement provides a convenient way for user-dependent
 @command{rush} configuration.  For example, the following fall-through
 rule (@pxref{Fall-through}) allows the administrator to keep each
-user's configuration in a file named @file{.rush}, located in the
+user personal configuration in a file named @file{.rush}, located in the
 user's home directory:
 
-@smallexample
+@example
 @group
 rule user
   include "~/.rush"
   fall-through
 @end group
-@end smallexample
+@end example
 
 Of course, it is supposed that such a per-user file, if it exists, is
 writable only for super-user.
@@ -2264,11 +2271,10 @@ The use of include files may be especially useful for per-user
 localization (@pxref{Localization}).  It suffices to provide a
 fall-through rule, similar to the one above, and to place a
 @code{locale} directive in @file{~/.rush} files, according to the
-users' preferences.
+user preferences.
 
 @node Default Configuration
 @chapter Default Configuration
-@UNREVISED
 
 You can compile @command{rush} with the default configuration built in
 the binary.  Such a binary can then be run without configuration file.
@@ -2281,9 +2287,9 @@ test it using @command{rush --lint}.  If the test shows no errors,
 reconfigure the package, using the @option{--with-default-config}
 option:
 
-@smallexample
+@example
   ./configure --with-default-config=@var{file}
-@end smallexample
+@end example
 
 @noindent
 where @var{file} is the name of your configuration file.  Then,
@@ -2293,9 +2299,9 @@ recompile and install the package.
 You can inspect the built-in configuration using the
 @option{--show-default} option:
 
-@smallexample
+@example
   rush --show-default
-@end smallexample
+@end example
 
 @node Usage Tips
 @chapter Usage Tips
@@ -2307,8 +2313,8 @@ utilities.  For this purpose, we assume the following setup:
 @item Users are allowed to use @code{scp} and @code{rsync} to upload
 files to the @file{/incoming} directory and to copy files to and from
 their @file{~/public_html} directory.
-The @file{/incoming} directory is located on server in @file{/home/ftp}
-directory, but that is transparent to users, i.e. they use
+The actual location of the @file{/incoming} directory is @file{/home/ftp},
+but that must be transparent to users, i.e. they use
 @code{scp @var{file} @var{host}:/incoming} (not
 @code{@var{host}:/home/ftp/incoming}) to upload files.
 
@@ -2318,7 +2324,7 @@ accessing other directories, @command{sftp-server} is executed in a
 chrooted environment.
 
 @item The server runs three version control system repositories, whose
-corresponding repositories are located in the following directories:
+corresponding root directories are:
 
 @multitable @columnfractions 0.3 0.7
 @headitem VCS @tab Repository Root
@@ -2346,7 +2352,8 @@ with option @option{-t}, when copying files to server, and with
 @option{-f} when copying from it.  Thus, the basic templates for
 @code{scp} rules are:
 
-@smallexample
+@example
+@group
 # Copying to server:
 rule scp-to
   match $command ~ "^scp -t"
@@ -2356,60 +2363,70 @@ rule scp-to
 rule scp-from
   match $command ~ "^scp -f"
   ...
-@end smallexample
+@end group
+@end example
 
 You may also wish to allow for @option{-v} (@samp{verbose}) command
 line option.  In this case, the @samp{scp-to} rule will become:
 
-@smallexample
+@example
+@group
 rule scp-to
   match $command ~ "^scp (-v )?-t"
   ...
-@end smallexample
+@end group  
+@end example
 
-First, we want users to be able to upload files to
+Now, we want users to be able to upload files to
 @file{/home/ftp/incoming} directory.  Moreover, the @file{/home/ftp}
 directory prefix must be invisible to them.  We should also make sure
 that the user cannot get outside the @file{incoming} directory by using
 @file{../} components in his upload path.  So, our first rule for
 @code{scp} uploads will be:
 
-@smallexample
+@example
+@group
 rule scp-to-incoming
-  match $command ~ "^scp (-v )?-t /incoming/" && $@{-1@} !~ "\\.\\./"
+  match $command ~ "^scp (-v )?-t /incoming/" && \
+                   $@{-1@} !~ "\\.\\./"
   set command "/bin/scp"
   set [-1] =~ "s|^|/home/ftp/|"
-@end smallexample
+@end group  
+@end example
 
 The @code{match} statement ensures that no relative components are
-used.  Two transform rules ensure that the right @command{scp} binary
-is used and that @file{/home/ftp} prefix is prepended to the upload
-path.
+used.  The two @code{set} statements ensure that the right
+@command{scp} binary is used and that @file{/home/ftp} prefix is
+prepended to the upload path.
 
 Other than uploading to @file{/incoming}, users must be able to use
 @command{scp} to manage @file{public_html} directories located in
 their homes.  They should use relative paths for that, i.e., the
 command:
 
-@smallexample
+@example
 $ scp file.html server:
-@end smallexample
+@end example
 
 @noindent
 will copy file @file{file.html} to @file{~/public_html/file.html} on
 the server.  The corresponding rule is:
 
-@smallexample
+@example
+@group
 rule scp-home
-  match $command ~ "^scp (-v )?-[tf] [^/].*" && $@{-1@} !~ "\\.\\./"
+  match $command ~ "^scp (-v )?-[tf] [^/].*" && \
+                   $@{-1@} !~ "\\.\\./"
   set [0] = "/bin/scp"
   set [-1] =~ "s|^|public_html/|"
   chdir "~"
-@end smallexample
+@end group  
+@end example
 
 Finally, we provide two trap rules for diagnostic purposes:
 
-@smallexample
+@example
+@group
 rule scp-to-trap
   match $command ~ "^scp (-v )?-t"
   exit "Error: Uploads to this directory prohibited"
@@ -2417,7 +2434,8 @@ rule scp-to-trap
 rule scp-from
   match $command ~ "^scp (-v )?-f"
   exit Error: Downloads from this directory prohibited
-@end smallexample
+@end group  
+@end example
 
 @node rsync
 @section rsync
@@ -2430,23 +2448,29 @@ makes it possible to discern between incoming and outgoing requests.
 In our setup, @command{rsync} is used the same way as @command{scp}, so
 the two rules will be:
 
-@smallexample
+@example
+@group
 rule rsync-incoming
-  match $command ~ "^rsync --server" && $command !~ --sender \
-        && $@{-1@} ~ "/incoming/" && $@{-1@} !~ "\\.\\./"
+  match $command ~ "^rsync --server" && \
+        $command !~ --sender && \
+        $@{-1@} ~ "/incoming/" && $@{-1@} !~ "\\.\\./"
   set [0] =~ "s|^|/usr/bin/|"
   set [-1] =~ "s|^|/home/ftp/|"
 
 rule rsync-home
-  match $command ~ "^rsync" && $@{-1@} !~ "^[^/]" && $@{-1@} !~ "\\.\\./"
+  match $command ~ "^rsync" && \
+        $@{-1@} !~ "^[^/]" && \
+        $@{-1@} !~ "\\.\\./"
   set [0] = "s|^|/usr/bin/|"
   set [-1] =~ "s|^|public_html/|"
   chdir "~"
-@end smallexample
+@end group  
+@end example
 
 The trap rules for @command{rsync} are trivial:
 
-@smallexample
+@example
+@group
 rule rsync-to-trap
   match $command ~ "^rsync.*--sender"
   exit "Error: Downloads from this directory prohibited"
@@ -2454,7 +2478,8 @@ rule rsync-to-trap
 rule rsync-from-trap
   match $command ~ "^rsync"
   exit "Error: Uploads to this directory prohibited"
-@end smallexample
+@end group  
+@end example
 
 @node sftp
 @section sftp
@@ -2476,14 +2501,17 @@ subdirectory @file{~/lib}.
 Given these prerequisites, the following rule will ensure proper
 @command{sftp} interaction:
 
-@smallexample
+@example
+@group
 rule sftp-incoming
   match $command ~ "^.*/sftp-server"
   set [0] = "/bin/sftp-server"
   chroot "~"
   chdir "public_html"
-@end smallexample
+@end group  
+@end example
 
+@noindent
 Notice the last action.  Due to it, users don't have to type @code{cd
 public_html} at the beginning of their sftp sessions.
 
@@ -2492,18 +2520,18 @@ public_html} at the beginning of their sftp sessions.
 @cindex cvs
 @UNREVISED
 @FIXME{CVS is rarely used nowadays, so the utility of this section is
-doubtful.  Rewrite it using some more widely used VCS (hg, for example)}.
+doubtful.  Rewrite it using some more widely used VCS (hg, for example)}
 Using @command{cvs} over @code{ssh} invokes @command{cvs server} on
 the server machine.  In the simplest case, the following rule will do
 to give users access to @acronym{CVS} repositories:
 
-@smallexample
+@example
 @group
 rule cvs
   match $command ~ "^cvs server"
   set command ~ "s|^cvs|/usr/bin/cvs -f"
 @end group
-@end smallexample
+@end example
 
 However, @command{cvs} as of version 1.12.13 does not allow to limit root
 directories that users are allowed to access.  It does have
@@ -2515,12 +2543,14 @@ with the @command{cvs} binary located in @file{/var/cvs/bin} and
 repository root directory being @file{/var/cvs/cvsroot}.  Then, we can
 use the following rule:
 
-@smallexample
+@example
+@group
 rule cvs
   match $command ~ "^cvs server"
   set [0] = "/bin/cvs"
   chroot "/var/cvs"
-@end smallexample
+@end group  
+@end example
 
 @node svn
 @section svn
@@ -2530,22 +2560,23 @@ Remote access to @acronym{SVN} repositories is done via
 option.  The @option{-r} option can be used to restrict access to a
 subset of root directories.  So, we can use the following rule:
 
-@smallexample
+@example
 @group
 rule svn
   match $command ~ "^svnserve -t"
   set command =~ "s|-r *[^ ]*||"
-  set command =~ "s|^svnserve |/usr/bin/svnserve -r /svnroot|"
+  set command =~ \
+      "s|^svnserve |/usr/bin/svnserve -r /svnroot|"
 @end group
-@end smallexample
+@end example
 
-First @code{set command} action removes any @option{-r} options the user
-might have specified and enforces a single root directory.  A more
-restrictive action can be used to improve security:
+The first @code{set command} action removes any @option{-r} options
+the user might have specified and enforces a single root directory.  A
+more restrictive action can be used to improve security:
 
-@smallexample
+@example
   set command =~ "s|.*|/usr/bin/svnserve -r /svnroot|"
-@end smallexample
+@end example
 
 @node git
 @section git
@@ -2557,15 +2588,16 @@ Remote access to Git repositories over ssh causes execution of
 @code{git-receive-pack} and @code{git-upload-pack} on the server.
 The simplest rule for Git is:
 
-@smallexample
+@example
 @group
 rule git
   set $command ~ "^git-(receive|upload)-pack"
   set [0] =~ "s|^|/usr/bin/|"
 @end group
-@end smallexample
+@end example
 
-The @code{transform} action is necessary to ensure the proper location
+@noindent
+The @code{set} action is necessary to ensure the proper location
 of Git binaries to use.  This example supposes they are placed in
 @file{/usr/bin}, you will have to tailor it if they are located
 elsewhere on your system.
@@ -2573,26 +2605,26 @@ elsewhere on your system.
 To limit Git accesses to repositories under @file{/gitroot} directory,
 modify the @samp{$1}, as shown in the example below:
 
-@smallexample
+@example
 @group
 rule git
   match $command ~ "^git-(receive|upload)-pack"
   set [1] =~ "^/gitroot[^ ]+\.git$"
   set [0] =~ "s|^|/usr/bin/|"
 @end group
-@end smallexample
+@end example
 
 To provide more helpful error messages, you may follow this rule by a
 trap rule (@pxref{Exit, trap rules}):
 
-@smallexample
+@example
 @group
 # @r{Trap the rest of Git requests:}
 rule git-trap
   match $command ~ "^git-.+"
   exit "fatal: access to this repository is denied."
 @end group
-@end smallexample
+@end example
 
 @node notification example
 @section Notification
@@ -2601,11 +2633,13 @@ Rush rules.  Let's suppose we wish to receive emails for each upload
 by @code{scp-to} rule (@pxref{scp}).  To do so, we add the following
 fall through rule to the beginning of @file{rush.rc}:
 
-@smallexample
+@example
+@group
 rule default
   post-socket "inet://localhost"
   fall-trough
-@end smallexample
+@end group  
+@end example
 
 This will enable notifications for each rule located below this one.
 Missing port in @code{post-socket} statement means @command{rush} will
@@ -2617,17 +2651,21 @@ one from GNU Inetutils package
 (@uref{http://www.gnu.org/software/inetutils, GNU Inetutils}).  In
 @file{/etc/inetd.conf} file, we add:
 
-@smallexample
+@example
+@group
 # @r{Enable @acronym{TCPMUX} handling}.
 tcpmux          stream  tcp  nowait root  internal
 # @r{Handle @samp{scp-to} service}.
-tcpmux/+scp-to  stream  tcp  nowait root  /usr/sbin/tcpd  /bin/rushmail
-@end smallexample
+tcpmux/+scp-to  stream  tcp  nowait root  \
+                        /usr/sbin/tcpd  /bin/rushmail
+@end group  
+@end example
 
 The program @command{/bin/rushmail} does the actual notification.
 Following is its simplest implementation:
 
-@smallexample
+@example
+@group
 #! /bin/sh
 
 read user command
@@ -2639,7 +2677,8 @@ Subject: GNU Rush notification
 
 Be informed that $user executed $command.
 EOT
-@end smallexample
+@end group  
+@end example
 
 @node Test Mode
 @chapter Test Mode
@@ -2651,7 +2690,7 @@ EOT
 @opindex -c
   GNU Rush provides a special @dfn{test mode}, intended to test
 configuration files and to emulate execution of commands.  Test
-mode is enabled by @option{--test} command line option (aliases:
+mode is enabled by the @option{--test} command line option (aliases:
 @option{--lint}, @option{-t}).  When @command{rush} is given this option, the
 following occurs:
 
@@ -2695,34 +2734,34 @@ in various cases:
 @enumerate 1
 @item Test default configuration file:
 
-@smallexample
+@example
 $ rush --test
-@end smallexample
+@end example
 
 @item Test configuration file @file{sample.rc}:
 
-@smallexample
+@example
 $ rush --test sample.rc
-@end smallexample
+@end example
 
 @item Test interactive access
 
-@smallexample
+@example
 $ rush --test -i sample.rc
-@end smallexample
+@end example
 
 @item Test the configuration file and emulate execution of the command
 @command{cvs server}.  Use debugging level 2:
 
-@smallexample
+@example
 $ rush --test --debug=2 -c "cvs server"
-@end smallexample
+@end example
 
 @item Same, but for user @samp{jeff}:
 
-@smallexample
+@example
 $ rush --user=jeff --debug=2 -c "cvs server"
-@end smallexample
+@end example
 
 Note, that you don't need to specify @option{--test} along with
 @option{--user} or @option{-i} options.
@@ -2730,9 +2769,9 @@ Note, that you don't need to specify @option{--test} along with
 @item Same, but use @file{sample.rc} instead of the default
 configuration file:
 
-@smallexample
+@example
 $ rush --test --debug=2 -c "cvs server" sample.rc
-@end smallexample
+@end example
 @end enumerate
 
 @menu
@@ -2899,9 +2938,9 @@ Configuration}, for more information.
 Run in test mode.  An optional argument may be used with this option
 to specify alternative configuration file name, e.g.:
 
-@smallexample
+@example
 $ rush --lint ./test.rc
-@end smallexample
+@end example
 
 If the @option{-c} option is also specified, @command{rush} emulates the
 normal processing for the command, but does not execute it.
@@ -2952,10 +2991,10 @@ on default Rush database, which is maintained if @command{rush}
 runs in accounting mode (@pxref{Accounting and Forked Mode}).  The following
 is a sample output from @code{rushwho}:
 
-@smallexample
-Login      Rule     Start     Time       PID      Command
-jeff       sftp     Sun 12:17 00:58:26   10673    bin/sftp-server
-@end smallexample
+@example
+Login   Rule   Start     Time      PID     Command
+jeff    sftp   Sun 12:17 00:58:26  10673   bin/sftp-server
+@end example
 
 The information displayed is:
 
@@ -3076,7 +3115,7 @@ character being output.
 
 @item Quoted strings
 Strings are delimited by single or double quotes.  Within a string
-any escape sequences are interpreted as described above.
+escape sequences are interpreted as described above.
 
 @item Format specifications
 A @dfn{format specification} is a kind of function, which outputs
@@ -3122,7 +3161,7 @@ is present, then skip @var{num} tab stops.  Each tab stop is eight
 characters long.
 @end deffn
 
-The following specifications output particular fields of a database
+The following specifications output particular fields from the database
 record.  They all take two positional arguments: @var{width} and
 @var{title}.
 
@@ -3138,13 +3177,14 @@ The second argument, @var{title}, gives the title of this column for
 the heading line.  By default no title is output.
 
 Every field specification accepts at least two keyword arguments.
-The keyword @code{:right} may be used to request alignment to the right
-for the data.  This keyword is ignored if @var{width} is not given.
+The keyword @code{:right} may be used to request alignment to the
+right.  This keyword is ignored if @var{width} is not given.
 
 The keyword @code{:empty} followed by a string instructs @command{rushwho}
 to output that string if the resulting value for this specification
 would otherwise be empty.
 
+@need 800
 @deffn {Format Spec} user @var{width} @var{title} [:empty @var{repl}][:right]
 Print the user login name.
 @end deffn
@@ -3189,18 +3229,18 @@ PID of the process.
 @end deffn
 
 For example, the following is the default format for the
-@command{rushwho} utility.  It is written in a form, suitable for use
+@command{rushwho} utility.  It is written in a form suitable for use
 in a file supplied with the @option{--format=@@@var{file}} command
 line option (@pxref{format option}):
 
-@smallexample
+@example
 (user 10 Login)" "
 (rule 8 Rule)" "
 (start-time 0 Start)" "
 (duration 9 Time)" "
 (pid 10 PID)" "
 (command 28 Command)
-@end smallexample
+@end example
 
 @node Rushlast
 @chapter The @code{rushlast} utility.
@@ -3209,11 +3249,11 @@ The @command{rushlast} utility searches back through the GNU Rush database
 and displays a list of all user sessions since the database was
 created.  By default, it displays the following information:
 
-@smallexample
-Login      Rule     Start     Stop      Time    Command
-sergiusz   rsync    Sun 20:43 Sun 20:43 05:57   /usr/bin/rsync /upload
-jeff       sftp-sav Sun 20:09 running   07:17   /bin/sftp-server
-@end smallexample
+@example
+Login Rule  Start     Stop      Time  Command
+gray  rsync Sun 20:43 Sun 20:43 05:57 /usr/bin/rsync /upload
+jeff  sftp  Sun 20:09 running   07:17 /bin/sftp-server
+@end example
 
 @table @asis
 @item Login
@@ -3259,13 +3299,10 @@ This section summarizes the command line options understood by
 @itemx --format=@var{string}
 Use @var{string} instead of the default format, described in
 @ref{Rushwho}.  @xref{Formats}, for a detailed description of the
-output format syntax.  If @var{string} begins with a @samp{@@}, then
-this character is removed from it, and the resulting string is
-regarded as a name of a file to read.  The contents of this file is
-the format string.  The file is read literally, except that lines
-beginning with @samp{;} are ignored (they can be used to introduce
-comments).  For example, @command{rushwho --format=@@formfile} reads
-in the contents of the file named @file{formfile}.
+output format syntax.  To read format from a file, use
+@option{--format=@@@var{filename}}.  The file is read literally,
+except that lines beginning with @samp{;} are ignored (they can be
+used to introduce comments).
 
 @opindex -f, @r{rushlast}
 @opindex --file, @r{rushlast}
@@ -3340,7 +3377,7 @@ logrotate man page}), or a similar tool, it is safe to rotate
 to truncate @file{utmp} to zero size after rotating @file{wtmp}, as
 shown in the following @file{logrotate.conf} snippet:
 
-@smallexample
+@example
 /var/run/rush/wtmp @{
     monthly
     create 0640 root svusers
@@ -3348,11 +3385,12 @@ shown in the following @file{logrotate.conf} snippet:
       cat /dev/null > /var/run/rush/utmp
     endscript
 @}
-@end smallexample
+@end example
 
-  Accounting files are owned by @samp{root} and normally have permissions
-@samp{600}.  You may change the default permissions using the
-following global configuration file statements:
+  Accounting files are owned by @samp{root} and normally are
+accessible only to the owner (file mode @samp{600}).  You may change
+the default permissions using the following global configuration file
+statements:
 
 @deffn {global} acct-umask @var{mask}
 Set umask used when accessing accounting database files.  Default
@@ -3394,7 +3432,7 @@ name, the rule tag, and the full command line.
 
   The header has the following structure:
 
-@smallexample
+@example
 @group
 struct rush_wtmp @{
         size_t reclen;
@@ -3404,7 +3442,7 @@ struct rush_wtmp @{
         char *unused[3];
 @};
 @end group
-@end smallexample
+@end example
 
 @noindent
 where:
@@ -3435,14 +3473,14 @@ The three pointers at the end of the structure are used internally by
   The @file{utmp} file consists of a fixed-size records of the
 following structure:
 
-@smallexample
+@example
 @group
 struct rush_utmp @{
         int status;
         off_t offset;
 @};
 @end group
-@end smallexample
+@end example
 
 The fields have the following meaning:
 
@@ -3452,7 +3490,7 @@ Status of the record: @samp{0} if the record is unused, and @samp{1}
 if it represents an active session.
 
 @item offset
-Offset to the corresponding record in @file{wtmp} (see previous
+Offset of the corresponding record in @file{wtmp} (see previous
 section).
 @end table
 
