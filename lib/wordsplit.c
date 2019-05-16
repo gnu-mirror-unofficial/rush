@@ -198,8 +198,10 @@ _wsplt_subsplit (struct wordsplit *wsp, struct wordsplit *wss,
 static void
 _wsplt_seterr_sub (struct wordsplit *wsp, struct wordsplit *wss)
 {
+  /* Clear user-defined error */
   if (wsp->ws_errno == WRDSE_USERERR)
     free (wsp->ws_usererr);
+  /* Copy error state */
   wsp->ws_errno = wss->ws_errno;
   if (wss->ws_errno == WRDSE_USERERR)
     {
@@ -207,6 +209,10 @@ _wsplt_seterr_sub (struct wordsplit *wsp, struct wordsplit *wss)
       wss->ws_errno = WRDSE_EOF;
       wss->ws_usererr = NULL;
     }
+  /* Copy error context */
+  free (wsp->ws_errctx);
+  wsp->ws_errctx = wss->ws_errctx;
+  wss->ws_errctx = NULL;
 }
 
 static void
