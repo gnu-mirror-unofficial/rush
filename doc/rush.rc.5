@@ -13,14 +13,14 @@
 .\"
 .\" You should have received a copy of the GNU General Public License
 .\" along with GNU Rush.  If not, see <http://www.gnu.org/licenses/>.
-.TH RUSH.RC 5 "April 19, 2019" "RUSH.RC" "Rush User Reference"
+.TH RUSH.RC 5 "May 16, 2019" "RUSH.RC" "Rush User Reference"
 .SH NAME
 rush.rc \- configuration rules for rush.
 .SH DESCRIPTION
 The file
 .B /etc/rush.rc
 contains a set of rules that the
-.B rush (1)
+.B rush (8)
 shell uses in order to determine whether the user is allowed to
 execute the requested command and to set up the environment for
 its execution.
@@ -30,37 +30,53 @@ comments and are ignored as well.
 .PP
 A
 .I statement
-consists of a keyword and optional argument, separated by any amount
-of whitespace.  Depending on the keyword, the statement may treat its
-argument as a single value or as multiple values.
-.PP
-If the keyword requires multiple values, its argument is split into
-words using the following algorithm:
-.nr step 1 1
-.IP \n[step].
-Any sequence of one or more non-whitespace characters is a word.
-.IP \n+[step].
-Any sequence of characters enclosed in single or double quotes is a
-word.
-.IP \n+[step].
-Words are separated by any amount of white space.
-.IP \n+[step].
-If the keyword expects s-expressions these are treated as words, even
-if they contain white space. 
-.PP
-Arguments obtained as a result of rules (1) and (2) are subject to
-.IR "backslash interpretation" ,
-during which the following
-.I escape sequences
-are replaced with single characters:  
+consists of a keyword and arguments, separated by any amount
+of whitespace.  Arguments can be one of the following:
+.TP
+.I Identifiers
+Identifiers begin with a letter and consist of letters, digits,
+underscores and dashes.  They serve as keywords and variable names.
+.TP
+.I Decimal numbers
+A sequence of decimal digits, optionally preceded by a minus or plus
+sign.
+.TP
+.I Unquoted strings
+An unquoted string is any contiguous sequence of any characters,
+except newlines, whitespace and the following special characters:
+.BR \e ,
+.BR \(dq ,
+.BR ! ,
+.BR = ,
+.BR < ,
+.BR > ,
+.BR ( ,
+.BR ) ,
+.BR { ,
+.BR } ,
+.BR [ ,
+.BR ] ,
+.BR $ ,
+.BR % ,
+.BR & ,
+.BR | ,
+.BR ~ ,
+.BR # .
+.TP
+.I Quoted strings
+A quoted string is a sequence of characters enclosed in
+double-quotes.  Quoted strings are subject to backslash
+interpretation, backreference interpretation and variable
+expansion.
 .sp
+During \fIbackslash interpretation\fR, the \fIescape sequences\fR
+are recognized and replaced as per table below:
 .nf
 .ta 8n 20n
 .ul
 	Sequence	Replaced with
 	\\a	Audible bell character (ASCII 7)
 	\\b	Backspace character (ASCII 8)
-	\\e	Escape character (ASCII 27)
 	\\f	Form-feed character (ASCII 12)
 	\\n	Newline character (ASCII 10)
 	\\r	Carriage return character (ASCII 13)
@@ -68,574 +84,105 @@ are replaced with single characters:
 	\\v	Vertical tabulation character (ASCII 11)
 	\\\\	A single backslash
 	\\\(dq	A double-quote.
+	\\%	Percent sign
 .fi
 .sp
-Any escape sequence not listed in this table is replaced with its
-second character.
-.PP
-Statements are delimited by newline characters.  Length of a
-statement line is not limited.  To improve readability, long
-statements may be split over several lines by using backslash
-as a last character on line.
-.SH GLOBAL STATEMENTS
-.TP
-\fBinclude\fR \fIFILE\fR
-Include the content of the named \fIFILE\fR.
-
-If \fIFILE\fR starts with \fB~/\fR, these two characters are replaced
-with the full path name of current user home directory.
-
-If \fIFILE\fR is a directory, that directory is searched for a file
-whose name coincides with the current user name.  If such a file is
-found, it is included.
-
-In any case, if the named file does not exist, no error is reported,
-and parsing of the configuration file continues.
-.TP
-\fBinclude\-security\fR \fIARG\fR...
-Configures the security checks that a file must pass in order to be
-included in the configuration by the \fBinclude\fR statement.  The
-arguments are a whitespace-separated list of check names.  The
-following check names are available:
-.RS
-.TP
-.B all
-Enable all checks.
-.TP
-.B owner
-The file must be owned by root.
-.TP
-.BR iwgrp ", " groupwritablefile
-Reject group-writable files.
-.TP
-.BR iwoth ", " worldwritablefile
-Reject world-writable files. 
-.TP
-.BR dir_iwgrp ", " groupwritabledir
-Reject files that reside in a group writable directory.
-.TP
-.BR dir_iwoth ", " worldwritabledir
-Reject files that reside in a world writable directory.
-.TP
-.B link
-The file may not be is a symbolic link to a file residing in a group
-or world writable directory.
-.RE
-.TP
-\fBdebug\fR \fINUMBER\fR
-Sets the debugging level.  The greater is the \fINUMBER\fR, the more
-verbose is the logging.  The debugging information is reported via
-.BR syslog (3)
-using
-.BR authpriv,
-priority
-.BR debug .
-
-Currently, three debugging levels are implemented:
+In addition, the sequence \fB\\\fInewline\fR is removed from
+the string.  This allows to split long strings over several
+physical lines.
 .sp
-.RS
-.TP
-.B 1
-A minimum debugging level, and the only one whose messages are logged
-using the priority \fBnotice\fR.  At this level, \fBrush only
-logs requests and rules selected to handle them.
-.TP
-.B 2
-List all actions executed when serving requests.
-.TP
-.B 3
-Verbosely describe parsing of the configuration file.
-.RE
-.TP
-\fBregex\fR \fIFLAGS\fR
-Defines what kind of regular expressions will be used in subsequent
-.BR command ,
-.BR match ,
-and
-.B transform
-statements.
+During the \fIbackreference interpretation\fR, references to parenthesized
+groups in regular expression are replaced with the actual content of
+the corresponding group in the most recently matched string.  A
+reference is \fB%{\fIN\fB}\fR where \fIN\fR is a decimal number.  If
+\fIN\fR is one digit, curly braces can be omitted: \fB%\fIN\fR
+If the \fB%\fR character resulted from previous backslash
+interpretation, no backreference interpretation occurs. 
 .sp
-Each flag is a word specifying some regular expression 
-feature.  It can be preceded by \fB+\fR to enable this feature (this
-is the default), or by \fB-\fR to disable it.  Valid flags are:
-.RS
+Strings used in the left-hand side of a comparison expression are
+subject to variable expansion.  This is discussed later.
 .TP
-.B extended
-Use POSIX Extended Regular Expression syntax.  This is the default.
+.I Backreferences
+The construct \fB%{\fIN\fB}\fR is replaced with the substring that
+matched the \fIN\fRth parenthesized subgroup in a most recently
+performed regular expression match.  If \fIN\fR is one digit, curly
+braces can be omitted.
 .TP
-.B basic
-Use basic regular expressions.  Equivalent to \fB\-extended\fR.
-.TP
-.B icase
-Do not differentiate case.  Subsequent regex matches will be case
-insensitive. 
-.RE
-.TP
-\fBusage\-error\fR \fITEXT\fR
-Define a textual message which is returned to the remote party if a
-usage error occurs.  The default is
-.sp
-.RS
-.EE
-You are not permitted to execute this command.
-.EX
-.RE
-.TP
-\fBnologin\-error\fR \fITEXT\fR
-Define a textual message which is returned to the remote user if
-there is no such user name in the password database.
-The default is:
-.sp
-.RS
-.EE
-You do not have interactive login access to this machine.
-.EX
-.RE
-.TP
-\fBconfig\-error\fR \fITEXT\fR
-Define a textual message which is returned to the remote party if
-a system error occurs.   The default is:
-.sp
-.RS
-.EE
-A system error occurred while attempting to execute command.
-.EX
-.RE
-.SH RULES
-Statements are grouped into \fIrules\fR.  A rule begins with the
-following construct
-.TP
-\fBrule\fR \fITAG\fR
-The \fITAG\fR argument is optional.  If it is given, it supplies a
-a (presumably unique) identifier, which will be used to label this
-rule.  Every diagnostic regarding this rule will be marked with this
-tag.  For rules without explicit tag, default tags will be supplied,
-constructed by concatenating a pound character and the ordinal number
-of rule in the configuration file, in decimal notation (rule
-numbering starts from 1). 
-.PP
-The statements that can be used within a rule fall into several
-distinct categories.
-.SS Conditionals
-A conditional statement evaluates to a boolean value.  All
-conditionals are tested in order of their appearance in the rule and are
-tied together using boolean shortcut \fBAND\fR evaluation: if any of
-them yields false, the rest of statements is skipped and next rule is
-tried.
-.TP
-\fBcommand\fR \fIREGEX\fR
-True, if the current command line matches regular expression
-\fIREGEX\fR.  By default, POSIX extended regular expressions are used.
-This, however can be changed using the \fBregex\fR (see below).
-.TP
-\fBmatch[\fIN\fB]\fR \IREGEX\fR
-True, if the \fIN\fRth word from the command line matches
-regular expression \fIREGEX\fR.  Notice, that square brackets form
-part of the statement syntax.  A special symbol \fB$\fR can be used
-instead of \fIN\fR to denote the last word.
-
-The command line is split into words using the same rules as used in
-\fB/bin/sh\fR.
-.TP
-\fBargc\fR \fIOP\fR \fINUM\fR
-Compare the number of command line arguments to \fINUM\fR.
-The comparison operator \fIOP\fR can be one of the following:
-\fB=\fR (or \fB==\fR),
-.BR != ,
-.BR < ,
-.BR <= ,
-.BR > ,
-.BR >= .
-.TP
-\fBuid\fR [\fIOP\fR] \fIUID\fR
-Compare the UID of the user who started \fBrush\fR to \fIUID\fR.
-The latter may be either a numeric UID or a name of an existing user.
-The comparison operator \fIOP\fR has the same values as discussed
-above.  If absent,
-.B ==
-is assumed.
-.TP
-\fBgid [\fIOP\fR] \fIGID\fR
-Compare the GID of the user who started \fBrush\fR to \fIGID\fR.
-It can be either a numeric value or a name of an existing group.
-The comparison operator \fIOP\fR has the same values as discussed
-above.  If absent,
-.B ==
-is assumed.
-.TP
-\fBuser\fR \fINAMES\fR
-Argument is a whitespace-separated list of user names.  This condition
-yields true, if the user name matches one of the listed names.
-String comparisons are case-sensitive.
-.TP
-\fBgroup\fR \fINAMES\fR
-Argument is a whitespace-separated list of group names.  This condition
-yields true, if the the name of any group the user is a member of
-matches one of listed names.  String comparisons are case-sensitive.
-.SS Transformations
-These statements transform the command line.
-.TP
-\fBset\fR \fIPATTERN\fR
-Replaces entire command line with the expansion of \fIPATTERN\fR.
-.TP
-\fBset[\fIN\fB]\fR \fIPATTERN\fR
-Replaces the \fIN\fRth word in the command line with the expansion of
-\fIPATTERN\fR.  Notice, that square brackets are part of the statement
-syntax.
-.TP
-\fBdelete[\fIN\fB]\fR
-Deletes the \fIN\fRth word.
-.TP
-\fBdelete\fR \fIN\fR \fIM\fR
-Deletes words between \fIN\fR and \fIM\fR, inclusive.
-.TP
-\fBtransform\fR \fIEXPR\fR
-Apply a
-.BR sed (1)
-expression \fIEXPR\fR to entire command line.  For example, the
-statement below adds a \fB\-t\fR option after the command name:
-.sp
-.RS
-.RS
-.EX
-transform s/^[^[:space:]]+/& -t/
-.EE
-.RE
-.RE
-.TP
-\fBtransform\fR \fIPATTERN\fR \fIEXPR\fR
-Applies the
-.BR sed (1)
-expression \fIEXPR\fR to the expansion of \fIPATTERN\fR and
-replaces entire command line with the result.
-.TP
-\fBtransform[\fIN\fB]\fR \fIEXPR\fR
-Applies expression \fIEXPR\fR to the \fIN\fRth word from the
-command line.  Notice, that square brackets are part of the statement
-syntax.
-.TP
-\fBtransform[\fIN\fB]\fR \fIPATTERN\fR \fIEXPR\fR
-Applies the expression \fIEXPR\fR to the expansion of \fIPATTERN\fR
-and replaces \fIN\fR word in the command line with the result.
-
-E.g. to replace the 0th argument with the base name of the
-command prefixed with a dash:
-.sp
-.RS
-.RS
-.EX
-transform[0] ${^} s,.*/,-,
-.EE
-.RE
-.RE
-.TP
-\fBmap[\fIN\fB]\fR \fIFILE\fR \fIDELIM\fR \fIPATTERN\fR \fIKN\fR\
- \fIVN\fR \fIDFL\fR
-Expand the \fIPATTERN\fR and scan the disk file \fIFILE\fR for the
-record whose \fIKN\fRth word matches the expansion (words are
-delimited with characters from \fIDELIM\fR).  If found, replace
-the \fIN\fBth command line word with the \fIVN\fRth word from the
-record.
-
-The arguments are:
-.RS
-.TP
-.I N
-Index of the word in command line.
-.TP
-.I FILE
-Name of the map file.  It must be an absolute file name (i.e. it must
-start with \fB/\fR or \fB~/fR.
-.TP
-.I DELIM
-A string containing allowed field delimiters.
-.TP
-.I PATTERN
-The value of the lookup key.  Before using, it is expanded as
-described above.
-.TP
-.I KN
-Number of the key field in \fIFILE\fR.  Fields are numbered starting
-from 1.
-.TP
-.I VN
-Number of the value field.
-.TP
-.I DFL
-If supplied, this value is used as a replacement value, when the key
-was not found in @var{file}.
-.RE
-The map file consists of records, separated by newline characters.
-Each record consists of fields, separated by delimiters given the \fIDELIM\fR
-argument.  If \fIDELIM\fR contains a space character, then fields may
-be delimited by any amount of whitespace characters (spaces and/or
-tabulations).  Otherwise, exactly one delimiter delimits fields.
-
-Fields are numbered starting from 1.
-.SS System Actions
-System actions provide interface to the operating system.
-.TP
-\fBumask\fR \fIMASK\fR
-Set the umask.  The argument is an octal value not greater than
-\fB0777\fR.  The default umask is \fB022\fR.
-.TP
-\fBnewgrp\fR \fIGID\fR
-Changes the current group ID to \fIGID\fR, which is either a
-numeric value or a name of an existing group.  The keyword can also
-be spelled as \fBnewgroup\fR.
-.TP
-\fBchroot\fR \fIDIR\fR
-Change the root directory to \fIDIR\fR.  This
-directory will be used for file names beginning with \fB/\fR.
-A tilde at the start of \fIDIR\fR is replaced with
-the user's home directory.
-.TP
-\fBchdir\fR \fIDIR\fR
-Change to the directory \fIDIR\fR.  The argument is subject to
-tilde-expansion as in \fBchroot\fR, above.  If both \fBchdir\fR and
-\fBchroot\fR are specified, then \fBchroot\fR is executed first.
-.TP
-\fBlimits\fR \fIRES\fR
-Imposes limits on system resources.  The argument consists of
-\fIcommands\fR, optionally separated by any amount of whitespace.  A
-command is a single command letter followed by a number, that
-specifies the limit.  The command letters are case-insensitive and
-coincide with those used by the shell
-.B ulimit
-utility.
+.I Variable references
+Variable references consist of a \fB$\fR sign, followed by the
+positional argument number or variable name, optionally enclosed in
+curly braces.  Positional arguments greater than 9 must be enclosed in
+curly braces.  The variable name must follow the rules for valid
+identifiers: it must begin with a letter and consist of letters,
+digits and underscores.  Variable name in curly braces can be followed
+by \fB\-\fR, \fB=\fR, \fB?\fR, or \fB+\fR, optionally preceded by
+\fB:\fR as summarized in the table below:
 .sp
 .nf
-.ta 8n 20n
+.ta 8n 30n
 .ul
-	Command	The limit it sets
-	A	max address space (KB)
-	C	max core file size (KB)
-	D	max data size (KB)
-	F	maximum file size (KB)
-	M	max locked-in-memory address space (KB)
-	N	max number of open files
-	R	max resident set size (KB)
-	S	max stack size (KB)
-	T	max CPU time (MIN)
-	U	max number of processes
-	L	max number of logins for this user (see below)
-	P	process priority -20..20
+	Reference	Meaning
+	${\fIVAR\fR:-\fIWORD\fR}	Use Default Values
+	${\fIVAR\fR:=\fIWORD\fR}	Assign Default Values
+	${\fIVAR\fR:?\fIWORD\fR}	Display Error if Null or Unset
+	${\fIVAR\fR:+\fIWORD\fR}	Use Alternate Value
 .fi
 .sp
-If some limit cannot be set, execution of the rule aborts.
-
-The use of the \fBL\fR resource automatically enables forked mode.
-.SS Environment
+where \fIWORD\fR stands for any valid token as described in this
+section.  See the section \fBVARIABLE EXPANSION\fR, for a detailed
+discussion of these forms and their meaning.
 .TP
-\fIenv\fR \fIARG\fR...
-Modifies the execution environment.  Arguments are a list of
-specifiers separated by any amount of whitespace.  Each
-specifier can contain references to variables from the inherited
-environment.  The reference syntax is the same as in
-.BR sh (1).
-
-The following specifiers are allowed:
-.RS
-.TP
-\fI\-\fR (a dash)
-Clear the environment.  If used, this must be the very first argument.
-.TP
-\fI\-NAME\fR
-Unset the environment variable \fINAME\fR.
-.TP
-\fI\-NAME\fB=\fIVAL\fR
-Unset the environment variable \fINAME\fR only if its value is \fIVAL\fR.
-.TP
-\fINAME\fR
-Retain the environment variable \fINAME\fR.
-.TP
-\fINAME\fB=\fIVALUE\fR
-Set the environment variable \fINAME\fB to the given \fIVALUE\fR.
-.TP
-\fINAME\fB+=\fIVALUE\fR
-Retain the variable \fINAME\fB and append \fIVALUE\fR to its value.  If
-no such variable is present in the environment, it is created and
-\fIVALUE\fR is assigned to it.  However, if \fIVALUE\fR starts with a
-punctuation character, this character is removed from it before the
-assignment.  This is convenient for using this construct with 
-environment variables like \fBPATH\fR, e.g.:
-.RS
-.RS
-.EX
-PATH+=:/sbin
-.EE
-.RE
-.RE
-.TP
-\fINAME\fB=+\fIVALUE\fR
-Retain variable \fIVALUE\fR and add \fIVALUE\fR to the beginning of
-its value.  If no such variable is defined in the environment, it is
-created and \fIVALUE\fR is assigned to it.  However, if \fIVALUE\fR
-ends with a punctuation character, this character is removed from it
-before assignment. 
-.SS Fall-Through
-.TP
-.B fall\-through
-Declares a
-.I fall\-through rule
--- a special rule that does not execute the
-requested command.  Instead, when
-.B rush
-encounters a matching fall-through rule, it evaluates it and continues
-scanning its configuration for the next matching rule.  Any
-transformations and environment modifications found in the
-fall-through rule take effect immediately, which means that subsequent
-rules will see modified command line and environment.  Execution of
-any other actions found in the fall-through rule is delayed until a
-usual rule is found.
+.I Comparison and boolean operators
+These are:
 .sp
-E.g.:
-.RS
-.RS
-.EX
-rule default
-    umask 002
-    env - HOME USERNAME PATH
-    fall-through
-.EE
-.RE
-.RE
-.SS Interactive Access
+.nf
+.ta 8n 30n
+	&&	Boolean AND
+	||	Boolean OR
+	!	Boolean negation
+	==	Equality (string or numeric)
+	!=	Inequality (string or numeric)
+	<	Less than
+	<=	Less than or equal to
+	>	Greater than
+	>=	Greater than or equal to
+	~	Regexp matching
+	!~	Negated regexp matching
+	in	Membership in set of strings
+	group	Membership in UNIX group
+	=	Assignment
+	=~	Regular expression substitution
+.fi
+.sp
+.SH STATEMENTS
+There are three global statements, two of which can contain multiple
+substatements.
+.SS rush
+Each configuration file must begin with the \fBrush\fR statement.  It
+must be exactly as follows:
 .TP
-.B interactive
-Marks the rule it appears in as interactive.
+.B rush 2.0
+Declare version of the configuration file syntax.
 .PP
-When
-.B rush
-is invoked without \fB\-c\fR option (interactive usage), it will
-consider only rules marked with \fBinteractive\fR keywords.  This
-allows for providing interactive shell access.
-.PP
-The default interactive rule terminates by invoking
-.BR /bin/sh .
-.PP
-The command name argument (\fBargv[0]\fR) is set to the basename of
-the program being executed prefixed with a dash.
-.PP
-Example:
-.PP
-.EX
-rule login
-    interactive
-    group shell
-    set[0] /bin/bash
-.EE 
-.SS Accounting and Forked Mode
-GNU Rush is able to operate in two modes, called \fIdefault\fR and
-\fIforked\fR.  When operating in the default mode, the process image of
-\fBrush\fR itself is overwritten by the command being executed.
-Thus, when it comes to launching the requested command,
-the running instance of \fBrush\fR ceases to exist.
-.PP
-In forked mode, \fBrush\fR executes the requested command in a
-subprocess, and remains in memory supervising its execution.  Once the
-command terminates, the main \fBrush\fR process exits too. 
-.TP
-\fBfork\fR \fIBOOL\fR
-Enable or disable forked mode.  The values
-.BR yes ,
-.BR on ,
-.BR t ,
-.BR true ,
-.BR 1
-stand for true, and
-.BR no , 
-.BR off ,
-.BR nil ,
-.BR false ", or"
-.BR 0
-stand for false.
-.PP
-The main advantage of the forked mode is that it allows to run
-\fIaccounting\fR, i.e. to note who is doing what and to keep a
-history of invocations.  The accounting, in turn, can be used to limit
-simultaneous executions of commands, as requested by the
-.B L
-command in the
-.B limit
-statement (see above).
-.TP
-\fBacct\fR \fIBOOL\fR
-Turn accounting mode on or off, depending on \fIBOOL\fR.
-.PP
-Notice, that there is no need in explicit \fBacct on\fR command, if
-you use the
-.B limit
-statement
-with
-.B L
-command, as this enables accounting implicitly.
-.PP
-Most often, accounting should affect all rules and therefore it is
-normally used in a fall-through rule at the beginning of the
-configuration file, e.g.: 
+If this statement is missing, the configuration file will be treated
+as
+.I legacy configuration file
+from previous versions of
+.BR "GNU rush" .
 
-.EX
-rule default
-    acct on
-    fall-through 
-.EE
-.SS Notification
+Currently two versions are supported.  Version 2.0 is the current
+syntax version.  Configuration file of the previous \fBrush\fR versions
 .TP
-\fBpost\-socket\fR \fIURL\fR
-After completing the command, notify the socket at \fIURL\fR about the
-fact.  This statement implies forked mode.
-.PP
-Valid formats for \fIURL\fR are:
+.B global
+Introduces global settings.  The settings changed within this section
+remain in effect until changed by the next \fBglobal\fR statement.
 .TP
-\fBinet://\fIHOST\fB[:\fIPORT\fB]\fR
-Connect to remote \fIHOST\fR using TCP/IP.  \fIHOST\fR is the
-host name or IP address of the remote machine.  Optional \fIPORT\fB
-specifies the port number to connect to.  It can be either a decimal
-port number or a service name from
-.BR /etc/services .
-If absent, TCPMUX (port 1) is assumed.
-.TP
-\fBunix://\fIFILENAME\fR, or \fBlocal://\fIFILENAME\fR
-Connect to a UNIX socket.
-.PP
-The GNU Rush notification protocol is based on TCPMUX.
-.PP
-After establishing connection, \fBrush\fR sends the rule tag
-followed by a CRLF pair.  The rule tag acts as a service name.  The
-remote party replies with a plus or minus character, indicating positive
-or negative acknowledgment, immediately followed by an optional
-message of explanation, and terminated with a CRLF.  
-.PP
-If positive acknowledgment is received, \fBrush\fR sends a
-single line, consisting of the user name and the executed command
-line, separated by a single space character.  The line is terminated
-with a CRLF.
-.PP
-After sending this line, \fBrush\fR closes the connection.
-.SS Exit
-.TP
-\fBexit\fR \fIFD\fR \fIMESSAGE\fR
-Write textual message to a file descriptor, given by the
-optional argument \fIFD\fR.  If \fIFD\fR is absent, the descriptor 2
-(standard error) is used.
-
-The \fIMESSAGE\fR argument is subject to backslash interpretation.
-.SS Localization
-The following configuration directives control localization.
-.TP
-\fBlocale\fR \fINAME\fR
-Sets the locale name.
-.TP
-\fBlocale\-dir \fIDIR\fR
-Sets the name of the locale directory.
-.TP
-\fBtext\-domain\fR \fINAME\fR
-Sets the textual domain name.
-
-
+.B rule
+Defines a rule.
+.SS global
+The \fBglobal\fR statement 
 .SH SEE ALSO
-.BR rush (1),
+.BR rush (8),
 .BR rushlast (1),
 .BR rushwho (1).
 .SH AUTHORS
@@ -643,7 +190,7 @@ Sergey Poznyakoff
 .SH "BUG REPORTS"
 Report bugs to <bug-rush@gnu.org.ua>.
 .SH COPYRIGHT
-Copyright \(co 2016 Sergey Poznyakoff
+Copyright \(co 2016-2019 Sergey Poznyakoff
 .br
 .na
 License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>

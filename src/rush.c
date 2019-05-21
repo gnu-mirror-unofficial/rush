@@ -478,16 +478,67 @@ getenvind(struct rush_request *req, char const *name, char **pval)
 	return -1;
 }
 
+/* Return true if VAR[0]@LEN patches EV, false if only the name part matches,
+   and undefined otherwise.
+   Arguments:
+     EV    - a pointer to an envar entry,
+     VAR   - an entry from the environ array,
+     LEN   - length of the variable name part of VAR (in other words,
+             position of the first = character in VAR).
+*/
+static enum rush_three_state
+envarmatch(struct envar *ev, char const *var, int len)
+{
+	if (ev->value) {
+		if (strncmp(ev->name, var, len) == 0) {
+			return strcmp(var + len + 1, ev->value) == 0
+				? rush_true
+				: rush_false;
+		}
+	} else if (wildmatch(ev->name, var, len) == 0) {
+		return rush_true;
+	}
+	return rush_undefined;
+}
+
+/* Return true if environ entry VAR must be kept in the environment, according
+   to RULE. */
 static rush_bool_t
 keep_envar(struct rush_rule *rule, char const *var)
 {
 	struct envar *ev;
 	int len = strcspn(var, "=");
 	for (ev = rule->envar_head; ev; ev = ev->next) {
-		if (ev->type == envar_keep && strncmp(ev->name, var, len) == 0)
-			return rush_true;
+		if (ev->type == envar_keep) {
+			enum rush_three_state res = envarmatch(ev, var, len);
+			switch (res) {
+			case rush_true:
+			case rush_false:
+				return res;
+			case rush_undefined:
+				/* go on */
+				break;
+			}
+		}
 	}
 	return rush_false;
+}
+
+/* Unset environment variable described by EV. */
+static void
+unset_envar(struct rush_request *req, struct envar *ev)
+{
+	size_t i;
+	for (i = 0; i < req->env_count; ) {
+		int len = strcspn(req->env[i], "=");
+		if (envarmatch(ev, req->env[i], len) == rush_true) {
+			free(req->env[i]);
+			memmove(req->env + i, req->env + i + 1,
+				(req->env_count - i) * sizeof(req->env[0]));
+			req->env_count--;
+		} else
+			i++;
+	}
 }
 
 static void
@@ -522,16 +573,9 @@ env_setup(struct rush_rule *rule, struct rush_request *req)
 		case envar_keep:
 			/* Skip it */
 			break;
+
 		case envar_unset:
-			n = getenvind(req, ev->name, &val);
-			if (n == -1)
-				continue;
-			if (ev->value && strcmp(ev->value, val))
-				continue;
-			free(req->env[n]);
-			memmove(req->env + n, req->env + n + 1,
-				(req->env_count - n) * sizeof(req->env[0]));
-			req->env_count--;
+			unset_envar(req, ev);
 			break;
 
 		case envar_set:

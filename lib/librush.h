@@ -153,4 +153,5 @@ const char *user_gettext(const char *locale, const char *domain,
 
 void argcv_free(int argc, char **argv);
 char *argcv_string(int argc, char **argv);
-
+
+int wildmatch(char *expr, char *name, size_t len);

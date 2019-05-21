@@ -13,12 +13,12 @@
 .\"
 .\" You should have received a copy of the GNU General Public License
 .\" along with GNU Rush.  If not, see <http://www.gnu.org/licenses/>.
-.TH RUSH 8 "April 19, 2019" "RUSH" "Rush User Reference"
+.TH RUSH 8 "May 15, 2019" "RUSH" "Rush User Reference"
 .SH NAME
 rush \- restricted user shell
 .SH SYNOPSIS
 \fBrush\fR\
- [\fB\-ht\fR]\
+ [\fB\-htTx\fR]\
  [\fB\-C\fR \fICHECK\fR]\
  [\fB\-D\fR \fIATTR\fR[\fB,\fIATTR\fR...]]\
  [\fB\-c\fR \fICOMMAND\fR]\
@@ -29,6 +29,7 @@ rush \- restricted user shell
  [\fB\-\-dump=\fIATTR\fR[\fB,\fIATTR\fR...]]\
  [\fB\-\-help\fR]\
  [\fB\-\-show\-default\fR]\
+ [\fB\-\-trace\fR]\
  [\fB\-\-usage\fR]\
  [\fB\-\-version\fR]\
  [\fIFILE\fR] 
@@ -66,44 +67,6 @@ of configuration rules to determine what kind of access the user is to
 be granted.
 .SH OPTIONS
 .TP
-\fB\-d\fR, \fB\-\-debug=\fINUMBER\fR
-Set debugging level.  The greater is the \fINUMBER\fR, the more
-verbose is the logging.  The debugging information is reported via
-.BR syslog (3)
-using
-.BR authpriv,
-priority
-.BR debug .
-Maximum meaningful value for \fINUMBER\fR is \fB3\fR.
-.TP
-\fB\-D\fR, \fB\-\-dump=\fIATTR\fR[\fB,\fIATTR\fR...]
-Request dump mode.  Arguments are the names of the attributes to be
-dumped, or the word
-.B all
-standing for all attributes.  Refer to the GNU Rush manual for a
-detailed description.
-.TP
-\fB\-t\fR, \fB\-\-test\fR, \fB\-\-lint
-Run in test mode.  When this option is given, the following occurs:
-.RS
-.nr step 1 1
-.IP \n[step].
-All diagnostic messages are redirected to standard error, instead of
-syslog.
-.IP \n+[step].
-If a single non-option argument is present, it is taken as a
-name of the configuration file to use.
-.IP \n+[step].
-The configuration file is parsed.  If parsing fails, the program
-exits with the code 1.
-.IP \n+[step].
-If the \fB\-c\fR option is present, \fBrush\fR processes
-its argument as usual, except that the command itself is not executed.
-.RE
-.TP
-\fB\-u\fR, \fB\-\-user=\fINAME\fR
-Supplies user name for use with \fB\-\-test\fR.
-.TP
 \fB\-c\fR \fICOMMAND\fR
 Execute \fICOMMAND\fR.
 .TP
@@ -135,12 +98,57 @@ Check if the file is not a symbolic link to a file residing in a group
 or world writable directory.
 .RE
 .TP
+\fB\-d\fR, \fB\-\-debug=\fINUMBER\fR
+Set debugging level.  The greater is the \fINUMBER\fR, the more
+verbose is the logging.  The debugging information is reported via
+.BR syslog (3)
+using
+.BR authpriv,
+priority
+.BR debug .
+Maximum meaningful value for \fINUMBER\fR is \fB3\fR.
+.TP
+\fB\-D\fR, \fB\-\-dump=\fIATTR\fR[\fB,\fIATTR\fR...]
+Request dump mode.  Arguments are the names of the attributes to be
+dumped, or the word
+.B all
+standing for all attributes.  Refer to the GNU Rush manual for a
+detailed description.
+.TP
 .B \-i
 Emulate interactive access.  Use this option to test whether and how
 does your configuration allow interactive access.
 .TP
 .B \-\-show\-default
-Show default configuration.      
+Show default configuration.
+.TP
+\fB\-t\fR, \fB\-\-test\fR, \fB\-\-lint
+Run in test mode.  When this option is given, the following occurs:
+.RS
+.nr step 1 1
+.IP \n[step].
+All diagnostic messages are redirected to standard error, instead of
+syslog.
+.IP \n+[step].
+If a single non-option argument is present, it is taken as a
+name of the configuration file to use.
+.IP \n+[step].
+The configuration file is parsed.  If parsing fails, the program
+exits with the code 1.
+.IP \n+[step].
+If the \fB\-c\fR option is present, \fBrush\fR processes
+its argument as usual, except that the command itself is not executed.
+.RE
+.TP
+\fB\-T
+Test scanner mode.  This option is used by the \fBrush\fR testsuite.
+.TP
+\fB\-u\fR, \fB\-\-user=\fINAME\fR
+Supplies user name for use with \fB\-\-test\fR.
+.TP
+\fB\-x\fR, \fB\-\-trace\fR
+Print parser traces.  When used twice, print lexical scanner traces as
+well.  This option is intended for debugging.
 .SH SEE ALSO
 .BR rush.rc (5),
 .BR rushlast (1),
@@ -150,7 +158,7 @@ Sergey Poznyakoff
 .SH "BUG REPORTS"
 Report bugs to <bug-rush@gnu.org.ua>.
 .SH COPYRIGHT
-Copyright \(co 2016 Sergey Poznyakoff
+Copyright \(co 2016-2019 Sergey Poznyakoff
 .br
 .na
 License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>

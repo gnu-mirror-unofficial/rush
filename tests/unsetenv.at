@@ -73,4 +73,23 @@ rule
 [])
 m4_popdef([RUSH_ENVIRON])
 
+m4_pushdef([RUSH_ENVIRON],[-i HOME=$PWD USER=$MY_USER TEST_FOO=foo TEST_BAR=bar])
+AT_RUSH_TEST([
+rush 2.0
+rule
+    unsetenv "TEST_*"
+],
+[environ],
+[command],
+[0],
+[{
+    "environ":[[
+        "HOME=$TESTDIR",
+        "USER=$MY_USER"
+    ]]
+}
+],
+[])
+m4_popdef([RUSH_ENVIRON])
+
 AT_CLEANUP

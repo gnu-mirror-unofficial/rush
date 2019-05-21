@@ -25,6 +25,7 @@ librush_a_SOURCES=\
  slist.c\
  utmp.c\
  version.c\
+ wildmatch.c\
  wordsplit.c\
  wordsplit.h\
  wtmp.c

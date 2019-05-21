@@ -17,12 +17,12 @@
 AT_SETUP([keepenv])
 AT_KEYWORDS([keepenv])
 
-m4_pushdef([RUSH_ENVIRON],[-i HOME=$PWD USER=$MY_USER LOGIN=NO_$MY_USER PATH=$PATH])
+m4_pushdef([RUSH_ENVIRON],[-i HOME=$PWD USER=$MY_USER LOGIN=NO_$MY_USER PATH=$PATH TEST_FOO=foo TEST_BAR=bar])
 AT_RUSH_TEST([
 rush 2.0
 rule
     clrenv
-    keepenv HOME USER
+    keepenv HOME USER "TEST_*"
 ],
 [environ],
 [command],
@@ -30,6 +30,8 @@ rule
 [{
     "environ":[[
         "HOME=$TESTDIR",
+        "TEST_BAR=bar",
+        "TEST_FOO=foo",
         "USER=$MY_USER"
     ]]
 }

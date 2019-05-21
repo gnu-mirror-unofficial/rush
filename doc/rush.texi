@@ -1504,10 +1504,17 @@ Clear the environment.
 Retain the names in @var{list} in the environment.  This statement
 should be used in conjunction with @code{clrenv}.
 
-Argument is a whitespace delimited list of variable names to retain.
-A variable name can be followed by an equals sign and a value, in
-which case it will be retained only if its actual value equals the
-supplied one.
+Argument is a whitespace delimited list of variables to retain.  Each
+element in the list can be either a variable name, or a shell-style
+globbing pattern, in which case all variables matching that pattern
+will be retained, or a variable name followed by an equals sign and a
+value, in which case it will be retained only if its actual value
+equals the supplied one.  For example, to retain only variables with
+names beginning with @samp{LC_}:
+
+@example
+keepenv "LC_*"
+@end example
 @end deffn
 
 @deffn {rule} setenv @var{name} = @var{value}
@@ -1525,9 +1532,12 @@ setenv PATH = "$PATH:/opt/bin"
 @deffn {rule} unsetenv @var{list}
 Unset environment variables listed as arguments.
 
-A variable name can be followed by an equals sign and a value, in
-which case it will be unset only if its actual value equals the
-supplied one.
+Argument is a whitespace delimited list of variables to retain.  Each
+element in the list can be either a variable name, or a shell-style
+globbing pattern, in which case all variables matching that pattern
+will be unset, or a variable name followed by an equals sign and a
+value, in which case it will be unset only if its actual value
+equals the supplied one.
 @end deffn
 
 @node Transformations
@@ -2518,9 +2528,6 @@ public_html} at the beginning of their sftp sessions.
 @node cvs
 @section cvs
 @cindex cvs
-@UNREVISED
-@FIXME{CVS is rarely used nowadays, so the utility of this section is
-doubtful.  Rewrite it using some more widely used VCS (hg, for example)}
 Using @command{cvs} over @code{ssh} invokes @command{cvs server} on
 the server machine.  In the simplest case, the following rule will do
 to give users access to @acronym{CVS} repositories:
@@ -2947,7 +2954,7 @@ normal processing for the command, but does not execute it.
 
 @opindex -x, @r{rush}
 @opindex --trace, @r{rush}
-@item -t
+@item -x
 @item --trace
 Print parser traces.  When used twice, print lexical scanner traces as
 well.  This option is intended for debugging.

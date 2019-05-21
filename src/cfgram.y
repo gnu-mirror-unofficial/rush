@@ -382,14 +382,14 @@ expr       : string '~' regex
 	     }
 	   | GROUP string
 	     {
-		     $$ = new_test_node(test_member);
+		     $$ = new_test_node(test_group);
 		     $$->v.groups = xcalloc(2, sizeof($$->v.groups[0]));
 		     $$->v.groups[0] = $2;
 		     $$->v.groups[1] = NULL;
 	     }
 	   | GROUP strlist
 	     {
-		     $$ = new_test_node(test_member);
+		     $$ = new_test_node(test_group);
 		     $$->v.groups = $2.argv;
 	     }
 	   ;
@@ -724,7 +724,7 @@ asgn_list   : asgn
 	      }
 	    ;
 
-asgn        : IDENT
+asgn        : literal
 	      {
 		     $$ = xmalloc(sizeof(*$$));
 		     $$->next = NULL;
