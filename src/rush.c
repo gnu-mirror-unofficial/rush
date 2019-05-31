@@ -478,7 +478,7 @@ getenvind(struct rush_request *req, char const *name, char **pval)
 	return -1;
 }
 
-/* Return true if VAR[0]@LEN patches EV, false if only the name part matches,
+/* Return true if VAR[0]@LEN matches EV, false if only the name part matches,
    and undefined otherwise.
    Arguments:
      EV    - a pointer to an envar entry,
