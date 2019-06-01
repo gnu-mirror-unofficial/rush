@@ -80,10 +80,10 @@ wilder_match(char *expr, char *name, size_t len)
 				return WILD_TRUE;
 			while (!END_OF_NAME(name, len)) {
 				int res;
-				NEXT_CHAR(name, len);
 				res = wilder_match(expr, name, len);
 				if (res != WILD_FALSE)
 					return res;
+				NEXT_CHAR(name, len);
 			}
                         return WILD_ABORT;
                         
