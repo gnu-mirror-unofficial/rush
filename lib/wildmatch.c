@@ -23,11 +23,11 @@ enum {
 };
 
 static int
-match_char_class(char **pexpr, char c)
+match_char_class(char const **pexpr, char c)
 {
 	int res;
 	int rc;
-	char *expr = *pexpr;
+	char const *expr = *pexpr;
 
 	expr++;
 	if (*expr == '^') {
@@ -65,7 +65,7 @@ match_char_class(char **pexpr, char c)
 #define NEXT_CHAR(s,l) (s++, l--)
 
 int
-wilder_match(char *expr, char *name, size_t len)
+wilder_match(char const *expr, char const *name, size_t len)
 {
         int c;
 
@@ -119,7 +119,7 @@ wilder_match(char *expr, char *name, size_t len)
 
 /* Return 0 if first LEN bytes of NAME match globbing pattern EXPR. */
 int
-wildmatch(char *expr, char *name, size_t len)
+wildmatch(char const *expr, char const *name, size_t len)
 {
 	return wilder_match(expr, name, len) != WILD_TRUE;
 }
