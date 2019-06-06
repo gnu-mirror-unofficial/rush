@@ -2686,6 +2686,8 @@ wordsplit_run (const char *command, size_t length, struct wordsplit *wsp,
   int rc;
   size_t start;
 
+  /* Initialize error context early */
+  wsp->ws_errctx = NULL;
   if (!command)
     {
       if (!(flags & WRDSF_INCREMENTAL))
@@ -2796,6 +2798,10 @@ wordsplit_clearerr (struct wordsplit *ws)
 void
 wordsplit_free (struct wordsplit *ws)
 {
+  if (ws->ws_errno == WRDSE_USAGE)
+    /* Usage error: the structure is not properly initialized and there's
+       nothing to free. */
+    return;
   wordsplit_clearerr (ws);
   wordsplit_free_nodes (ws);
   wordsplit_free_words (ws);
