@@ -332,6 +332,7 @@ static int noinc(void);
 "setenv"    { BEGIN(ARGS); return tok(SETENV); }
 "unsetenv"  { BEGIN(ARGS); return tok(UNSETENV); }
 "keepenv"   { BEGIN(ARGS); return tok(KEEPENV); }
+"evalenv"   { BEGIN(ARGS); return tok(EVALENV); }
 "delete"    { BEGIN(ARGS); return tok(DELETE); }
 "exit"      { BEGIN(ARGS); return tok(EXIT); }
 "map"       { BEGIN(ARGS); return tok(MAP); }

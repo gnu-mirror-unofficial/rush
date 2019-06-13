@@ -194,9 +194,10 @@ struct rush_error {     /* Rush error object */
 };
 
 enum envar_type {
-	envar_set,
-	envar_unset,
-	envar_keep
+	envar_set,   /* Set variable */
+	envar_unset, /* Unset variable(s) */
+	envar_keep,  /* Preserve variable(s) while clearing the environment */
+	envar_eval   /* Evaluate string for side effects. Discard the result */
 };
 
 struct envar {

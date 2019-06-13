@@ -596,6 +596,10 @@ env_setup(struct rush_rule *rule, struct rush_request *req)
 			free(val);
 			break;
 
+		case envar_eval:
+			free(rush_expand_string(ev->value, req));
+			break;
+			
 		default:
 			die(system_error, NULL,
 			    _("INTERNAL ERROR at %s:%d: invalid envar type %d"),

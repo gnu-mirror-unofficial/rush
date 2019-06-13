@@ -115,7 +115,7 @@ _wsplt_store_errctx (struct wordsplit *wsp, char const *str, size_t len)
   if (!wsp->ws_errctx)
     {
       wsp->ws_error ("%s",
-		     _("memory exhausted while trying to store error subject"));
+		     _("memory exhausted while trying to store error context"));
     }
   else
     {
@@ -1185,7 +1185,7 @@ wsplt_assign_var (struct wordsplit *wsp, const char *name, size_t namelen,
       strcpy(v + namelen, value);
       wsp->ws_env[wsp->ws_envidx++] = v;
     }
-  wsp->ws_env[wsp->ws_envidx++] = NULL;
+  wsp->ws_env[wsp->ws_envidx] = NULL;
   return WRDSE_OK;
 }
 

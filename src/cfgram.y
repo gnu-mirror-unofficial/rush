@@ -86,6 +86,7 @@ static struct transform_node *new_set_node(enum transform_node_type type,
 %token SETENV "setenv"
 %token UNSETENV "unsetenv"
 %token KEEPENV "keepenv"
+%token EVALENV "evalenv"
 %token DELETE "delete"
 %token EXIT "exit"
 %token <attrib> ATTRIB "rule attribute"
@@ -702,6 +703,14 @@ environ_stmt: CLRENV
 			       envar_set);
 		     free($2);
 		     free($4);
+	      }
+            | EVALENV string
+	      {
+		      new_envar(current_rule,
+				"", 0,
+				$2, strlen($2),
+				envar_eval);
+		      free($2);
 	      }
 	    | UNSETENV asgn_list
 	      {

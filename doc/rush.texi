@@ -416,9 +416,9 @@ are recognized and replaced as per table below:
 @end multitable
 @end float
 
-The backslash immediately followed by newline character is removed.
-When followed by any other character except as listed above, both the
-backslash and the character are retained verbatim.
+A backslash immediately followed by newline character is removed.
+A backslash followed by any other character except as listed above
+is retained along with the character. 
 
 @cindex backreference interpretation
 @anchor{backreference}
@@ -495,7 +495,7 @@ These are:
 
   A @dfn{statement} consists of a keyword and optional arguments,
 separated by any amount of whitespace.  Each statement occupies one
-line in the configuration file and is terminated by newline character.
+line in the configuration file and is terminated by a newline character.
 Extremely long statements may be split across several physical lines
 by ending each line except the last with a backslash followed by a
 newline.
@@ -1538,6 +1538,18 @@ globbing pattern, in which case all variables matching that pattern
 will be unset, or a variable name followed by an equals sign and a
 value, in which case it will be unset only if its actual value
 equals the supplied one.
+@end deffn
+
+@deffn {rule} evalenv @var{string}
+Performs backslash interpretation, backreference interpretation
+and variable expansion on @var{string} and discards the result.
+This statement is similar to the shell's @dfn{colon} statement.
+For example, the following statement will define the @env{DEPTH}
+variable and initialize it to 10, unless it is already defined:
+
+@example
+evalenv $@{DEPTH:=10@}
+@end example
 @end deffn
 
 @node Transformations

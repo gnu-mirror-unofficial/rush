@@ -63,6 +63,7 @@ TESTSUITE_AT = \
   interactive.at\
   fallthrough.at\
   error.at\
+  evalenv.at\
   clrenv.at\
   unsetenv.at\
   keepenv.at\

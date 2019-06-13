@@ -98,6 +98,7 @@ m4_include([clrenv.at])
 m4_include([unsetenv.at])
 m4_include([keepenv.at])
 m4_include([setenv.at])
+m4_include([evalenv.at])
 
 AT_BANNER([Features])
 m4_include([backref.at])

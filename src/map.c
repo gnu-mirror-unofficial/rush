@@ -179,15 +179,24 @@ rush_variable_target(char const *varname)
 	return vd ? vd->target : target_var;
 }
 
+static char **
+find_user_varptr(struct rush_request *req, char const *var, size_t len)
+{
+	size_t i;
+	for (i = 0; i < req->var_count; i += 2)
+		if (strlen(req->var_kv[i]) == len
+		    && memcmp(req->var_kv[i], var, len) == 0)
+			return &req->var_kv[i+1];
+	return NULL;
+}
+
 char **
 rush_getvarptr(struct rush_request *req, char const *varname)
 {
-	size_t i;
-
 	if (req->var_kv) {
-		for (i = 0; i < req->var_count; i += 2)
-			if (strcmp(req->var_kv[i], varname) == 0)
-				return &req->var_kv[i+1];
+		char **ret = find_user_varptr(req, varname, strlen(varname));
+		if (ret)
+			return ret;
 	}
 
 	while (req->var_count + 3 >= req->var_max)
@@ -232,18 +241,10 @@ getvar(char **ret, const char *var, size_t len, void *clos)
 		}
 	}
 
-	if (!s && req->env_count) {
-		/* Look up in the environment */
-		int i;
-		
-		for (i = 0; req->env[i]; i++) {
-			if (strlen(req->env[i]) > len
-			    && req->env[i][len] == '='
-			    && memcmp(req->env[i], var, len) == 0) {
-				s = req->env[i] + len + 1;
-				break;
-			}
-		}
+	if (!s && req->var_kv) {
+		char **ptr = find_user_varptr(req, var, len);
+		if (ptr)
+			s = *ptr;
 	}
 
 	if (!s)
@@ -271,6 +272,7 @@ rush_expand_string(const char *string, struct rush_request *req)
 	int wsflags = WRDSF_NOSPLIT
 		      | WRDSF_NOCMD
 		      | (expand_undefined ? 0: WRDSF_UNDEF)
+		      | WRDSF_ENV
 		      | WRDSF_GETVAR
 		      | WRDSF_CLOSURE
 		      | WRDSF_ERROR
@@ -284,10 +286,7 @@ rush_expand_string(const char *string, struct rush_request *req)
 	ws.ws_error = rush_ws_error;
 	ws.ws_options = WRDSO_BSKEEP_QUOTE | WRDSO_NOCMDSPLIT
 		      | WRDSO_PARAMV | WRDSO_PARAM_NEGIDX;
-	if (req->var_kv) {
-		ws.ws_env = (const char **)req->var_kv;
-		wsflags |= WRDSF_ENV|WRDSF_ENV_KV;
-	}
+	ws.ws_env = (char const**)req->env;
 
 	result = expandref(string, &req->backref[req->backref_cur], "%");
 	switch (wordsplit(result, &ws, wsflags)) {
@@ -304,6 +303,40 @@ rush_expand_string(const char *string, struct rush_request *req)
 	free(result);
 	result = ws.ws_wordv[0];
 	ws.ws_wordv[0] = NULL;
+
+	if (ws.ws_envbuf) {
+		size_t i;
+		
+		for (i = 0; i < req->env_count; i++)
+			free (req->env[i]);
+		req->env_count = 0;
+		if (req->env_max < ws.ws_envidx + 1) {
+			req->env = xrealloc(req->env,
+					    (ws.ws_envidx + 1) * sizeof(req->env[0]));
+			req->env_max = ws.ws_envidx + 1;
+		}
+		for (i = 0; i < ws.ws_envidx; i++) {
+			size_t len = strcspn(ws.ws_envbuf[i], "=");
+			char **ptr = find_user_varptr(req,
+						      ws.ws_envbuf[i],
+						      len);
+			if (ptr) {
+				free(*ptr);
+				*ptr = xstrdup(ws.ws_envbuf[i] + len + 1);
+				free(ws.ws_envbuf[i]);
+			} else {
+				req->env[req->env_count++] = ws.ws_envbuf[i];
+			}
+		}
+		req->env[req->env_count] = NULL;
+
+		free (ws.ws_envbuf);
+		ws.ws_envbuf = NULL;
+		ws.ws_envidx = 0;
+		ws.ws_envsiz = 0;
+		
+	}
+	
 	wordsplit_free(&ws);
 	return result;
 }
