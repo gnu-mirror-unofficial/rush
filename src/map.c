@@ -285,7 +285,8 @@ rush_expand_string(const char *string, struct rush_request *req)
 	ws.ws_paramc = req->argc;
 	ws.ws_error = rush_ws_error;
 	ws.ws_options = WRDSO_BSKEEP_QUOTE | WRDSO_NOCMDSPLIT
-		      | WRDSO_PARAMV | WRDSO_PARAM_NEGIDX;
+		      | WRDSO_PARAMV | WRDSO_PARAM_NEGIDX
+		      | WRDSO_GETVARPREF;
 	ws.ws_env = (char const**)req->env;
 
 	result = expandref(string, &req->backref[req->backref_cur], "%");

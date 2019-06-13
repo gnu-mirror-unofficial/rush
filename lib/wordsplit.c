@@ -1034,15 +1034,13 @@ find_closing_paren (const char *str, size_t i, size_t len, size_t *poff,
   return 1;
 }
 
-static int
-wordsplit_find_env (struct wordsplit *wsp, const char *name, size_t len,
-		    char const **ret)
+static char const *
+wsplt_env_find (struct wordsplit *wsp, const char *name, size_t len)
 {
   size_t i;
 
-  if (!(wsp->ws_flags & WRDSF_ENV))
-    return WRDSE_UNDEF;
-
+  if (!wsp->ws_env)
+    return NULL;
   if (wsp->ws_flags & WRDSF_ENV_KV)
     {
       /* A key-value pair environment */
@@ -1050,17 +1048,14 @@ wordsplit_find_env (struct wordsplit *wsp, const char *name, size_t len,
 	{
 	  size_t elen = strlen (wsp->ws_env[i]);
 	  if (elen == len && memcmp (wsp->ws_env[i], name, elen) == 0)
-	    {
-	      *ret = wsp->ws_env[i + 1];
-	      return WRDSE_OK;
-	    }
+	    return wsp->ws_env[i + 1];
 	  /* Skip the value.  Break the loop if it is NULL. */
 	  i++;
 	  if (wsp->ws_env[i] == NULL)
 	    break;
 	}
     }
-  else if (wsp->ws_env)
+  else 
     {
       /* Usual (A=B) environment. */
       for (i = 0; wsp->ws_env[i]; i++)
@@ -1072,13 +1067,36 @@ wordsplit_find_env (struct wordsplit *wsp, const char *name, size_t len,
 	    if (name[j] != var[j])
 	      break;
 	  if (j == len && var[j] == '=')
-	    {
-	      *ret = var + j + 1;
-	      return WRDSE_OK;
-	    }
+	    return var + j + 1;
+	}
+    }
+  return NULL;
+}
+
+static int
+wsplt_env_lookup (struct wordsplit *wsp, const char *name, size_t len,
+		  char **ret)
+{
+  if (wsp->ws_flags & WRDSF_ENV)
+    {
+      char const *val = wsplt_env_find (wsp, name, len);
+      if (val)
+	{
+	  char *retval = strdup (val);
+	  if (!retval)
+	    return WRDSE_NOSPACE;
+	  *ret = retval;
+	  return WRDSE_OK;
 	}
     }
   return WRDSE_UNDEF;
+}
+
+static int
+wsplt_env_getvar (struct wordsplit *wsp, const char *name, size_t len,
+		  char **ret)
+{
+  return wsp->ws_getvar (ret, name, len, wsp->ws_closure);
 }
 
 static int
@@ -1356,7 +1374,6 @@ expvar (struct wordsplit *wsp, const char *str, size_t len,
   size_t i = 0;
   const char *defstr = NULL;
   char *value;
-  const char *vptr;
   struct wordsplit_node *newnode;
   const char *start = str - 1;
   int rc;
@@ -1497,22 +1514,23 @@ expvar (struct wordsplit *wsp, const char *str, size_t len,
 	}
       else
 	{
-	  rc = wordsplit_find_env (wsp, str, i, &vptr);
-	  if (rc == WRDSE_OK)
+	  if (wsp->ws_flags & WRDSF_GETVAR)
 	    {
-	      if (vptr)
+	      if (wsp->ws_options & WRDSO_GETVARPREF)
 		{
-		  value = strdup (vptr);
-		  if (!value)
-		    rc = WRDSE_NOSPACE;
+		  rc = wsplt_env_getvar (wsp, str, i, &value);
+		  if (rc == WRDSE_UNDEF)
+		    rc = wsplt_env_lookup (wsp, str, i, &value);
 		}
 	      else
-		rc = WRDSE_UNDEF;
+		{
+		  rc = wsplt_env_lookup (wsp, str, i, &value);
+		  if (rc == WRDSE_UNDEF)
+		    rc = wsplt_env_getvar (wsp, str, i, &value);
+		}
 	    }
-	  else if (wsp->ws_flags & WRDSF_GETVAR)
-	    rc = wsp->ws_getvar (&value, str, i, wsp->ws_closure);
 	  else
-	    rc = WRDSE_UNDEF;
+	    rc = wsplt_env_lookup (wsp, str, i, &value);
 	}
 
       if (rc == WRDSE_OK

@@ -216,7 +216,8 @@ struct wordsplit
 #define WRDSO_FAILGLOB        0x00000002
 /* Allow a leading period to be matched by metacharacters. */
 #define WRDSO_DOTGLOB         0x00000004
-/* Unused value:              0x00000008 */
+/* Prefer ws_getvar over lookup in ws_env, if both are supplied */
+#define WRDSO_GETVARPREF      0x00000008
 /* Keep backslash in unrecognized escape sequences in words */
 #define WRDSO_BSKEEP_WORD     0x00000010
 /* Handle octal escapes in words */
