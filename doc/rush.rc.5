@@ -13,14 +13,46 @@
 .\"
 .\" You should have received a copy of the GNU General Public License
 .\" along with GNU Rush.  If not, see <http://www.gnu.org/licenses/>.
-.TH RUSH.RC 5 "May 16, 2019" "RUSH.RC" "Rush User Reference"
+.\"
+.\" Additional macros used in this document:
+.\"
+.\" Begins example text
+.de ex
+.  nr rush-saved-indent \\n[.i]
+.  nr rush-level-indent (\\n[rush-saved-indent] +2m)
+.  nr mE \\n(.f
+.  nf
+.  nh
+.  ft CW
+.  in \\n[rush-level-indent]u
+.  sp
+..
+.\" End example.
+.de ee
+.  in \\n[rush-saved-indent]u
+.  ft \\n(mE
+.  fi
+.  hy \\n(HY
+.  sp
+..
+.de table
+.  sp
+.  nf
+.  ta \\$1 \\$2
+..
+.de tabend
+.  fi
+.  sp
+..
+.\" Document begins
+.TH RUSH.RC 5 "June 26, 2019" "RUSH.RC" "Rush User Reference"
 .SH NAME
-rush.rc \- configuration rules for rush.
+rush.rc \- configuration rules for remote user shell
 .SH DESCRIPTION
 The file
 .B /etc/rush.rc
 contains a set of rules that the
-.B rush (8)
+.BR rush (8)
 shell uses in order to determine whether the user is allowed to
 execute the requested command and to set up the environment for
 its execution.
@@ -28,6 +60,212 @@ its execution.
 Empty lines are ignored.  Lines beginning with a pound sign are
 comments and are ignored as well.
 .PP
+Except for comments and empty lines, each line of the configuration
+file consists of the keyword and optional value, and constitutes a
+\fIstatement\fR.  Exceedingly long lines may be split across multiple
+physical lines, by ending each line with a backslash immediately
+followed by a newline.  Statements fall into two major classes:
+\fIsection\fR and \fIregular\fR statements.  A \fIsection\fR statement
+serves as a container for one or more regular statements that pursue the
+same goal, thus playing the role of a chapter in a book.
+A \fIregular\fR statement modifies a certain aspect of the program's
+behavior.
+.PP
+The overall file structure is as follows:
+.ex
+.B rush 2.0
+
+.B global
+  \fIkeyword\fR \fIvalue\fR
+  ...
+
+.B rule \fIA\fB
+  \fIkeyword\fR \fIvalue\fR
+  ...
+  
+.B rule \fIB\fB
+  \fIkeyword\fR \fIvalue\fR
+  ...
+.ee
+.PP
+A configuration file must begin with a \fBrush\fR statement indicating
+the version of the syntax this file uses.  Current versions of
+\fBrush\fR implement syntax version 2.0.  In the absence of the initial
+\fBrush\fR statement, the program will treat the configuration file as
+written in legacy configuration syntax (see
+.B http://www.gnu.org.ua/software/rush/manual/1.x
+for details).
+.PP
+There are two section statements:
+.B global
+and
+.BR rule .
+The
+.B global
+section contains statements configuring the behavior of the program
+in general.  There can be as many \fBglobal\fR statements in the
+configuration as you consider necessary, each of them affecting the
+material up to the next \fBglobal\fR statement, or end of the file,
+whichever occurs first.
+.PP
+Examples of statements that can be used in a \fBglobal\fR section are:
+.BR debug ,
+which sets the debug verbosity level,
+.BR message ,
+which configures error messages, etc.  See the
+.B FIXME REF
+for the full list.
+.PP
+One or more
+.B rule
+statements constitute the core of the configuration.  Each
+.B rule
+statement provides a recipe for serving a specific class of input
+commands.  When
+.B rush
+is invoked with a specific command, it will scan the
+configuration file looking for a rule that matches the requested
+command line.  If such a rule is found, it will be applied.  Commands
+that don't match any rule will be rejected.
+.PP
+A \fBrule\fR statement may be followed by a \fItag\fR, an aribtrary
+sequence of non-whitespace characters serving as a label for this
+rule.  This sequence will be used in diagnostic messages to identify
+this rule.  In the absense of user-supplied tag, the default one will be
+generated, consisting of the \fB#\fR symbol followed by the ordinal
+number of the rule in the configuration file (started with 1).
+.PP
+To match a particular command, each rule should contain the
+.B match
+statement.  Its argument is a conditional expression that can contain
+comparison and boolean operators.  The operands can refer to the
+command line using shell-like variables:
+.B $command
+to refer to the entire command line,
+.BR $# ,
+referring to the number of arguments in the command line (the command
+itself being counted as one of the arguments),
+.BR $0
+meaning the command name, and
+.BR $1 ,
+.BR $2 ,
+etc., referring to the particular command line arguments (arguments 
+past the ninth one can be accessed as, e.g.
+.BR ${10} ).
+Thus, the following rule:
+.ex
+rule
+  match $command == "ls"
+.ee
+will match only the
+.B ls
+command without arguments.
+.PP
+The
+.B ~
+(tilde) operator denotes regular expression matching.  For example,
+the following rule matches \fBls\fR command, optionally preceded with
+any path prefix:
+.ex
+rule
+  match $0 ~ "^(.*/)?ls$"
+.ee
+\fBMatch\fR expressions can contain terms of arbitrary complexity.
+Consider the following example:
+.ex
+rule
+  match $0 ~ "^(.*/)?ls$" && $# == 2 \\
+        && $1 !~ "^(/|/etc)$"
+.ee
+This rule will match any \fBls\fR command having exactly one argument,
+unless that argument is \fB/\fR or \fB/etc\fR.  Notice the use of the
+.B !~
+operator to denote the negated regular expression matching, and the use
+of backslash to split a single expression across two physical lines.
+.PP
+Variables are referenced using the same syntax as in shell.  For
+example,
+.B ${1:-/bin}
+expands to the value of the first parameter, if it is supplied, or
+to the string "/bin" otherwise. See \fIFIXME REF\fR for details.
+.PP
+Although important, the \fBmatch\fR statement is not mandatory in a
+\fBrule\fR statement.  If it is absent, the rule will match any
+command line.  This is normally used in \fIfall-through\fR rules.
+A \fIfall-through\fR rule applies modifications to the command
+environment.  After applying such rule, the scanning resumes at
+the rule that follows it. Fall-through rules are marked with
+the
+.BR fall\-through
+statement.
+.PP
+A rule can modify the command line and environment in which it will be
+executed.  The \fBset\fR statement is provided for altering the
+command line or its parts.  It takes three arguments: the variable
+name or index, the operator and the value.  For example, the
+statement:
+.ex
+set command = "/bin/sftp-server -u 002"
+.ee
+replaces the entire command line.  To replace particular arguments,
+use the \fB[\fIN\fR]\fR syntax, where \fIN\fR is the index of the
+argument in the command line.  For example, to set the first argument:
+.ex
+set [1] = "/tmp"
+.ee
+The part to the right of the equals sign can contain a transformation,
+i.e. a string followed by the \fB~\fR operand and a
+\fIs-expression\fR of the form
+\fBs/\fIregexp\fB/\fIreplacement\fB/\fR[\fIflags\fR].
+Parenthesized groups in \fIregexp\fR can be referred to in
+\fIreplacement\fR using the backreference construct in the form
+\fB\\\fIN\fR, where \fIN\fR is the 1-based ordinal number of the
+group.  For example, the following statement sets the second argument
+to the directory part of the first one:
+.ex
+set [2] = "$1" ~ "s/(.*)\\//\\1/"
+.ee
+Two points are worth noticing.  First, the left operand of \fB~\fR
+undergoes variable expansion.  Secondly, the right-hand side operand
+is quoted and therefore each backslash in it has to be escaped.
+.PP
+The special operator \fB=~\fR is used if the resulted value is
+assigned to the same variable that served as its argument.  For
+example, the two statements below are equivalent:
+.ex
+set [1] =~ "s/(.*)\\//\\1/"
+set [1] = "$1" ~ "s/(.*)\\//\\1/"
+.ee
+Parenthesized groups matched by the most recent \fBset\fR statement
+remain available for use in the statements that follow it in the rule.
+To refer to the group from the recent matching, use the following
+construct: \fB%\fIN\fR.  For example, the following two statements set
+the first argument to the directory part, and second argument to the
+basename of the original \fB$1\fR value:
+.ex
+set [1] =~ "s/(.*)\\/(.*)/\\1/"
+set [2] = %2
+.ee
+The
+.B set
+statement operates not only on positional arguments and built-in
+variables, but also on arbitrary user-defined variables.  A
+user-defined variable springs into existence when it first appears as
+a left-hand side argument to the \fBset\fR statement.  The name of the
+variable must follow the usual rules for variable names: it must begin
+with an alphabetical character or underscore and contain only letters,
+digits and underscores.  References to user-defined variables follow
+the same syntax as for built-in ones.
+.PP
+The following example uses temporary variable \fBtemp\fR to swap two
+arguments:
+.ex
+set temp = $1
+set [1] = $2
+set [2] = $temp
+.ee
+
+.SH REFERENCE: LEXICAL STRUCTURE
 A
 .I statement
 consists of a keyword and arguments, separated by any amount
@@ -71,8 +309,7 @@ expansion.
 .sp
 During \fIbackslash interpretation\fR, the \fIescape sequences\fR
 are recognized and replaced as per table below:
-.nf
-.ta 8n 20n
+.table 8n 20n
 .ul
 	Sequence	Replaced with
 	\\a	Audible bell character (ASCII 7)
@@ -85,8 +322,7 @@ are recognized and replaced as per table below:
 	\\\\	A single backslash
 	\\\(dq	A double-quote.
 	\\%	Percent sign
-.fi
-.sp
+.tabend
 In addition, the sequence \fB\\\fInewline\fR is removed from
 the string.  This allows to split long strings over several
 physical lines.
@@ -117,26 +353,20 @@ identifiers: it must begin with a letter and consist of letters,
 digits and underscores.  Variable name in curly braces can be followed
 by \fB\-\fR, \fB=\fR, \fB?\fR, or \fB+\fR, optionally preceded by
 \fB:\fR as summarized in the table below:
-.sp
-.nf
-.ta 8n 30n
+.table 8n 30n
 .ul
 	Reference	Meaning
 	${\fIVAR\fR:-\fIWORD\fR}	Use Default Values
 	${\fIVAR\fR:=\fIWORD\fR}	Assign Default Values
 	${\fIVAR\fR:?\fIWORD\fR}	Display Error if Null or Unset
 	${\fIVAR\fR:+\fIWORD\fR}	Use Alternate Value
-.fi
-.sp
+.tabend
 where \fIWORD\fR stands for any valid token as described in this
 section.  See the section \fBVARIABLE EXPANSION\fR, for a detailed
 discussion of these forms and their meaning.
 .TP
 .I Comparison and boolean operators
-These are:
-.sp
-.nf
-.ta 8n 30n
+.table 8n 30n
 	&&	Boolean AND
 	||	Boolean OR
 	!	Boolean negation
@@ -152,35 +382,215 @@ These are:
 	group	Membership in UNIX group
 	=	Assignment
 	=~	Regular expression substitution
-.fi
-.sp
-.SH STATEMENTS
+.tabend
+.SH REFERENCE: STATEMENTS
 There are three global statements, two of which can contain multiple
-substatements.
-.SS rush
-Each configuration file must begin with the \fBrush\fR statement.  It
-must be exactly as follows:
+substatements:
 .TP
 .B rush 2.0
-Declare version of the configuration file syntax.
-.PP
+Declares the version of the syntax this configuration file is written
+in.  This must be the first statement in the configuration file.
 If this statement is missing, the configuration file will be treated
 as
 .I legacy configuration file
 from previous versions of
 .BR "GNU rush" .
-
-Currently two versions are supported.  Version 2.0 is the current
-syntax version.  Configuration file of the previous \fBrush\fR versions
+For the discussion of the legacy configuration file, please refer to
+.BR http://www.gnu.org.ua/software/rush/manual/1.x .
 .TP
 .B global
-Introduces global settings.  The settings changed within this section
-remain in effect until changed by the next \fBglobal\fR statement.
+Defines global settings.
 .TP
-.B rule
-Defines a rule.
+\fBrule\fR [\fITAG\fR]
+Contains a set of rules for a certain class of input command lines.
 .SS global
-The \fBglobal\fR statement 
+Introduces global settings.  This statement is followed by one or
+more substatements.  Global settings end at the nearest \fBrule\fR
+statement that follows.  They remain in effect until the next
+\fBglobal\fR statement is encountered which alters them.
+.PP
+The following statements may appear in this section.
+.TP
+\fBexpand\-undefined\fR \fIBOOL\fR
+Controls how undefined variables are expanded.
+If \fIBOOL\fR is \fBtrue\fR, references to undefined variables are
+replaced with empty values.  If it is \fBfalse\fR (the default), an
+error message is issued and program terminates.
+
+Any of the following values can be used as a synonym for \fBtrue\fR:
+.BR yes ,
+.BR on ,
+.BR t ,
+.BR 1 .
+
+The following values can be used as synonyms for \fBfalse\fR:
+.BR no ,
+.BR off ,
+.BR nil ,
+.BR 0 .
+.TP
+\fBdebug\fR \fINUM\fR
+Set debugging level.  The bigger \fINUM\fR is, the more verbose is the
+logging.  The debugging information is reported via \fBsyslog\fR at facility
+\fBauthpriv\fR, priority \fBdebug\fR.
+.TP
+\fBsleep\-time\fR \fINUM\fR
+Set the time in seconds to sleep before exiting on error.
+This statement is intended as a measure against brute-force attacks.
+Default sleep time is 5 seconds.
+.TP
+\fBmessage\fR \fICLASS\fR \fITEXT\fR
+Define a textual message which is returned to the remote party if an
+error of the given \fICLASS\fR occurs.  Valid classes are:
+.RS 4
+.TP
+.B usage\-error
+This error is reported when \fBrush\fR has been invoked improperly.
+The default text is:
+.sp
+\fB"You are not permitted to execute this command."\fR
+.TP
+.B nologin\-error
+A message which is returned if there is no such user name in the
+password database.  Defaults to:
+.sp
+\fB"You are not permitted to execute this command."\fR
+.TP
+.B config\-error
+Define a textual message which is returned if the configuration file
+contained errors.  Default is:
+.sp
+\fB"Local configuration error occurred."\fR
+.TP
+.B system\-error
+Define a textual message which is returned if a system error occurs.
+Default is:
+.sp
+\fB"A system error occurred while attempting to execute command."\fR
+.RE
+.TP
+\fBregexp\fR \fIFLAG\fR [\fIFLAG\fR...]
+Configure the type of regular expressions to be used by subsequent
+\fBmatch\fR and \fBset\fR statements.  Each \fIFLAG\fR is a word
+specifying a regular expression feature.  It can be preceded by a plus
+sing to enable this feature (this is the default), or by the minus
+sign to disable it.  Valid flags are: 
+.RS 4
+.TP
+.B extended
+Use POSIX Extended Regular Expression syntax when
+interpreting regex.  This is the default.
+.TP
+.B basic
+Use basic regular expressions.  Equivalent to \fB\-extended\fR.
+.TP
+\fBicase\fR or \fBignore\-case\fR
+Do not differentiate case.  Subsequent regex matches will be case
+insensitive.
+.RE
+.TP
+\fBinclude\-security\fR \fIFLAG\fR [\fIFLAG\fR...]
+Configure the security checks for include files.  Valid flags are:
+.RS 4
+.TP
+.B all
+Enable all checks.
+.TP
+.B owner
+The file must be owned by root.
+.TP
+\fBiwgrp\fR or \fBgroupwritablefile\fR
+Forbid group writable files.
+.TP
+\fBiwoth\fR or \fBworldwritablefile\fR
+Forbid world writable files.
+.TP
+\fBdir_iwgrp\fR or \fBgroupwritabledir\fR
+Forbid files that reside in group writable directories.
+.TP
+\fBdir_iwoth\fR or \fBworldwritabledir\fR
+Forbid files that reside in world writable directories.
+.TP
+\fBlink\fR
+Forbid symbolic links to files residing in group or world
+writable directories.
+.RE
+.sp
+Each of the above keywords can be prefixed by \fBno\fR, which
+reverses its meaning.  The special keyword \fBnone\fR disables all
+checks.
+.TP
+\fBacct\-umask\fR \fIMASK\fR
+Set umask used when accessing accounting database files.  Default
+value is 022.
+.TP
+\fBacct\-dir\-mode\fR \fIMODE\fR
+Set mode bits for the accounting directory.  The argument
+is the mode in octal.
+.TP
+\fBacct\-file\-mode\fR \fIMODE\fR
+Set mode bits for the \fBwtmp\fR and \fButmp\fR files.
+.SS rule
+Defines a rule.  This is a block statement, which means that all statements
+located between it and the next \fBrule\fR statement (or end of file,
+whichever occurs first) modify the definition of that rule.
+.PP
+The syntax is:
+.ex
+rule \fBTAG\fR
+.ee
+Optional \fBTAG\fR argument supplies the identifier for that rule.  It
+is used in diagnostic messages.  If tag is missing, \fBrush\fR will
+supply a default one, which is constructed by concatenating the
+\fB#\fR character and the ordinal number of rule in the configuration
+file, in decimal notation.  Rule numbering starts from 1.
+.PP
+A rule can contain the following statements:
+.TP
+\fBmatch\fR \fIEXPR\fR
+Defines conditions that decide whether the rule matches the particular
+request.  The \fIEXPR\fR argument is a comparison expression.  It can
+be a simple comparison expression or a boolean expression involving
+several other expressions.
+.sp
+A simple expression is either a comparison or a membership test.  A
+comparison has the general syntax
+.ex
+.I lhs op rhs
+.ee
+where \fIlhs\fR and \fIrhs\fR are operands and \fIop\fR is the
+operation.  The \fIlhs\fR is either a string (quoted or unquoted), or
+a variable reference.  The \fIrhs\fR is a string or number.  Prior to
+evaluating a simple expression, its \fILHS\fR undergoes variable
+expansion.  In contrast, the \fIRHS\fR operand is always treated
+verbatim.
+.sp
+The comparison operator \fIOP\fR is one of the following:
+.table 8n 30n
+	==	Equality (string or numeric)
+	!=	Inequality (string or numeric)
+	<	Less than
+	<=	Less than or equal to
+	>	Greater than
+	>=	Greater than or equal to
+	~	Regexp matching
+	!~	Negated regexp matching
+.tabend
+Two membership tests are available:
+.RS +4
+.TP
+\fILHS\fR \fBin\fR ( \fISTRING\fR ... )
+.TP
+\fBgroup\fR \fIGRP\fR
+.RE -4
+Compound boolean expression combine one or more expressions using
+logical operators
+.table 8n 30n
+	&&	Boolean AND
+	||	Boolean OR
+	!	Boolean negation
+.tabend
+
 .SH SEE ALSO
 .BR rush (8),
 .BR rushlast (1),
@@ -203,5 +613,5 @@ There is NO WARRANTY, to the extent permitted by law.
 .\" time-stamp-start: ".TH [A-Z_][A-Z0-9_.\\-]* [0-9] \""
 .\" time-stamp-format: "%:B %:d, %:y"
 .\" time-stamp-end: "\""
-.\" time-stamp-line-limit: 20
+.\" time-stamp-line-limit: 60
 .\" end:

@@ -76,6 +76,8 @@ static struct transform_node *new_set_node(enum transform_node_type type,
 %token GLOBAL "global"
 %token EOL "end of line"
 %token SET "set"
+%token INSERT "insert"
+%token REMOPT "remopt"
 %token MAP "map"
 %token UNSET "unset"
 %token MATCH "match"
@@ -113,7 +115,7 @@ static struct transform_node *new_set_node(enum transform_node_type type,
 %nonassoc EQ NE LT LE GT GE NM XF '~' IN GROUP
 
 %type <intval> fdescr index
-%type <str> literal string value defval ruleid
+%type <str> literal string optstring value defval ruleid
 %type <regex> regex
 %type <node> expr compound_cond simple_cond
 %type <range> range
@@ -248,6 +250,7 @@ stmt       : match_stmt eol
 	   | environ_stmt eol
 	   | flowctl_stmt eol
 	   | attrib_stmt eol
+	   | remopt_stmt eol
 	   | include_stmt skipeol
 	   | error
 	     {
@@ -428,7 +431,19 @@ set_stmt   : SET index '=' value
 
 		     node = new_transform_node(current_rule, transform_set);
 		     node->target.type = target_arg;
-		     node->target.v.arg = $2;
+		     node->target.v.arg.ins = 0;
+		     node->target.v.arg.idx = $2;
+		     node->v.xf.pattern = $4;
+		     node->v.xf.trans = NULL;
+	     }
+	   | INSERT index '=' value
+	     {
+		     struct transform_node *node;
+
+		     node = new_transform_node(current_rule, transform_set);
+		     node->target.type = target_arg;
+		     node->target.v.arg.ins = 1;
+		     node->target.v.arg.idx = $2;
 		     node->v.xf.pattern = $4;
 		     node->v.xf.trans = NULL;
 	     }
@@ -438,7 +453,8 @@ set_stmt   : SET index '=' value
 
 		     node = new_transform_node(current_rule, transform_set);
 		     node->target.type = target_arg;
-		     node->target.v.arg = $2;
+		     node->target.v.arg.ins = 0;
+		     node->target.v.arg.idx = $2;
 		     node->v.xf.pattern = NULL;
 		     node->v.xf.trans = compile_transform_expr($4, re_flags);
 	     }
@@ -448,7 +464,19 @@ set_stmt   : SET index '=' value
 
 		     node = new_transform_node(current_rule, transform_set);
 		     node->target.type = target_arg;
-		     node->target.v.arg = $2;
+		     node->target.v.arg.ins = 0;
+		     node->target.v.arg.idx = $2;
+		     node->v.xf.pattern = $4;
+		     node->v.xf.trans = compile_transform_expr($6, re_flags);
+	     }
+	   | INSERT index '=' string '~' value
+	     {
+		     struct transform_node *node;
+
+		     node = new_transform_node(current_rule, transform_set);
+		     node->target.type = target_arg;
+		     node->target.v.arg.ins = 1;
+		     node->target.v.arg.idx = $2;
 		     node->v.xf.pattern = $4;
 		     node->v.xf.trans = compile_transform_expr($6, re_flags);
 	     }
@@ -497,7 +525,8 @@ set_stmt   : SET index '=' value
 				     new_transform_node(current_rule,
 							transform_delete);
 			     node->target.type = target_arg;
-			     node->target.v.arg = $2;
+			     node->target.v.arg.ins = 0;
+			     node->target.v.arg.idx = $2;
 			     node->v.arg_end = $2;
 		     }
 	     }
@@ -509,7 +538,8 @@ map_stmt   : MAP index value value value NUMBER NUMBER defval
 
 		     node = new_transform_node(current_rule, transform_map);
 		     node->target.type = target_arg;
-		     node->target.v.arg = $2;
+		     node->target.v.arg.ins = 0;
+		     node->target.v.arg.idx = $2;
 		     node->v.map.file = $3;
 		     node->v.map.delim = $4;
 		     node->v.map.key = $5;
@@ -603,7 +633,8 @@ delete_stmt: DELETE range
 				     new_transform_node(current_rule,
 							transform_delete);
 			     node->target.type = target_arg;
-			     node->target.v.arg = $2.start;
+			     node->target.v.arg.ins = 0;
+			     node->target.v.arg.idx = $2.start;
 			     node->v.arg_end = $2.end;
 		     }
 	     }
@@ -689,6 +720,53 @@ resource_limits: IDENT
 	    ;
 
 /* *************************
+   Remove option statement
+   ************************* */
+remopt_stmt: REMOPT string optstring
+	     {
+		     struct transform_node *node;
+		     size_t n;
+
+		     n = strspn($2 + 1, ":");
+		     if ($2[n + 1]) {
+			     struct cfloc loc;
+			     loc.beg = @2.beg;
+			     loc.beg.column += n + 1;
+			     loc.end = loc.beg;
+			     cferror(&loc,
+				     _("invalid character in short option designator"));
+			     cferror(&loc,
+				     _("short option letter can be followed only by zero to two colons"));
+			     errors++;
+		     } else {
+			     if (n > 2) {
+				     struct cfloc loc;
+				     loc.beg = @2.beg;
+				     loc.beg.column += n;
+				     loc.end = loc.beg;
+				     cferror(&loc,
+					     _("ignoring extra character in short option designator"));
+				     cferror(&loc,
+					     _("short option letter can be followed only by zero to two colons"));
+			     }
+
+			     node = new_transform_node(current_rule,
+						       transform_remopt);
+			     node->target.type = target_command;
+			     node->v.remopt.s_opt = $2;
+			     node->v.remopt.l_opt = $3;
+		     }
+	     }
+	   ;
+
+optstring  : /* empty */
+	     {
+		     $$ = NULL;
+	     }
+	   | string
+	   ;
+
+/* *************************
    Environment modification
    ************************* */
 environ_stmt: CLRENV
@@ -704,7 +782,7 @@ environ_stmt: CLRENV
 		     free($2);
 		     free($4);
 	      }
-            | EVALENV string
+	    | EVALENV string
 	      {
 		      new_envar(current_rule,
 				"", 0,

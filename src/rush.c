@@ -644,13 +644,137 @@ static int
 get_arg_no(int index, struct rush_request *req)
 {
 	int arg_no = ARG_NO(index, req->argc);
-	if (arg_no < 0 || arg_no >= req->argc) 
+	if (arg_no < 0 || arg_no > req->argc)
 		die(config_error,
 		    &req->i18n, 
 		    _("no argument at index %d in command: %s"),
 		    index,
 		    req->cmdline);
 	return arg_no;
+}
+
+/* Remove from the Nth argument of the request REQ the option described
+   by OPT, with its argument (if any). TAIL points to the first character
+   after the option and is used to decide whether the argument follows the
+   option immediately or is placed in the next argv entry.
+ */
+static int
+remove_optarg(struct rush_request *req, struct option_defn *opt,
+	      size_t n, char *tail)
+{
+	size_t c;
+
+	if (opt->s_opt[1] == ':') {
+		if (*tail)
+			c = 1;
+		else if (opt->s_opt[2] == ':')
+			c = 1;
+		else
+			c = 2;
+	} else
+		c = 1;
+
+	if (n + c < req->argc) {
+		memmove(&req->argv[n], &req->argv[n + c],
+			(req->argc - n + 1 - c) * sizeof req->argv[0]);
+		req->argc -= c;
+		return 1;
+	}
+	return 0;
+}
+
+/* Remove all occurrences of the option OPT from REQ.
+   For the sake of clarity, in the comments below the word "argument"
+   means an argv entry, and the word "parameter" means argument passed
+   to an option,
+ */
+static void
+remove_option(struct rush_request *req, struct option_defn *opt)
+{
+	size_t i;
+	/* Length of the long option */
+	size_t l_len = opt->l_opt ? strlen(opt->l_opt) : 0;
+	/* Flag indicating whether a rebuild is required */
+	int mod = 0;
+
+	for (i = 1; i < req->argc; i++)	{
+		char *arg = req->argv[i];
+		if (*arg == '-') {
+			char *p;
+
+			++arg;
+			if (*arg == '-') {
+				/* It is a long option */
+				/* ------------------- */
+
+				/* Length of the argument without initial -- */
+				size_t a_len;
+
+				/* Skip past the initial -- */
+				++arg;
+				if (*arg == 0)
+					/* No more options */
+					break;
+				if (opt->l_opt == NULL)
+					/* No long option requested */
+					continue;
+				/* Check if option parameter is supplied */
+				a_len = strcspn(arg, "=");
+				if (l_len < a_len)
+					/* Argument is longer than the option
+					   name. */
+					continue;
+				if (arg[a_len] == '=' && opt->s_opt[1] != ':')
+					/* A parameter is supplied, but the
+					   option does not take any. */
+					continue;
+				if (memcmp(arg, opt->l_opt, a_len))
+					/* Argument doesn't match initial option
+					   prefix. */
+					continue;
+				/* Save the character following the option name
+				   for further use */
+				p = arg + a_len;
+			} else if ((p = strchr(arg, opt->s_opt[0]))) {
+				/* It is a short option */
+				/* -------------------- */
+
+				if (opt->s_opt[1] == 0) {
+					/* No parameters. Delete the option
+					   letter. */
+					memmove(p, p + 1, strlen(p + 1) + 1);
+					if (*arg) {
+						/* An option cluster still
+						   present in the argument:
+						   no need to remove it. */
+						continue;
+					}
+					/* Remove the argument otherwise. */
+				} else if (p > arg) {
+					if (p[1] || opt->s_opt[2] == ':')
+						/* A parameter is supplied or
+						   option takes an optional
+						   parameter. Remove the option
+						   and its parameter */
+						*p = 0;
+					/* Retain the remaining part of the
+					   option cluster. */
+					continue;
+				}
+			} else {
+				/* Skip unrecognized short option */
+				continue;
+			}
+
+			/* Remove the option (and its parameter, if any) */
+			if (remove_optarg(req, opt, i, p + 1)) {
+				i--;
+				mod = 1;
+			}
+		}
+	}
+	if (mod)
+		rebuild_cmdline(req);
 }
 
 static void
@@ -662,6 +786,13 @@ rush_transform(struct transform_node *node, struct rush_request *req)
 	int arg_no;
 	void (*postprocess)(struct rush_request *) = NULL;
 	
+	if (node->type == transform_remopt) {
+		debug(2, _("Removing option %s %s"), node->v.remopt.s_opt,
+		      node->v.remopt.l_opt ? node->v.remopt.l_opt : "(null)");
+		remove_option(req, &node->v.remopt);
+		return;
+	}
+
 	switch (node->target.type) {
 	case target_command:
 		/* Command line */
@@ -680,14 +811,16 @@ rush_transform(struct transform_node *node, struct rush_request *req)
 
 	case target_arg:
 		/* Single command line argument */
-		if (node->target.v.arg == req->argc) {
+		arg_no = get_arg_no(node->target.v.arg.idx, req);
+		if (arg_no == req->argc || node->target.v.arg.ins) {
 			req->argv = xrealloc(req->argv,
 					     (req->argc + 2)
 					      * sizeof(req->argv[0]));
 			req->argc++;
-			req->argv[req->argc] = NULL;
+			memmove(&req->argv[arg_no+1], &req->argv[arg_no],
+				(req->argc - arg_no) * sizeof req->argv[0]);
+			req->argv[arg_no] = NULL;
 		}
-		arg_no = get_arg_no(node->target.v.arg, req);
 		target_ptr = &req->argv[arg_no];
 		target_src = req->argv[arg_no];
 		postprocess = rebuild_cmdline;
@@ -762,7 +895,7 @@ rush_transform_delete(struct transform_node *node, struct rush_request *req)
 	switch (node->target.type) {
 	case target_arg:
 		/* Single command line argument */
-		arg_no = get_arg_no(node->target.v.arg, req);
+		arg_no = get_arg_no(node->target.v.arg.idx, req);
 		arg_end = get_arg_no(node->v.arg_end, req);
 		if (arg_end < arg_no) {
 			int x = arg_end;

@@ -324,6 +324,7 @@ static int noinc(void);
 "global"    { if (!noinc()) return tok(GLOBAL); }
 "set"       { BEGIN(ARGS); return tok(SET); }
 "unset"     { BEGIN(ARGS); return tok(UNSET); }
+"insert"    { BEGIN(ARGS); return tok(INSERT); }
 "match"     { BEGIN(ARGS); return tok(MATCH); }
 "fallthrough"|"fall-through" { BEGIN(ARGS); return tok(FALLTHROUGH); }
 "include"   { BEGIN(ARGS); return tok(INCLUDE); }
@@ -336,6 +337,7 @@ static int noinc(void);
 "delete"    { BEGIN(ARGS); return tok(DELETE); }
 "exit"      { BEGIN(ARGS); return tok(EXIT); }
 "map"       { BEGIN(ARGS); return tok(MAP); }
+"remopt"    { BEGIN(ARGS); return tok(REMOPT); }
 [A-Za-z_][A-Za-z_0-9-]* {
 	if ((yylval.attrib = rule_attrib_lookup(yytext))) {
 	        BEGIN(ARGS);

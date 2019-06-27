@@ -605,7 +605,8 @@ _parse_transform_ar(input_buf_ptr ibuf, struct rush_rule *rule,
 		node->target.type = target_program;
 	else {
 		node->target.type = target_arg;
-		node->target.v.arg = env->index;
+		node->target.v.arg.ins = 0;
+		node->target.v.arg.idx = env->index;
 	}
 	return 0;
 }
@@ -968,7 +969,8 @@ _parse_map_ar(input_buf_ptr ibuf, struct rush_rule *rule,
 		node->target.type = target_program;
 	else {
 		node->target.type = target_arg;
-		node->target.v.arg = env->index;
+		node->target.v.arg.ins = 0;
+		node->target.v.arg.idx = env->index;
 	}
 
 	node->v.map.file = xstrdup(env->argv[0]);
@@ -999,7 +1001,8 @@ _parse_delete_ar(input_buf_ptr ibuf, struct rush_rule *rule,
 	struct transform_node *node =
 		new_transform_node(rule, transform_delete);
 	node->target.type = target_arg;
-	node->target.v.arg = env->index;
+	node->target.v.arg.ins = 0;
+	node->target.v.arg.idx = env->index;
 	node->v.arg_end = env->index;
 	return 0;
 }
@@ -1038,7 +1041,8 @@ _parse_delete(input_buf_ptr ibuf, struct rush_rule *rule,
 	
 	node = new_transform_node(rule, transform_delete);
 	node->target.type = target_arg;
-	node->target.v.arg = from;
+	node->target.v.arg.ins = 0;
+	node->target.v.arg.idx = from;
 	node->v.arg_end = to;
 	return 0;
 }
@@ -1063,7 +1067,8 @@ _parse_set_ar(input_buf_ptr ibuf, struct rush_rule *rule,
 		node->target.type = target_program;
 	else {
 		node->target.type = target_arg;
-		node->target.v.arg = env->index;
+		node->target.v.arg.ins = 0;
+		node->target.v.arg.idx = env->index;
 	}
 	node->v.xf.pattern = xstrdup(env->val);
 	node->v.xf.trans = NULL;

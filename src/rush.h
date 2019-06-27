@@ -107,7 +107,10 @@ struct transform_target {
 	enum transform_target_type type;
 	union {
 		char *name;
-		int arg;
+		struct {
+			int idx;
+			int ins;
+		} arg;
 	} v;
 };
 
@@ -115,6 +118,12 @@ enum transform_node_type {
 	transform_set,
 	transform_delete,
 	transform_map,
+	transform_remopt,
+};
+
+struct option_defn {
+	char *s_opt;  /* short option name with optional argument designator */
+	char *l_opt;    /* optional long option name */
 };
 
 struct transform_node {
@@ -129,6 +138,7 @@ struct transform_node {
 		struct rush_map map;    /* For transform_map */
 		int arg_end;            /* For tranform_delete, if target.type
 					   is target_arg */
+		struct option_defn remopt; /* For transform_remopt */
 	} v;
 };
 

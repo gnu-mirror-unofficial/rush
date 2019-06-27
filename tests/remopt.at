@@ -1,0 +1,120 @@
+# This file is part of GNU Rush. 
+# Copyright (C) 2016-2019 Sergey Poznyakoff
+#
+# GNU Rush is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3, or (at your option)
+# any later version.
+#
+# GNU Rush is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with GNU Rush.  If not, see <http://www.gnu.org/licenses/>.
+
+AT_SETUP([remopt])
+AT_KEYWORDS([remopt])
+
+# Option without argument
+AT_RUSH_TEST([
+rush 2.0
+rule 
+  match \$command ~ "^server"
+  remopt r root
+],
+[cmdline,argv],
+[server -A -r -B -ref -C -erf -D -efr -C --root -D --roo -E --ro -F --r -G --rooting],
+[0],
+[{
+    "cmdline":"server -A -B -ef -C -ef -D -ef -C -D -E -F -G --rooting",
+    "argv":[[
+        "server",
+        "-A",
+        "-B",
+        "-ef",
+        "-C",
+        "-ef",
+        "-D",
+        "-ef",
+        "-C",
+        "-D",
+        "-E",
+        "-F",
+        "-G",
+        "--rooting"
+    ]]
+}
+],
+[])     
+
+# Option with mandatory argument
+AT_RUSH_TEST([
+rush 2.0
+rule 
+  match \$command ~ "^server"
+  remopt r: root
+],
+[cmdline,argv],
+[server -t -r ARG -A -rARG -B -C -aeFrARG -D --root=ARG -E --root ARG -F --ro=ARG -G --ro ARG -H --root],
+[0],
+[{
+    "cmdline":"server -t -A -B -C -aeF -D -E -F -G -H --root",
+    "argv":[[
+        "server",
+        "-t",
+        "-A",
+        "-B",
+        "-C",
+        "-aeF",
+        "-D",
+        "-E",
+        "-F",
+        "-G",
+        "-H",
+        "--root"
+    ]]
+}
+],
+[])
+
+# Option with optional argument
+AT_RUSH_TEST([
+rush 2.0
+rule 
+  match \$command ~ "^server"
+  remopt r:: root
+],
+[cmdline,argv],
+[server -t -rARG -A -r ARG -B -aeFrARG -D -beFr -E --root=ARG -F --roo=ARG -G --root ARG -H --root],
+[0],
+[{
+    "cmdline":"server -t -A ARG -B -aeF -D -beF -E -F -G ARG -H --root",
+    "argv":[[
+        "server",
+        "-t",
+        "-A",
+        "ARG",
+        "-B",
+        "-aeF",
+        "-D",
+        "-beF",
+        "-E",
+        "-F",
+        "-G",
+        "ARG",
+        "-H",
+        "--root"
+    ]]
+}
+],
+[])
+
+
+AT_CLEANUP
+
+    
+
+
+

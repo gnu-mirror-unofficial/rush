@@ -35,7 +35,10 @@ rule scp-from
 # Svn server: force full binary path and root directory.  
 rule svn
   match $command ~ "^svnserve -t"
-  set command =~ "s|-r *[^ ]*||;s|^svnserve |/usr/bin/svnserve -r /svnroot |"
+  set program = "/usr/bin/svnserve"
+  remopt r:
+  insert [1] = "-r"
+  insert [2] = "/svnroot"
 
 # For git requests, allow access to repositories located under
 # /vcs-roots/git

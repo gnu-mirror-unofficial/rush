@@ -146,9 +146,12 @@ Matching Conditions
 
 Modifying variables
 
-* set::             Set variable
-* unset::           Unset variable
-* map::             Use file lookup to modify variable
+* set::             Set variable.
+* insert::          Insert positional arguments.
+* unset::           Unset variable.
+* remopt::          Remove options.
+* delete::          Delete arguments.
+* map::             Use file lookup to modify variable.
 
 Localization
 
@@ -418,7 +421,7 @@ are recognized and replaced as per table below:
 
 A backslash immediately followed by newline character is removed.
 A backslash followed by any other character except as listed above
-is retained along with the character. 
+is retained along with the character.
 
 @cindex backreference interpretation
 @anchor{backreference}
@@ -561,10 +564,10 @@ an undefined variable is expanded (@pxref{Variable expansion}).
 If @var{bool} is @samp{true}, expand undefined variables to empty
 value.  If it is @samp{false} (the default), issue an error and abort.
 
-The following values can be used as a synonym for @samp{true}:
+The following values can be used as synonyms for @samp{true}:
 @samp{yes}, @samp{on}, @samp{t}, @samp{1}.
 
-The following values can be used as a synonym for @samp{false}:
+The following values can be used as synonyms for @samp{false}:
 @samp{no}, @samp{off}, @samp{nil}, @samp{0}.
 @end deffn
 
@@ -686,7 +689,7 @@ expressions for use by subsequent @code{match} and
 Configure the type of regular expressions.
 @end deffn
 
-Each @var{flag} is word specifying some regular expression
+Each @var{flag} is a word specifying some regular expression
 feature.  It can be preceded by @samp{+} to enable this feature (this
 is the default), or by @samp{-} to disable it.  Valid flags are:
 
@@ -804,7 +807,7 @@ is the mode in octal.
 @end deffn
 
 @deffn {global} acct-file-mode @var{mode}
-Set mode bits for @file{wtmp} and @file{utmp} files.
+Set mode bits for the @file{wtmp} and @file{utmp} files.
 @end deffn
 
 @node Rule
@@ -975,7 +978,7 @@ result of processing.
 @subsubsection Variable Expansion
 
 Most statements in the configuration file undergo variable expansion prior
-to their use.  During variable expansion, any references to variables
+to their use.  During variable expansion, references to variables
 in the string are replaced with their actual values.  A variable
 reference has two basic forms:
 
@@ -1020,10 +1023,15 @@ substituted, otherwise the expansion of @var{word} is substituted.
 These constructs test for a variable that is unset or null.  Omitting
 the colon results in a test only for a variable that is unset.
 
+When expanding a variable reference, the variable name is first looked
+among the request variables.  If it is not found, it is looked up in
+the user-defined variable list.  If it is not there, the look up in
+the environment is attempted.
+
 @anchor{handling of undefined variables}
 @cindex expansion of undefined variables
 @cindex undefined variable, expansion
-If an undefined variable is encountered during variable expansion, the
+If the variable name is not found in any of these lists, the
 default @command{rush} behavior is to report the error of
 @samp{config-error} class (@pxref{Error Messages}) and exit.  To
 gracefully handle such cases, use the @dfn{default value construct},
@@ -1092,7 +1100,7 @@ A @dfn{comparison expression} is:
 
 @noindent
 here, @var{lhs} (@dfn{left-hand side}) is a string (quoted or
-unquoted), or variable reference (@pxref{Lexical Structure}),
+unquoted), or a variable reference (@pxref{Lexical Structure}),
 @var{rhs} (@dfn{right-hand side}) is a string or number, and @var{op}
 is one of the following binary operators:
 
@@ -1111,8 +1119,8 @@ is one of the following binary operators:
 @end float
 
 Prior to evaluating a simple expression, its left-hand side
-undergoes variable expansion.  In contrast, the right-hand side is
-always treated verbatim.
+undergoes variable expansion and backreference interpretation.  In
+contrast, the right-hand side is always treated verbatim.
 
 For example the following rule will match any request with 2 or more
 arguments (recall, that the command name itself is counted as one of
@@ -1150,7 +1158,7 @@ regular expression in the @var{rhs}.
 If the regular expression contains parenthesized groups, subsequent
 commands can refer to the strings that matched the groups using the
 @dfn{backreference notation} @samp{%@var{n}}, where @var{n} is 1-based
-index ordinal number of the group in the regular expression 
+index ordinal number of the group in the regular expression
 (@pxref{backreference}).  The reference @samp{%0} expands to the
 entire matched string.  For example:
 
@@ -1233,7 +1241,7 @@ either the UID is 100 or the user is a member of the group @samp{git}:
 rule
   match $0 ~ "git-(receive|upload)-pack" && \
              ($uid == 100 || group "git")
-@end group  
+@end group
 @end example
 
 @noindent
@@ -1279,9 +1287,12 @@ equivalent to removing the corresponding argument from the command
 line.
 
 @menu
-* set::             Set variable
-* unset::           Unset variable
-* map::             Use file lookup to modify variable
+* set::             Set variable.
+* insert::          Insert positional arguments.
+* unset::           Unset variable.
+* remopt::          Remove options.
+* delete::          Delete arguments.
+* map::             Use file lookup to modify variable.
 @end menu
 
 @node set
@@ -1306,7 +1317,7 @@ It is discussed in more detail in @ref{Transformations}.
 Applies the @command{sed} search-and-replace expression @var{s-expr}
 to @var{value} and assigns the result to the variable @var{name} or
 argument @var{n}.  Both @var{value} and @var{s-expr} are subject to
-variable expansion.
+variable expansion and backreference interpretation.
 @end deffn
 
 @deffn {rule} set @var{name} =~ @var{s-expr}
@@ -1398,12 +1409,119 @@ into a regular expression is
 s/(.*)\//\1/
 @end example
 
+@node insert
+@subsubsection The @code{insert} statement
+The @code{insert} statement inserts new positional argument at a given
+position.  Its syntax is similar to @code{set}:
+
+@deffn {rule} insert [@var{n}] = @var{value}
+@deffnx {rule} insert [@var{n}] = @var{value} ~ @var{s-expr}
+Shift arguments starting from @var{n} one position to the right (so
+that @var{n} becomes @var{n+1} etc.) and insert @var{value} at
+@code{argv[@var{n}]}.
+
+In the second form, the value to be inserted is computed by applying
+sed-expression @var{s-expr} to @var{value}.
+
+Both @var{value} and @var{s-expr} are subject to variable expansion
+and backreference interpretation.
+@end deffn
+
+Example using this statement to insert the @code{--root=/tmp} argument
+at position 1:
+
+@example
+insert [1] = "--root=/tmp"
+@end example
+
+@noindent
+Note that when inserting multiple arguments (e.g. an option with a
+value), you have two possibilities.  First, you can insert each
+argument at its corresponding position.  For example, to insert two
+arguments @samp{--root} and @samp{/tmp} starting at position 1, one
+can use:
+
+@example
+insert [1] = "--root"
+insert [2] = "/tmp"
+@end example
+
+@noindent
+Otherwise, you can revert the arguments and insert them at the same
+position, as shown in the example below:
+
+@example
+insert [1] = "/tmp"
+insert [1] = "--root"
+@end example
+
 @node unset
 @subsubsection The @code{unset} statement
 
 @deffn {rule} unset @var{name}
 Unsets the variable @var{name}.
 @end deffn
+
+@deffn {rule} unset @var{n}
+Unset the positional argument @var{n} (an integer number greater than
+0), shifting the remaining arguments one position left.  The effect is
+the same as from @code{delete} (@pxref{delete}).
+@end deffn
+
+@node remopt
+@subsubsection The @code{remopt} statement
+The @code{remopt} statement removes from the command line all
+occurrences of the supplied option.
+
+@deffn {rule} remopt @var{sopt}
+@deffnx {rule} remopt @var{sopt} @var{lopt}
+Remove from the command line all occurrences of the short option
+described by @var{sopt}.  The @var{sopt} argument is the short option
+letter, optionally followed by a colon if that option takes a
+mandatory argument, or by two colons if it takes an optional argument.
+
+Optional @var{lopt} supplies a long option equivalent to @var{sopt}.
+If no short option equivalent exists, use @samp{_} as @var{sopt},
+eventually followed by @samp{:} or @samp{::}.
+@end deffn
+
+For example, to remove all occurrences of the @code{-r}
+(@code{--root}) option that takes a mandatory argument, use:
+
+@example
+remopt r: root
+@end example
+
+@node delete
+@subsubsection The @code{delete} statement
+
+Another statement modifying the command line is @code{delete}:
+
+@deffn {rule} delete @var{n}
+Delete @var{n}th argument.
+@end deffn
+
+@deffn {rule} delete @var{i} @var{j}
+Delete positional parameters between @samp{$@var{i}} and @samp{$@var{j}},
+inclusive.
+@end deffn
+
+Neither form can be used to delete the program name (@samp{$0}).
+
+For example, the following statement deletes all arguments from
+the command line, except for the program name:
+
+@example
+delete 1 -1
+@end example
+
+To delete a single argument, @code{unset} can also be used.  The
+following statements have the same effect:
+
+@example
+delete 2
+unset 2
+@end example
 
 @node map
 @subsubsection The @code{map} statement
@@ -1557,9 +1675,14 @@ evalenv $@{DEPTH:=10@}
   Transformations are special actions that modify entire command line
 or particular arguments from it (positional variables).
 
-  Statements that modify entire command line have been described in
-the previous section: these are @code{set} and @code{map} commands
-with @samp{command} given as first argument.
+  Statements that modify variable have been described in the previous
+section: these are @code{set}, @code{insert}, @code{unset},
+@code{remopt}, @code{delete} and @code{map} statements.  When
+@code{set} or @code{map} is applied to the @samp{command} variable, it
+modifies entire command line.  When these setatements are applied to an
+index (@samp{[@var{n}]}), they modify the corresponding positional
+variable (argument).  This subsection discusses the implications of
+modifying these variable and illustrates them with some examples.
 
   Positional variables and the @code{$command} request variable are
 mutually dependent.  If the @code{$command} is modified, the word
@@ -1573,21 +1696,45 @@ modified arguments.  @xref{Modifying variables}, for more detail on it.
 @enumerate 1
 @item Echo the command line
 @example
+@group
 rule
   set command = "/bin/echo $command"
+@end group
 @end example
 
-@item This rule first removes all occurrences of @option{-r}
-option and its arguments from the command line, and then adds its own
+@item Remove all occurrences of @option{-r} option and its arguments
+from the command line, and then adds its own
 @option{-r} option and replaces @samp{svnserve} with the full program
 file name.
 
+There are at least three different ways to do so.
+
+@enumerate a
+@item The recommended approach is to use the @code{remopt} and
+@code{insert} statements, as shown below:
+
 @example
+@group
+rule svn
+  match $command ~ "^svnserve -t"
+  set program = "/usr/bin/svnserve"
+  remopt r:
+  insert [1] = "-r"
+  insert [2] = "/svnroot"
+@end group
+@end example
+
+@item The same can be achieved using regular expressions.  This was
+the default in versions of @command{rush} prior to 2.0:
+
+@example
+@group
 rule svn
   match $command ~ "^svnserve -t"
   set command =~ "s/-r *[^ ]*//"
   set command =~ \
       "s|^svnserve |/usr/bin/svnserve -r /svnroot |"
+@end group
 @end example
 
 @noindent
@@ -1602,11 +1749,14 @@ expression in the second @code{set} command will be
 @item The same rule, rewritten using the single @command{set} statement:
 
 @example
+@group
 rule svn
   match $command ~ "^svnserve -t"
   set command =~ "s|-r *[^ ]*||;\
          s|^svnserve |/usr/bin/svnserve -r /svnroot |"
+@end group
 @end example
+@end enumerate
 
 @item Override the executable program name.
 
@@ -1618,29 +1768,6 @@ rule cvs
 @end group
 @end example
 @end enumerate
-
-@need 800
-@subsubheading Delete
-
-Another statement modifying the command line is @code{delete}:
-
-@deffn {rule} delete @var{n}
-Delete @var{n}th argument.
-@end deffn
-
-@deffn {rule} delete @var{i} @var{j}
-Delete positional parameters between @samp{$@var{i}} and @samp{$@var{j}},
-inclusive.
-@end deffn
-
-Neither form can be used to delete the program name (@samp{$0}).
-
-For example, the following statement deletes all arguments from
-the command line, except for the program name:
-
-@example
-delete 1 -1
-@end example
 
 @node System Actions
 @subsection System Actions
@@ -1753,7 +1880,7 @@ configuration for the next matching rule.  Any modifications to the
 request found in the fall-through rule take effect immediately, which
 means that subsequent rules will see modified command line and
 environment.  Execution of any other actions found in the fall-through
-rule is delayed until a usual rule is found. 
+rule is delayed until a usual rule is found.
 
 A fall-through rule is declared using the following statement:
 
@@ -2396,7 +2523,7 @@ line option.  In this case, the @samp{scp-to} rule will become:
 rule scp-to
   match $command ~ "^scp (-v )?-t"
   ...
-@end group  
+@end group
 @end example
 
 Now, we want users to be able to upload files to
@@ -2413,7 +2540,7 @@ rule scp-to-incoming
                    $@{-1@} !~ "\\.\\./"
   set command "/bin/scp"
   set [-1] =~ "s|^|/home/ftp/|"
-@end group  
+@end group
 @end example
 
 The @code{match} statement ensures that no relative components are
@@ -2442,7 +2569,7 @@ rule scp-home
   set [0] = "/bin/scp"
   set [-1] =~ "s|^|public_html/|"
   chdir "~"
-@end group  
+@end group
 @end example
 
 Finally, we provide two trap rules for diagnostic purposes:
@@ -2456,7 +2583,7 @@ rule scp-to-trap
 rule scp-from
   match $command ~ "^scp (-v )?-f"
   exit Error: Downloads from this directory prohibited
-@end group  
+@end group
 @end example
 
 @node rsync
@@ -2486,7 +2613,7 @@ rule rsync-home
   set [0] = "s|^|/usr/bin/|"
   set [-1] =~ "s|^|public_html/|"
   chdir "~"
-@end group  
+@end group
 @end example
 
 The trap rules for @command{rsync} are trivial:
@@ -2500,7 +2627,7 @@ rule rsync-to-trap
 rule rsync-from-trap
   match $command ~ "^rsync"
   exit "Error: Uploads to this directory prohibited"
-@end group  
+@end group
 @end example
 
 @node sftp
@@ -2530,7 +2657,7 @@ rule sftp-incoming
   set [0] = "/bin/sftp-server"
   chroot "~"
   chdir "public_html"
-@end group  
+@end group
 @end example
 
 @noindent
@@ -2568,7 +2695,7 @@ rule cvs
   match $command ~ "^cvs server"
   set [0] = "/bin/cvs"
   chroot "/var/cvs"
-@end group  
+@end group
 @end example
 
 @node svn
@@ -2657,7 +2784,7 @@ fall through rule to the beginning of @file{rush.rc}:
 rule default
   post-socket "inet://localhost"
   fall-trough
-@end group  
+@end group
 @end example
 
 This will enable notifications for each rule located below this one.
@@ -2677,7 +2804,7 @@ tcpmux          stream  tcp  nowait root  internal
 # @r{Handle @samp{scp-to} service}.
 tcpmux/+scp-to  stream  tcp  nowait root  \
                         /usr/sbin/tcpd  /bin/rushmail
-@end group  
+@end group
 @end example
 
 The program @command{/bin/rushmail} does the actual notification.
@@ -2696,7 +2823,7 @@ Subject: GNU Rush notification
 
 Be informed that $user executed $command.
 EOT
-@end group  
+@end group
 @end example
 
 @node Test Mode

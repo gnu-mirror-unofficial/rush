@@ -86,6 +86,8 @@ m4_include([set.at])
 m4_include([delete.at])
 m4_include([transform.at])
 m4_include([map.at])
+m4_include([insert.at])
+m4_include([remopt.at])
 
 AT_BANNER([Rule attributes])
 m4_include([umask.at])
