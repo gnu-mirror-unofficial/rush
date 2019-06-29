@@ -616,7 +616,7 @@ process.
 @subsection The @code{sleep-time} statement
 
 @deffn {global} sleep-time @var{num}
-Set the time in seconds to sleep before exiting on error.
+Set the time to sleep before exiting on error, in seconds.
 This statement is intended as a measure against brute-force attacks.
 Default sleep time is 5 seconds.
 @end deffn
@@ -682,8 +682,8 @@ A system error occurred while attempting to execute command.
 @cindex extended regular expressions
 @cindex basic regular expressions
 The @code{regexp} statement configures the flavor of regular
-expressions for use by subsequent @code{match} and
-@code{set} statements.
+expressions for use by subsequent @code{match},
+@code{set}, and @code{insert} statements.
 
 @deffn {global} regexp @var{flags} ...
 Configure the type of regular expressions.
@@ -996,7 +996,9 @@ greater than 9.  Secondly, it should be used if the variable
 reference is immediately followed by an alphanumeric symbol, which
 will otherwise be considered part of it (as in @samp{$@{home@}dir}).
 Finally, this form allows for specifying the action to take if the
-variable is undefined or expands to an empty value:
+variable is undefined or expands to an empty value.
+
+The following special forms are recognized:
 
 @table @asis
 @item $@{@var{variable}:-@var{word}@}
@@ -1118,7 +1120,7 @@ is one of the following binary operators:
 @end multitable
 @end float
 
-Prior to evaluating a simple expression, its left-hand side
+Prior to evaluating simple expression, its left-hand side
 undergoes variable expansion and backreference interpretation.  In
 contrast, the right-hand side is always treated verbatim.
 
@@ -1459,7 +1461,7 @@ insert [1] = "--root"
 @subsubsection The @code{unset} statement
 
 @deffn {rule} unset @var{name}
-Unsets the variable @var{name}.
+Unset the variable @var{name}.
 @end deffn
 
 @deffn {rule} unset @var{n}
@@ -1638,7 +1640,7 @@ keepenv "LC_*"
 @deffn {rule} setenv @var{name} = @var{value}
 Set the environment variable @var{name}.  The @var{value}
 argument is subject to variable expansion (@pxref{Variable
-expansion}).
+expansion}) and backreference interpretation (@pxref{{backreference}).
 
 For example, to modify the @env{PATH} value:
 
@@ -1679,7 +1681,7 @@ or particular arguments from it (positional variables).
 section: these are @code{set}, @code{insert}, @code{unset},
 @code{remopt}, @code{delete} and @code{map} statements.  When
 @code{set} or @code{map} is applied to the @samp{command} variable, it
-modifies entire command line.  When these setatements are applied to an
+modifies entire command line.  When these statements are applied to an
 index (@samp{[@var{n}]}), they modify the corresponding positional
 variable (argument).  This subsection discusses the implications of
 modifying these variable and illustrates them with some examples.
@@ -2149,9 +2151,10 @@ invoked without command line arguments.
 
 Unless command line transformations are applied, interactive rule
 finishes by executing @command{/bin/sh}.  The first word in the
-command line (@code{argv[0]}) is normally set to the basename of
+command line (@code{argv[0]}) is normally set to the base name of
 the command being executed prefixed by a dash sign.
 
+@noindent
 Consider the following example:
 
 @example
