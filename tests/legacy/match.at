@@ -34,12 +34,14 @@ rule
     "prog":null
 }
 ],
-[],
+[rush: Notice: parsing legacy configuration file test.conf
+],
 
 [/usr/bin/echo bar],
 [1],
 [],
-[rush: Error: no matching rule for "/usr/bin/echo bar", user $MY_USER
+[rush: Notice: parsing legacy configuration file test.conf
+rush: Error: no matching rule for "/usr/bin/echo bar", user $MY_USER
 ])
 
 AT_CLEANUP

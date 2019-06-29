@@ -256,6 +256,8 @@ following configuration file rule:
 
 @example
 @group
+rush 2.0
+
 rule sftp
   # Matching condition
   match $uid >= 100 && $command ~ "^.*/sftp-server"
@@ -267,7 +269,10 @@ rule sftp
 @end group
 @end example
 
-  The first clause, @code{rule}, defines a new rule.  Its argument
+  The first clause defines the version of the syntax this
+configuration uses.  Each configuration must begin with this statement.
+
+  Next clause, @code{rule}, defines a new rule.  Its argument
 serves as a rule tag and is used for diagnostic messages and in
 accounting.
 
@@ -339,9 +344,10 @@ configuration file formats.
 @cindex syntax, legacy
   The @dfn{legacy} configuration format is the one used in rush
 versions up to 1.9.  It is still supported to facilitate transition of
-existing installations to the new syntax.  Its support will be removed
-in future versions.  The legacy syntax is described in detail in
-@uref{http://www.gnu.org.ua/software/rush/manual/1.x}.
+existing installations to the new syntax.  Its support will eventually
+be removed in future versions, so the users are encouraged to switch
+to the new syntax as soon as possible.  The legacy syntax is described
+in detail in @uref{http://www.gnu.org.ua/software/rush/legacy}.
 
   This manual describes new configuration file format.
 
@@ -355,7 +361,7 @@ in future versions.  The legacy syntax is described in detail in
 
 @node Lexical Structure
 @section Lexical Structure of the Configuration File
-  Configuration file consist of tokens separated by arbitrary amount
+  Configuration file consists of tokens separated by arbitrary amount
 of whitespace characters: horizontal spaces and tabs.  Except when
 enclosed in double quotes or preceded by a dollar sign, the @samp{#}
 character introduces an inline comment: the character itself and any
@@ -515,7 +521,10 @@ rush 2.0
 @end example
 
   This statement is mandatory.  In its absence, the file will be
-treated as a legacy configuration file.
+treated as a legacy configuration file@footnote{For the discussion of
+the legacy syntax, please refer to
+@uref{http://www.gnu.org.ua/software/rush/manual/legacy}.}.  To avoid
+confusion, a notice message to that effect will be printed.
 
   Statements that follow form logical groups.  Each group begins
 with a @code{rule} or @code{global} statement.
@@ -540,6 +549,7 @@ These statements are described in the sections that follow.
     ...
 @end example
 
+@noindent
 where dots represent any number of statements.  The following
 subsections discuss the statements that can be used within a
 @code{global} block.
@@ -1639,8 +1649,8 @@ keepenv "LC_*"
 
 @deffn {rule} setenv @var{name} = @var{value}
 Set the environment variable @var{name}.  The @var{value}
-argument is subject to variable expansion (@pxref{Variable
-expansion}) and backreference interpretation (@pxref{{backreference}).
+argument is subject to variable expansion (@pxref{Variable expansion})
+and backreference interpretation (@pxref{backreference}).
 
 For example, to modify the @env{PATH} value:
 

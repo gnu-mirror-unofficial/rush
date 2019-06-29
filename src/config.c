@@ -1362,6 +1362,13 @@ cfparse_old(CFSTREAM *cf, char const *filename, int line)
 {
 	input_buf_ptr buf;
 
+	if (strcmp (filename, "<built-in>") == 0) {
+		logmsg(LOG_NOTICE, _("parsing legacy built-in configuration"));
+	} else {
+		logmsg(LOG_NOTICE, _("parsing legacy configuration file %s"),
+		       filename);
+	}
+
 	init_input_buf(&buf, NULL, cf, filename, line - 1);
 	return parse_input_buf(buf);
 }

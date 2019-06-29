@@ -1,9 +1,18 @@
-GNU Rush NEWS -- history of user-visible changes. 2019-05-01
+GNU Rush NEWS -- history of user-visible changes. 2019-06-29
 See the end of file for copying conditions.
 
 Please send bug reports to <bug-rush@gnu.org.ua>
 
 Version 1.9.90 (git)
+
+This version introduces a completely new syntax for the configuration
+file.  Please see the documentation for details.
+
+Old configuration file syntax is still supported, so your existing
+installations will remain operational without any changes.
+You are however encouraged to switch to the new syntax as soon as 
+possible.
+
 
 Version 1.9, 2019-04-24
 

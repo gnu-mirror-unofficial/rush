@@ -33,7 +33,8 @@ rule
     "prog":null
 }
 ],
-[])
+[rush: Notice: parsing legacy configuration file test.conf
+])
 
 AT_RUSH_TEST([
 rule
@@ -51,7 +52,8 @@ rule
     "prog":null
 }
 ],
-[])
+[rush: Notice: parsing legacy configuration file test.conf
+])
 
 AT_RUSH_TEST([
 rule
@@ -70,7 +72,8 @@ rule
     "prog":null
 }
 ],
-[])
+[rush: Notice: parsing legacy configuration file test.conf
+])
 
 AT_RUSH_TEST([
 rule
@@ -80,7 +83,8 @@ rule
 [echo foo bar],
 [1],
 [],
-[rush: Error: Deleting argv[[0]] is prohibited
+[rush: Notice: parsing legacy configuration file test.conf
+rush: Error: Deleting argv[[0]] is prohibited
 ])
 
 AT_CLEANUP

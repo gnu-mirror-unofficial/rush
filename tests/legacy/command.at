@@ -37,12 +37,14 @@ rule
     "acct":-1
 }
 ],
-[],
+[rush: Notice: parsing legacy configuration file test.conf
+],
 
 [/usr/bin/echo foo bar],
 [1],
 [],
-[rush: Error: no matching rule for "/usr/bin/echo foo bar", user $MY_USER
+[rush: Notice: parsing legacy configuration file test.conf
+rush: Error: no matching rule for "/usr/bin/echo foo bar", user $MY_USER
 ])
 
 AT_CLEANUP

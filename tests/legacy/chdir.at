@@ -28,7 +28,8 @@ rule
     "home_dir":"$TESTDIR"
 }
 ],
-[])
+[rush: Notice: parsing legacy configuration file test.conf
+])
 
 AT_CLEANUP
 

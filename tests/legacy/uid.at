@@ -33,7 +33,8 @@ rule
     "prog":null
 }
 ],
-[])
+[rush: Notice: parsing legacy configuration file test.conf
+])
 
 AT_RUSH_TEST([
 rule
@@ -43,7 +44,8 @@ rule
 [ls /],
 [1],
 [],
-[rush: Error: no matching rule for "ls /", user $MY_USER
+[rush: Notice: parsing legacy configuration file test.conf
+rush: Error: no matching rule for "ls /", user $MY_USER
 ])
 
 AT_CLEANUP

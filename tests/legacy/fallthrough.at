@@ -36,7 +36,8 @@ rule
     ]]
 }
 ],
-[])
+[rush: Notice: parsing legacy configuration file test.conf
+])
 
 AT_RUSH_TEST([
 rule
@@ -56,7 +57,8 @@ rule
     "home_dir":null    
 }
 ],
-[])
+[rush: Notice: parsing legacy configuration file test.conf
+])
 
 AT_CLEANUP
 

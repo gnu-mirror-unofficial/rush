@@ -33,7 +33,8 @@ rule
     "interactive":1
 }
 ],
-[])
+[rush: Notice: parsing legacy configuration file test.conf
+])
 
 AT_CLEANUP
 

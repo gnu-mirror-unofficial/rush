@@ -25,7 +25,8 @@ rule
 [command],
 [1],
 [],
-["Forced error"
+[rush: Notice: parsing legacy configuration file test.conf
+"Forced error"
 ])
 
 AT_RUSH_TEST([
@@ -37,7 +38,8 @@ rule
 [1],
 ["Forced error"
 ],
-[])
+[rush: Notice: parsing legacy configuration file test.conf
+])
 
 AT_RUSH_TEST([
 rule
@@ -49,7 +51,8 @@ rule
 [You do not have interactive login access to this machine.
 Contact the systems administrator for further assistance.
 ],
-[])
+[rush: Notice: parsing legacy configuration file test.conf
+])
 
 AT_RUSH_TEST([
 rule
@@ -60,6 +63,7 @@ rule
 [1],
 [@nologin-error
 ],
-[])
+[rush: Notice: parsing legacy configuration file test.conf
+])
 
 AT_CLEANUP

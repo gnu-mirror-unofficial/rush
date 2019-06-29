@@ -173,10 +173,13 @@ vlogmsg(int prio, const char *fmt, va_list ap)
 			break;
 			
 		case LOG_INFO:      
-		case LOG_NOTICE:
 			fprintf(stderr, _("Info: "));
 			break;
 			
+		case LOG_NOTICE:
+			fprintf(stderr, _("Notice: "));
+			break;
+
 		case LOG_WARNING:
 			fprintf(stderr, _("Warning: "));
 			break;
