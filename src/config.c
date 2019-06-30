@@ -575,7 +575,7 @@ _parse_transform_common(input_buf_ptr ibuf, struct rush_rule *rule,
 	default:
 		abort();
 	}
-	node->v.xf.trans = compile_transform_expr(expr, re_flags);
+	node->v.xf.trans = compile_transform_expr(expr, re_flags, &ibuf->loc);
 	if (env->argc > 1) 
 		node->v.xf.pattern = xstrdup(env->argv[0]);
 	else

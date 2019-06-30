@@ -323,8 +323,12 @@ extern struct passwd *rush_pw;
 			logmsg(LOG_DEBUG, fmt, __VA_ARGS__);	\
 	} while(0)	
 
+struct cfloc;
+
 void die(enum error_type type, struct rush_i18n *i18n, const char *fmt, ...)
 	 RUSH_NORETURN RUSH_PRINTFLIKE(3,4);
+void die_usage(struct cfloc const *loc, char const *fmt, ...)
+	 RUSH_NORETURN RUSH_PRINTFLIKE(2,3);
 void logmsg(int prio, const char *fmt, ...)  RUSH_PRINTFLIKE(2,3);
 void vlogmsg(int prio, const char *fmt, va_list ap);
 
@@ -338,7 +342,8 @@ int limits_record_add(limits_record_t lrec, char *str, char **endp);
 int parse_limits(limits_record_t *plrec, char *str, char **endp);
 int set_user_limits(const char *name, struct limits_rec *lrec);
 
-transform_t compile_transform_expr (const char *expr, int cflags);
+transform_t compile_transform_expr (const char *expr, int cflags,
+				    struct cfloc *loc);
 char *transform_string (struct transform *tf, const char *input);
 
 int post_socket_send(const struct rush_sockaddr *sockaddr,

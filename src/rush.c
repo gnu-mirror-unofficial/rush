@@ -208,10 +208,12 @@ logmsg(int prio, const char *fmt, ...)
 void
 die(enum error_type type, struct rush_i18n *i18n, const char *fmt, ...)
 {
-        va_list ap;
-        va_start(ap, fmt);
-        vlogmsg(LOG_ERR, fmt, ap);
-        va_end(ap);
+	if (fmt) {
+		va_list ap;
+		va_start(ap, fmt);
+		vlogmsg(LOG_ERR, fmt, ap);
+		va_end(ap);
+	}
 	if (!lint_option) {
 		const char *msg = error_msg[type].text;
 		if (error_msg[type].custom) {
@@ -228,6 +230,16 @@ die(enum error_type type, struct rush_i18n *i18n, const char *fmt, ...)
 		sleep(sleep_time);
 	}
         exit(1);
+}
+
+void
+die_usage(struct cfloc const *loc, char const *fmt, ...)
+{
+        va_list ap;
+        va_start(ap, fmt);
+	vcferror(loc, fmt, ap);
+	va_end(ap);
+	die(usage_error, NULL, NULL);
 }
 
 void

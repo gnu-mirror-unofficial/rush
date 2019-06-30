@@ -456,7 +456,8 @@ set_stmt   : SET index '=' value
 		     node->target.v.arg.ins = 0;
 		     node->target.v.arg.idx = $2;
 		     node->v.xf.pattern = NULL;
-		     node->v.xf.trans = compile_transform_expr($4, re_flags);
+		     node->v.xf.trans = compile_transform_expr($4, re_flags,
+							       &@4);
 	     }
 	   | SET index '=' string '~' value
 	     {
@@ -467,7 +468,8 @@ set_stmt   : SET index '=' value
 		     node->target.v.arg.ins = 0;
 		     node->target.v.arg.idx = $2;
 		     node->v.xf.pattern = $4;
-		     node->v.xf.trans = compile_transform_expr($6, re_flags);
+		     node->v.xf.trans = compile_transform_expr($6, re_flags,
+							       &@6);
 	     }
 	   | INSERT index '=' string '~' value
 	     {
@@ -478,7 +480,8 @@ set_stmt   : SET index '=' value
 		     node->target.v.arg.ins = 1;
 		     node->target.v.arg.idx = $2;
 		     node->v.xf.pattern = $4;
-		     node->v.xf.trans = compile_transform_expr($6, re_flags);
+		     node->v.xf.trans = compile_transform_expr($6, re_flags,
+							       &@6);
 	     }
 	   | SET IDENT '=' value
 	     {
@@ -495,7 +498,9 @@ set_stmt   : SET index '=' value
 			     new_set_node(transform_set, $2, &@2);
 		     if (node) {
 			     node->v.xf.pattern = NULL;
-			     node->v.xf.trans = compile_transform_expr($4, re_flags);
+			     node->v.xf.trans = compile_transform_expr($4,
+								       re_flags,
+								       &@4);
 		     }
 	     }
 	   | SET IDENT '=' string '~' value
@@ -504,7 +509,9 @@ set_stmt   : SET index '=' value
 			     new_set_node(transform_set, $2, &@2);
 		     if (node) {
 			     node->v.xf.pattern = $4;
-			     node->v.xf.trans = compile_transform_expr($6, re_flags);
+			     node->v.xf.trans = compile_transform_expr($6,
+								       re_flags,
+								       &@6);
 		     }
 	     }
 	   | UNSET IDENT

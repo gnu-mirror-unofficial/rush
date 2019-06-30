@@ -142,7 +142,7 @@ add_case_ctl_segment (struct transform *tf, enum case_ctl_type ctl)
 
 static const char *
 parse_transform_expr (struct transform_list *tlist, const char *expr,
-                      int cflags)
+                      int cflags, struct cfloc *loc)
 {
   int delim;
   int i, j, rc;
@@ -151,8 +151,9 @@ parse_transform_expr (struct transform_list *tlist, const char *expr,
   struct transform *tf = new_transform (tlist);
 
   if (expr[0] != 's')
-    die(usage_error, NULL, _("Invalid transform expression: %s"), expr);
-
+    die_usage (loc, "%s",
+	       _("Transform expression must start with 's' followed by a punctuation character"));
+  
   delim = expr[1];
 
   /* Scan regular expression */
@@ -161,18 +162,19 @@ parse_transform_expr (struct transform_list *tlist, const char *expr,
       i++;
 
   if (expr[i] != delim)
-    die(usage_error, NULL,
-	_("Missing 2nd delimiter in position %d of expression %s"), i, expr);
-
+    die_usage (loc,
+	       _("Missing 2nd delimiter in position %d of expression %s"),
+	       i, expr);
+  
   /* Scan replacement expression */
   for (j = i + 1; expr[j] && expr[j] != delim; j++)
     if (expr[j] == '\\' && expr[j+1])
       j++;
 
   if (expr[j] != delim)
-    die(usage_error, NULL,
-	_("Missing trailing delimiter in position %d of expression %s"), 
-	j, expr);
+    die_usage (loc,
+	       _("Missing trailing delimiter in position %d of expression %s"), 
+	       j, expr);
 
   /* Check flags */
   tf->transform_type = transform_first;
@@ -198,8 +200,7 @@ parse_transform_expr (struct transform_list *tlist, const char *expr,
 	break;
 
       default:
-	die(usage_error, NULL,
-	    _("Unknown flag in transform expression: %c"), *p);
+	die_usage (loc, _("Unknown flag in transform expression: %c"), *p);
       }
 
   if (*p == ';')
@@ -216,7 +217,7 @@ parse_transform_expr (struct transform_list *tlist, const char *expr,
     {
       char errbuf[512];
       regerror (rc, &tf->regex, errbuf, sizeof (errbuf));
-      die(usage_error, NULL, _("Invalid transform expression: %s"), errbuf);
+      die_usage (loc, _("Invalid transform expression: %s"), errbuf);
     }
 
   if (str[0] == '^' || str[strlen (str) - 1] == '$')
@@ -243,9 +244,9 @@ parse_transform_expr (struct transform_list *tlist, const char *expr,
 	    case '5': case '6': case '7': case '8': case '9':
 	      n = strtoul (cur, &cur, 10);
 	      if (n > tf->regex.re_nsub)
-		die(usage_error, NULL,
-		    _("Invalid transform replacement: "
-		      "back reference out of range"));
+		die_usage (loc,
+			   _("Invalid transform replacement: "
+			     "back reference out of range"));
 	      add_backref_segment (tf, n);
 	      break;
 
@@ -354,11 +355,11 @@ parse_transform_expr (struct transform_list *tlist, const char *expr,
 }
 
 transform_t 
-compile_transform_expr (const char *expr, int cflags)
+compile_transform_expr (const char *expr, int cflags, struct cfloc *loc)
 {
   struct transform_list tlist = { NULL, NULL };
   while (*expr)
-    expr = parse_transform_expr (&tlist, expr, cflags);
+    expr = parse_transform_expr (&tlist, expr, cflags, loc);
   return tlist.head;
 }
 
