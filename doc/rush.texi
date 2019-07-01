@@ -523,7 +523,7 @@ rush 2.0
   This statement is mandatory.  In its absence, the file will be
 treated as a legacy configuration file@footnote{For the discussion of
 the legacy syntax, please refer to
-@uref{http://www.gnu.org.ua/software/rush/manual/legacy}.}.  To avoid
+@uref{http://www.gnu.org.ua/software/rush/legacy}.}.  To avoid
 confusion, a notice message to that effect will be printed.
 
   Statements that follow form logical groups.  Each group begins
