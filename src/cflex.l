@@ -297,7 +297,7 @@ static int noinc(void);
 		  return tok(T_VERSION); }
 \\\n        { advance_line(1); }
 #.*\n      { advance_line(1); return EOL; }
-\n+        { advance_line(yyleng); return EOL; }
+\n         { advance_line(1); return EOL; }
 [ \t]+     reset_loc();
 .          return tok(BOGUS);
 }
@@ -307,7 +307,7 @@ static int noinc(void);
 #.*\n       { advance_line(1);
 	      BEGIN(NORMAL);
 	      return tok(EOL); }	 
-\n+         { advance_line(yyleng);
+\n          { advance_line(1);
 	      BEGIN(NORMAL);
 	      return tok(EOL); }
 [ \t]+      reset_loc();

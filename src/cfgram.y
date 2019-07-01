@@ -130,7 +130,7 @@ static struct transform_node *new_set_node(enum transform_node_type type,
 rcfile     : skipeol select
 	   ;
 
-select     : preface content
+select     : preface skipeol content
 	     {
 		     if (errors)
 			     YYERROR;

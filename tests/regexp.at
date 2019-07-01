@@ -45,7 +45,7 @@ rule
 [ls foo],
 [1],
 [],
-[rush: Error: no matching rule for "ls foo", user gray
+[rush: Error: no matching rule for "ls foo", user $MY_USER
 ],
 
 [ls bar],
