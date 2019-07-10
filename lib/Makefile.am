@@ -26,12 +26,17 @@ librush_a_SOURCES=\
  utmp.c\
  version.c\
  wildmatch.c\
- wordsplit.c\
- wordsplit.h\
  wtmp.c
+nodist_librush_a_SOURCES = wordsplit.c
+
+VPATH += $(srcdir)/wordsplit
+EXTRA_DIST = \
+ wordsplit/wordsplit.c\
+ wordsplit/wordsplit.h
 
 noinst_HEADERS=librush.h
 AM_CPPFLAGS=\
  -I$(top_srcdir)/gnu\
  -I$(top_builddir)/gnu\
+ -I$(srcdir)/wordsplit\
  -DLOCALEDIR=\"$(localedir)\"

@@ -4,3 +4,6 @@
 [submodule "gnulib"]
 	path = gnulib
 	url = git://git.savannah.gnu.org/gnulib.git
+[submodule "lib/wordsplit"]
+	path = lib/wordsplit
+	url = git://git.gnu.org.ua/wordsplit.git
