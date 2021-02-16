@@ -396,18 +396,22 @@ static rush_bool_t
 eval_fstest(struct test_node *node, 
 	    struct rush_rule *rule, struct rush_request *req)
 {
+	char *str = rush_expand_string(node->v.fstest.arg, req);
 	struct stat st;
 
-	if (((node->v.fstest.op == fs_symlink) ? lstat : stat)(node->v.fstest.arg, &st)) {
-		if (errno == ENOENT)
+	if (((node->v.fstest.op == fs_symlink) ? lstat : stat)(str, &st)) {
+		if (errno == ENOENT) {
+			free(str);
 			return rush_false;
+		}
 		die(system_error, &req->i18n,
 		    _("%s:%d: %s: can't stat '%s': %s"),
 		    rule->file, rule->line, rule->tag,
-		    node->v.fstest.arg,
+		    str,
 		    strerror(errno));
 	}
-
+	free(str);
+	
 	switch (node->v.fstest.op) {
 	case fs_block_special:
 		return S_ISBLK(st.st_mode);
@@ -991,7 +995,8 @@ rush_transform(struct transform_node *node, struct rush_request *req)
 	
 	free(*target_ptr);
 	*target_ptr = newval;
-
+	debug(2, _("transformed value: %s"), newval);
+	
 	if (postprocess)
 		postprocess(req);
 }
