@@ -346,9 +346,8 @@ eval_in(struct test_node *node,
 }
 	
 static rush_bool_t
-groupmember(char const *gname, struct passwd const *pw)
+groupmember(struct group *grp, struct passwd const *pw)
 {
-        struct group *grp = getgrnam(gname);
         if (grp) {
 		char **p;
 		
@@ -370,10 +369,102 @@ eval_member(struct test_node *node,
 	size_t i;
 
 	for (i = 0; node->v.groups[i]; i++) {
-		if (groupmember(node->v.groups[i], req->pw))
+		if (groupmember(getgrnam(node->v.groups[i]), req->pw))
 			return rush_true;
 	}
 	return rush_false;
+}
+
+static rush_bool_t
+rush_access(struct stat *st, struct rush_request *req, int bit)
+{
+	if (st->st_mode & bit)
+		return rush_true;
+	
+	bit <<= 3;
+	if ((st->st_mode & bit) && groupmember(getgrgid(st->st_gid), req->pw))
+		return rush_true;
+	
+	bit <<= 3;
+	if ((st->st_mode & bit) && st->st_uid == req->pw->pw_uid)
+		return rush_true;
+
+	return rush_false;
+}
+	
+static rush_bool_t
+eval_fstest(struct test_node *node, 
+	    struct rush_rule *rule, struct rush_request *req)
+{
+	struct stat st;
+
+	if (((node->v.fstest.op == fs_symlink) ? lstat : stat)(node->v.fstest.arg, &st)) {
+		if (errno == ENOENT)
+			return rush_false;
+		die(system_error, &req->i18n,
+		    _("%s:%d: %s: can't stat '%s': %s"),
+		    rule->file, rule->line, rule->tag,
+		    node->v.fstest.arg,
+		    strerror(errno));
+	}
+
+	switch (node->v.fstest.op) {
+	case fs_block_special:
+		return S_ISBLK(st.st_mode);
+		
+	case fs_char_special:
+		return S_ISCHR(st.st_mode);
+		
+	case fs_directory:
+		return S_ISDIR(st.st_mode);
+		
+	case fs_exists:
+		return rush_true;
+		
+	case fs_regular:
+		return S_ISREG(st.st_mode);
+		
+	case fs_set_gid:
+		return st.st_mode & S_ISGID;
+		
+	case fs_owner_egid:
+		return st.st_gid == req->pw->pw_gid;
+			
+	case fs_symlink:
+		return S_ISLNK(st.st_mode);
+		
+	case fs_sticky:
+		return st.st_mode & S_ISVTX;
+		
+	case fs_owner_euid:
+		return st.st_uid == req->pw->pw_uid;
+		
+	case fs_pipe:
+		return S_ISFIFO(st.st_mode);
+		
+	case fs_readable:
+		return rush_access(&st, req, 4);
+		
+	case fs_size:
+		return st.st_size > 0;
+		
+	case fs_socket:
+		return S_ISSOCK(st.st_mode);
+		
+	case fs_set_uid:
+		return st.st_mode & S_ISUID;
+		
+	case fs_writable:
+		return rush_access(&st, req, 2);
+		
+	case fs_executable:
+		return rush_access(&st, req, 1);
+		
+	default:
+		die(system_error, NULL,
+		    _("INTERNAL ERROR at %s:%d: unrecognized operation %d"),
+		    __FILE__, __LINE__, node->v.fstest.op);
+	}
 }
 
 rush_bool_t
@@ -406,6 +497,9 @@ test_eval(struct test_node *node,
 	case test_not:
 		return ! test_eval(node->v.arg[0], rule, req);
 
+	case test_fstest:
+		return eval_fstest(node, rule, req);
+		
 	default:
 		die(system_error, NULL,
 		    _("INTERNAL ERROR at %s:%d: unrecognized node type %d"),

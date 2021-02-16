@@ -79,6 +79,7 @@ TESTSUITE_AT = \
   insert.at\
   remopt.at\
   lex.at\
+  fstest.at\
   legacy/argc.at\
   legacy/backref.at\
   legacy/chdir.at\
@@ -117,4 +118,5 @@ clean-local:
 check-local: atconfig atlocal $(TESTSUITE)
 	@$(SHELL) $(TESTSUITE)
 
-noinst_PROGRAMS=myid
+noinst_PROGRAMS=myid mksock
+

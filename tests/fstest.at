@@ -1,0 +1,216 @@
+# This file is part of GNU Rush. 
+# Copyright (C) 2021 Sergey Poznyakoff
+#
+# GNU Rush is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3, or (at your option)
+# any later version.
+#
+# GNU Rush is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with GNU Rush.  If not, see <http://www.gnu.org/licenses/>.
+
+m4_pushdef([AT_FS_SUCCESS],
+[AT_CHECK([$1])
+AT_RUSH_TEST([
+rush 2.0
+rule
+  match $2
+  set SUCCESS = true
+],
+[vars],
+[cmd],
+[0],
+[{
+    "vars":{
+        "SUCCESS":"true"
+    }
+}
+],
+[])])
+
+m4_pushdef([AT_FS_FAILURE],
+[AT_CHECK([$1])
+AT_RUSH_TEST([
+rush 2.0
+rule
+  match $2
+  set SUCCESS = true
+],
+[vars],
+[cmd],
+[1],
+[],
+[rush: Error: no matching rule for "cmd", user $MY_USER
+])])
+
+AT_SETUP([basic filesystem tests])
+AT_KEYWORDS([match fstest])
+
+# ##############################
+# test -e
+# ##############################
+
+AT_FS_FAILURE([rm -f file],[-e file])
+AT_FS_SUCCESS([touch file],[-e file])
+
+# ##############################
+# test -f
+# ##############################
+AT_FS_FAILURE([rm -rf file],[-f file])
+AT_FS_SUCCESS([touch file],[-f file])
+AT_FS_FAILURE([rm -f file && mkdir file],[-f file])
+
+# ##############################
+# test -d
+# ##############################
+AT_FS_FAILURE([rm -rf file],[-d file])
+AT_FS_FAILURE([touch file],[-d file])
+AT_FS_SUCCESS([rm -f file && mkdir file],[-d file])
+
+# ##############################
+# test -s
+# ##############################
+AT_FS_FAILURE([rm -rf file],[-s file])
+AT_FS_FAILURE([touch file],[-s file])
+AT_FS_SUCCESS([echo "test" > file],[-s file])
+
+# ##############################
+# test -r
+# ##############################
+
+AT_CHECK([rm -rf file && touch file])
+AT_FS_SUCCESS([chmod u=r file],[-r file])
+AT_FS_SUCCESS([chmod g=r file],[-r file])
+AT_FS_SUCCESS([chmod o=r file],[-r file])
+AT_FS_SUCCESS([chmod a=r file],[-r file])
+AT_FS_FAILURE([chmod -r file],[-r file])
+
+# ##############################
+# test -w
+# ##############################
+
+AT_FS_SUCCESS([chmod u=w file],[-w file])
+AT_FS_SUCCESS([chmod g=w file],[-w file])
+AT_FS_SUCCESS([chmod o=w file],[-w file])
+AT_FS_SUCCESS([chmod a=w file],[-w file])
+AT_FS_FAILURE([chmod 444 file],[-w file])
+
+# ##############################
+# test -x
+# ##############################
+
+AT_FS_SUCCESS([chmod u=x file],[-x file])
+AT_FS_SUCCESS([chmod g=x file],[-x file])
+AT_FS_SUCCESS([chmod o=x file],[-x file])
+AT_FS_SUCCESS([chmod a=x file],[-x file])
+AT_FS_FAILURE([chmod 644 file],[-x file])
+
+AT_CLEANUP
+
+AT_SETUP([match -h])
+AT_KEYWORDS([match fstest fs_symlink])
+# ##############################
+# test -h
+# ##############################
+AT_FS_FAILURE([rm -rf file symlink],[-h symlink])
+AT_FS_FAILURE([touch file],[-h file])
+AT_FS_SUCCESS([ln -sf file symlink || AT_SKIP_TEST],[-h symlink])
+AT_FS_SUCCESS([true],[-L symlink])
+AT_CLEANUP
+
+AT_SETUP([match -p])
+AT_KEYWORDS([match fstest fs_pipe])
+# ##############################
+# test -p
+# ##############################
+AT_FS_FAILURE([rm -rf file],[-p file])
+AT_FS_SUCCESS([mkfifo file || AT_SKIP_TEST],[-p file])
+AT_CLEANUP
+
+AT_SETUP([match -k])
+AT_KEYWORDS([match fstest fs_sticky])
+# ##############################
+# test -k
+# ##############################
+AT_FS_FAILURE([rm -rf file],[-k file])
+AT_FS_SUCCESS([touch file && chmod +t file || AT_SKIP_TEST],[-k file])
+AT_CLEANUP
+
+AT_SETUP([match -c])
+AT_KEYWORDS([match fstest fs_char_special])
+# ##############################
+# test -c
+# ##############################
+AT_FS_FAILURE([rm -rf file],[-c file])
+AT_FS_FAILURE([touch file],[-c file])
+AT_FS_SUCCESS([test -c /dev/tty || AT_SKIP_TEST],[-c /dev/tty])
+AT_CLEANUP
+
+AT_SETUP([match -b])
+AT_KEYWORDS([match fstest fs_block_special])
+AT_FS_FAILURE([rm -rf file],[-b file])
+AT_FS_FAILURE([touch file],[-b file])
+AT_FS_SUCCESS([mknod file b 1 1 || AT_SKIP_TEST],[-b file])
+AT_CLEANUP
+
+AT_SETUP([match -S])
+AT_KEYWORDS([match fstest fs_socket])
+# ##############################
+# test -c
+# ##############################
+AT_FS_FAILURE([rm -rf file],[-S file])
+AT_FS_FAILURE([touch file],[-S file])
+AT_FS_SUCCESS([mksock socket || AT_SKIP_TEST],[-S socket])
+AT_CLEANUP
+
+AT_SETUP([match -O])
+AT_KEYWORDS([match fstest fs_owner_euid])
+# ##############################
+# test -O
+# ##############################
+AT_FS_FAILURE([rm -rf file],[-O file])
+AT_FS_SUCCESS([touch file],[-O file])
+AT_CLEANUP
+
+AT_SETUP([match -G])
+AT_KEYWORDS([match fstest fs_owner_egid])
+# ##############################
+# test -G
+# ##############################
+AT_FS_FAILURE([rm -rf file],[-G file])
+AT_FS_SUCCESS([touch file],[-G file])
+AT_CLEANUP
+
+AT_SETUP([match -u])
+AT_KEYWORDS([match fstest fs_set_uid])
+# ##############################
+# test -u
+# ##############################
+AT_FS_FAILURE([rm -rf file],[-u file])
+AT_FS_FAILURE([touch file],[-u file])
+AT_FS_SUCCESS([chmod u+s file || AT_SKIP_TEST],[-u file])
+AT_CLEANUP
+
+AT_SETUP([match -g])
+AT_KEYWORDS([match fstest fs_set_gid])
+# ##############################
+# test -g
+# ##############################
+AT_FS_FAILURE([rm -rf file],[-g file])
+AT_FS_FAILURE([touch file],[-g file])
+AT_FS_SUCCESS([chmod g+s file || AT_SKIP_TEST],[-g file])
+AT_CLEANUP
+
+# ##############################
+# Cleanup
+# ##############################
+
+m4_popdef([AT_FS_FAILURE])
+m4_popdef([AT_FS_SUCCESS])
+
+

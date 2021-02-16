@@ -16,6 +16,8 @@
 
 m4_version_prereq([2.52g])
 
+m4_define([AT_SKIP_TEST],[exit 77])
+
 dnl m4_run_rush([KW], [CMD],[EC],[STDOUT],[STDERR],...)
 m4_define([m4_run_rush],[m4_ifval([$2],[dnl
 echo "; m4_bpatsubst($2,",\\")"
@@ -75,6 +77,7 @@ m4_include([user.at])
 m4_include([in.at])
 m4_include([gid.at])
 m4_include([group.at])
+m4_include([fstest.at])
 
 AT_BANNER([Complex Conditions])
 m4_include([and.at])

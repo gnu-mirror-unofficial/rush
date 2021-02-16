@@ -149,7 +149,8 @@ enum test_type {
 	test_group,
 	test_and,
 	test_or,
-	test_not
+	test_not,
+	test_fstest
 };
 
 enum cmp_op {
@@ -161,6 +162,26 @@ enum cmp_op {
 	cmp_ge,
 	cmp_match,
 	cmp_in
+};
+
+enum fstest_op {
+	fs_block_special = 'b',
+	fs_char_special  = 'c',
+	fs_directory     = 'd',
+	fs_exists        = 'e',
+	fs_regular       = 'f',
+	fs_set_gid       = 'g',
+	fs_owner_egid    = 'G',
+	fs_symlink       = 'h',
+	fs_sticky        = 'k',
+	fs_owner_euid    = 'O',
+	fs_pipe          = 'p',
+	fs_readable      = 'r',
+	fs_size          = 's',
+	fs_socket        = 'S',
+	fs_set_uid       = 'u',
+	fs_writable      = 'w',
+	fs_executable    = 'x'
 };
 
 typedef unsigned long rush_num_t;
@@ -180,6 +201,10 @@ struct test_node {
 		} cmp;
 		char **groups;
 		struct test_node *arg[2];
+		struct {
+			int op;
+			char *arg;
+		} fstest;
 	} v;
 };
 

@@ -142,6 +142,7 @@ Matching Conditions
 
 * Comparisons::
 * Membership operators::
+* File system tests::
 * Boolean expressions::
 
 Modifying variables
@@ -1098,6 +1099,7 @@ A @dfn{simple expression} is either a comparison or membership test.
 @menu
 * Comparisons::
 * Membership operators::
+* File system tests::
 * Boolean expressions::
 @end menu
 
@@ -1221,6 +1223,91 @@ It can have two forms:
   Evaluate to @samp{true} if the user is a member of one of the groups
 in whitespace delimited @var{list}.  Members of @var{list} are group
 names or GIDs.
+@end table
+
+@node File system tests
+@subsubsection File system tests
+@cindex file type, checking
+@cindex checking file type
+@cindex file ownership, checking
+@cindex checking file ownership
+  File system tests check file types and ownership.  They are similar
+to options to @command{test} shell command:  
+
+@table @code
+@cindex -b, file system test
+@item  -b @var{file}
+@var{file} exists and is block special
+
+@cindex -c, file system test
+@item -c @var{file}
+@var{file} exists and is character special
+
+@cindex -d, file system test
+@item -d @var{file}
+@var{file} exists and is a directory
+
+@cindex -e, file system test
+@item -e @var{file}
+@var{file} exists
+
+@cindex -f, file system test
+@item -f @var{file}
+@var{file} exists and is a regular file
+
+@cindex -g, file system test
+@item -g @var{file}
+@var{file} exists and is set-group-ID
+
+@cindex -G, file system test
+@item -G @var{file}
+@var{file} exists and is owned by the primary group of the current user.
+
+@cindex -h, file system test
+@cindex -L, file system test
+@item -h @var{file}
+@itemx -L @var{file}
+@var{file} exists and is a symbolic link
+
+@cindex -k, file system test
+@item -k @var{file}
+@var{file} exists and has its sticky bit set
+
+@cindex -L, file system test
+@item -L @var{file}
+@var{file} exists and is a symbolic link (same as -h)
+
+@cindex -O, file system test
+@item -O @var{file}
+@var{file} exists and is owned by the current user
+
+@cindex -p, file system test
+@item -p @var{file}
+@var{file} exists and is a named pipe
+
+@cindex -r, file system test
+@item -r @var{file}
+@var{file} exists and read permission is granted
+
+@cindex -s, file system test
+@item -s @var{file}
+@var{file} exists and has a size greater than zero
+
+@cindex -S, file system test
+@item -S @var{file}
+@var{file} exists and is a socket
+
+@cindex -u, file system test
+@item -u @var{file}
+@var{file} exists and its set-user-ID bit is set
+
+@cindex -w, file system test
+@item -w @var{file}
+@var{file} exists and write permission is granted
+
+@cindex -x, file system test
+@item -x @var{file}
+@var{file} exists and execute (or search) permission is granted
 @end table
 
 @node Boolean expressions

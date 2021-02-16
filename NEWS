@@ -1,7 +1,20 @@
-GNU Rush NEWS -- history of user-visible changes. 2019-07-12
+GNU Rush NEWS -- history of user-visible changes. 2021-02-16
 See the end of file for copying conditions.
 
 Please send bug reports to <bug-rush@gnu.org.ua>
+
+Version 2.1 .90 (git)
+
+* File system tests
+
+New predicates, designed after options to the "test" system command,
+check for file types. modes and ownership.  For example
+
+  rule
+    match -d /var/lock/sd
+
+will match if /var/lock/sd exists on diks and is a directory
+
 
 Version 2.1, 2019-07-12
 

@@ -368,6 +368,8 @@ static int noinc(void);
 "!~"                          return tok(NM);
 "in"                          return tok(IN);
 "group"                       return tok(GROUP);
+-[bcdefgGkOprsSuwx]           { yylval.fstest = yytext[1]; return tok(TEST); }
+-[hL]                         { yylval.fstest = fs_symlink; return tok(TEST); } 
 [+-]?[0-9]+                   { yylval.num.strval = xstrdup(yytext);
 				yylval.num.intval = atoi(yytext);
 				return tok(NUMBER); }

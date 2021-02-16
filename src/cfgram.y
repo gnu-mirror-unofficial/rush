@@ -64,6 +64,7 @@ static struct transform_node *new_set_node(enum transform_node_type type,
 		struct argval *tail;
 	} arglist;
 	struct { unsigned major, minor; } version;
+	int fstest;
 }
 
 %token <str> STRING "string"
@@ -108,6 +109,7 @@ static struct transform_node *new_set_node(enum transform_node_type type,
 %token NM "!~"
 %token IN "in"
 %token GROUP "group"
+%token <fstest> TEST "test"
 
 %left OR
 %left AND
@@ -395,6 +397,12 @@ expr       : string '~' regex
 	     {
 		     $$ = new_test_node(test_group);
 		     $$->v.groups = $2.argv;
+	     }
+           | TEST string
+	     {
+		     $$ = new_test_node(test_fstest);
+		     $$->v.fstest.op = $1;
+		     $$->v.fstest.arg = $2;
 	     }
 	   ;
 
