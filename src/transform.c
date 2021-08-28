@@ -438,9 +438,6 @@ _single_transform_name_to_slist (struct transform *tf, slist_t slist,
 	  
 	  disp = rmp[0].rm_eo;
 
-	  if (rmp[0].rm_so)
-	    slist_append (slist, input, rmp[0].rm_so);
-
 	  nmatches++;
 	  if (tf->match_number && nmatches < tf->match_number)
 	    {
@@ -448,6 +445,9 @@ _single_transform_name_to_slist (struct transform *tf, slist_t slist,
 	      input += disp;
 	      continue;
 	    }
+
+	  if (rmp[0].rm_so)
+	    slist_append (slist, input, rmp[0].rm_so);
 
 	  for (segm = tf->repl_head; segm; segm = segm->next)
 	    {

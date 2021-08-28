@@ -107,4 +107,31 @@ rule
 ],
 [])
 
+AT_RUSH_TEST([
+rush 2.0
+rule
+    set command =~ "s/s/@/2"
+],    
+[cmdline],
+[password],
+[0],
+[{
+    "cmdline":"pas@word"
+}
+],
+[])
+
+AT_RUSH_TEST([
+rush 2.0
+rule
+    set command =~ "s/s/@/2g"
+],    
+[cmdline],
+[passwords],
+[0],
+[{
+    "cmdline":"pas@word@"
+}
+],
+[])
 AT_CLEANUP
