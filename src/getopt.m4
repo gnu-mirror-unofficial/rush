@@ -1,5 +1,5 @@
 dnl This file is part of GNU Rush.
-dnl Copyright (C) 2007-2021 Sergey Poznyakoff.
+dnl Copyright (C) 2007-2022 Sergey Poznyakoff.
 dnl 
 dnl GNU Rush is free software; you can redistribute it and/or modify
 dnl it under the terms of the GNU General Public License as published by
@@ -536,7 +536,7 @@ const char version_etc_copyright[] =
      symbol suitable for this locale, and %d is the copyright
      year.  */
   "Copyright %s 2008-%d Sergey Poznyakoff";
-int rush_copyright_year = 2021;
+int rush_copyright_year = 2022;
 
 void
 print_version_only(const char *program_version, FILE *stream)
